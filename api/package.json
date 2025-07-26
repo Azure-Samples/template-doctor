@@ -1,0 +1,14 @@
+{
+  "name": "template-doctor-api",
+  "version": "1.0.0",
+  "description": "API functions for Template Doctor",
+  "scripts": {
+    "start": "func start"
+  },
+  "dependencies": {
+    "node-fetch": "^2.6.7"
+  },
+  "engines": {
+    "node": ">=16"
+  }
+}

@@ -1,0 +1,526 @@
+// Main Application Logic for Template Doctor Frontend
+// Wires up authentication, search, analysis, and dashboard rendering
+
+// Debug logging utility - consistent with auth.js
+function debug(module, message, data) {
+    const timestamp = new Date().toISOString();
+    console.lo            div.querySelector('.rescan-btn').addEventListener('click', () => {
+                if (analyzer) {
+                    debug('app', `Rescanning template: ${matchedTemplate.owner}/${matchedTemplate.repo}`);
+                    analyzeRepo(matchedTemplate.owner, matchedTemplate.repo);
+                    scrollAndHighlightTemplate(templateId);
+                } else {
+                    debug('app', 'Analyzer not initialized for rescan');
+                    showError('Please wait for the analyzer to initialize before rescanning');
+                }
+            });[${timestamp}][${module}] ${message}`, data !== undefined ? data : '');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    debug('app', 'Application initializing');
+    
+    // Check for auth errors from the callback page
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('auth_error')) {
+        debug('app', 'Auth error detected in URL parameters', urlParams.get('auth_error'));
+        showAuthError(urlParams.get('auth_error'));
+    }
+    
+    // Check for stored auth errors
+    const storedAuthError = sessionStorage.getItem('auth_error');
+    if (storedAuthError) {
+        debug('app', 'Auth error detected in session storage', storedAuthError);
+        showAuthError(storedAuthError);
+        sessionStorage.removeItem('auth_error');
+    }
+    
+    const auth = window.GitHubAuth;
+    const github = window.GitHubClient;
+    const analyzer = window.TemplateAnalyzer;
+    const dashboard = window.DashboardRenderer;
+
+    // UI elements
+    const searchInput = document.getElementById('repo-search');
+    const searchButton = document.getElementById('search-button');
+    const searchResults = document.getElementById('search-results');
+    const recentList = document.getElementById('recent-list');
+    const analysisSection = document.getElementById('analysis-section');
+    const resultsContainer = document.getElementById('results-container');
+    const loadingContainer = document.getElementById('loading-container');
+    const backButton = document.getElementById('back-button');
+    const errorSection = document.getElementById('error-section');
+    const errorMessage = document.getElementById('error-message');
+    const errorBackButton = document.getElementById('error-back-button');
+    
+    // Create elements for scanned templates section
+    const searchSection = document.getElementById('search-section');
+    let scannedTemplatesSection;
+    let templateGrid;
+
+    // State
+    let recentSearches = JSON.parse(localStorage.getItem('td_recent_searches') || '[]');
+    let scannedTemplates = [];
+    
+    // --- Scanned Templates Functionality ---
+    function loadScannedTemplates() {
+        // Check if window.templatesData exists (loaded from results/index-data.js)
+        if (window.templatesData) {
+            debug('app', 'Loading scanned templates from index-data.js', window.templatesData.length);
+            scannedTemplates = window.templatesData;
+            renderScannedTemplates();
+            return true;
+        } else {
+            debug('app', 'No scanned templates found');
+            return false;
+        }
+    }
+
+    function createScannedTemplatesSection() {
+        // Create the section if it doesn't exist
+        if (!document.getElementById('scanned-templates-section')) {
+            scannedTemplatesSection = document.createElement('section');
+            scannedTemplatesSection.id = 'scanned-templates-section';
+            scannedTemplatesSection.className = 'scanned-templates-section';
+            
+            scannedTemplatesSection.innerHTML = `
+                <h2>Previously Scanned Templates</h2>
+                <div id="template-grid" class="template-grid"></div>
+            `;
+            
+            // Insert after the search section
+            if (searchSection && searchSection.parentNode) {
+                searchSection.parentNode.insertBefore(scannedTemplatesSection, searchSection.nextSibling);
+            } else {
+                // Fallback: insert into main container
+                document.querySelector('main.container').appendChild(scannedTemplatesSection);
+            }
+            
+            templateGrid = document.getElementById('template-grid');
+        } else {
+            scannedTemplatesSection = document.getElementById('scanned-templates-section');
+            templateGrid = document.getElementById('template-grid');
+        }
+    }
+
+    function renderScannedTemplates() {
+        createScannedTemplatesSection();
+        
+        if (!templateGrid) return;
+        
+        if (scannedTemplates.length === 0) {
+            templateGrid.innerHTML = '<div class="no-templates">No scanned templates found.</div>';
+            return;
+        }
+
+        templateGrid.innerHTML = '';
+        scannedTemplates.forEach(template => {
+            const repoName = template.repoUrl.split('github.com/')[1] || template.repoUrl;
+            const templateId = `template-${template.relativePath.split('/')[0]}`.replace(/[^a-zA-Z0-9-]/g, '-');
+            
+            const card = document.createElement('div');
+            card.className = 'template-card';
+            card.id = templateId;
+            card.dataset.repoUrl = template.repoUrl;
+            card.dataset.dashboardPath = template.relativePath;
+            card.innerHTML = `
+                <div class="card-header">
+                    <h3 data-tooltip="${repoName}" class="has-permanent-tooltip">${repoName}</h3>
+                    <span class="scan-date">${new Date(template.timestamp).toLocaleDateString()}</span>
+                </div>
+                <div class="card-body">
+                    <div class="compliance-bar">
+                        <div class="compliance-fill" style="width: ${template.compliance.percentage}%"></div>
+                        <span class="compliance-value">${template.compliance.percentage}%</span>
+                    </div>
+                    <div class="stats">
+                        <div class="stat-item issues">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <span>${template.compliance.issues} issues</span>
+                        </div>
+                        <div class="stat-item passed">
+                            <i class="fas fa-check-circle"></i>
+                            <span>${template.compliance.passed} passed</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <button class="view-report-btn">View Report</button>
+                    <button class="rescan-btn">Rescan</button>
+                </div>
+            `;
+            
+            // Add click handlers
+            card.querySelector('.view-report-btn').addEventListener('click', () => {
+                // Template path should already point directly to the HTML file
+                window.open(template.relativePath, '_blank');
+                
+                // Log for debugging
+                debug('app', `Opening report at path: ${template.relativePath}`);
+            });
+            
+            card.querySelector('.rescan-btn').addEventListener('click', () => {
+                if (analyzer) {
+                    analyzeRepo(template.repoUrl);
+                } else {
+                    debug('app', 'Analyzer not available');
+                    alert('Template analyzer is not initialized. Please reload the page and try again.');
+                }
+            });
+            
+            templateGrid.appendChild(card);
+        });
+
+        // Make section visible
+        if (scannedTemplatesSection) {
+            scannedTemplatesSection.style.display = 'block';
+        }
+    }
+
+    // --- Search Functionality ---
+    function updateRecentSearches(repoUrl) {
+        if (!repoUrl) return;
+        recentSearches = recentSearches.filter(url => url !== repoUrl);
+        recentSearches.unshift(repoUrl);
+        if (recentSearches.length > 5) recentSearches = recentSearches.slice(0, 5);
+        localStorage.setItem('td_recent_searches', JSON.stringify(recentSearches));
+        renderRecentSearches();
+    }
+
+    function renderRecentSearches() {
+        recentList.innerHTML = '';
+        if (recentSearches.length === 0) {
+            recentList.innerHTML = '<li>No recent searches.</li>';
+            return;
+        }
+        recentSearches.forEach(url => {
+            const li = document.createElement('li');
+            li.innerHTML = `<a href="#">${url}</a>`;
+            li.querySelector('a').addEventListener('click', e => {
+                e.preventDefault();
+                analyzeRepo(url);
+            });
+            recentList.appendChild(li);
+        });
+    }
+    
+    // Search for a repo in the scanned templates
+    function findScannedTemplate(searchTerm) {
+        if (!scannedTemplates || scannedTemplates.length === 0) return null;
+        
+        // Clean up search term to handle various formats
+        searchTerm = searchTerm.toLowerCase().trim();
+        
+        // Handle full URLs
+        if (searchTerm.includes('github.com/')) {
+            searchTerm = searchTerm.split('github.com/')[1];
+        }
+        
+        // Remove trailing slashes, .git extension
+        searchTerm = searchTerm.replace(/\/$|\.git$/g, '');
+        
+        debug('app', `Searching for template with normalized term: ${searchTerm}`);
+        
+        // First try exact match
+        let match = scannedTemplates.find(template => {
+            const repoName = template.repoUrl.split('github.com/')[1] || '';
+            const normalizedRepoName = repoName.toLowerCase().replace(/\/$|\.git$/g, '');
+            
+            return normalizedRepoName === searchTerm || 
+                   normalizedRepoName.replace('/', '-') === searchTerm;
+        });
+        
+        // If no exact match, try partial match
+        if (!match) {
+            match = scannedTemplates.find(template => {
+                const repoName = template.repoUrl.split('github.com/')[1] || '';
+                const normalizedRepoName = repoName.toLowerCase().replace(/\/$|\.git$/g, '');
+                
+                return normalizedRepoName.includes(searchTerm) || 
+                       normalizedRepoName.replace('/', '-').includes(searchTerm);
+            });
+        }
+        
+        if (match) {
+            debug('app', `Found matching template:`, match);
+        } else {
+            debug('app', `No matching template found for: ${searchTerm}`);
+        }
+        
+        return match;
+    }
+
+    async function searchRepos() {
+        const query = searchInput.value.trim();
+        if (!query) return;
+        searchResults.innerHTML = '<div>Searching...</div>';
+        
+        // First check if this matches an already scanned template
+        const matchedTemplate = findScannedTemplate(query);
+        if (matchedTemplate) {
+            searchResults.innerHTML = '';
+            
+            // Create result for the matched template
+            const div = document.createElement('div');
+            div.className = 'repo-item previously-scanned';
+            
+            const repoName = matchedTemplate.repoUrl.split('github.com/')[1] || matchedTemplate.repoUrl;
+            const templateId = `template-${matchedTemplate.relativePath.split('/')[0]}`.replace(/[^a-zA-Z0-9-]/g, '-');
+            
+            div.innerHTML = `
+                <div>
+                    <div class="repo-name" data-tooltip="${repoName}" class="has-permanent-tooltip">
+                        ${repoName}
+                        <span class="scanned-badge">Previously Scanned</span>
+                    </div>
+                    <div class="repo-description">This repository has already been scanned</div>
+                </div>
+                <div class="action-buttons">
+                    <button class="view-report-btn">View Report</button>
+                    <button class="rescan-btn">Rescan</button>
+                </div>
+            `;
+            
+            div.querySelector('.view-report-btn').addEventListener('click', () => {
+                window.open(matchedTemplate.relativePath, '_blank');
+                debug('app', `Opening report at path: ${matchedTemplate.relativePath}`);
+                scrollAndHighlightTemplate(templateId);
+            });
+            
+            div.querySelector('.rescan-btn').addEventListener('click', () => {
+                analyzeRepo(matchedTemplate.repoUrl);
+            });
+            
+            searchResults.appendChild(div);
+            
+            // Scroll to the template card and highlight it
+            scrollAndHighlightTemplate(templateId);
+            highlightRescanButton(templateId);
+            
+            return;
+        }
+        
+        // If not found in scanned templates, proceed with GitHub API search
+        try {
+            const res = await github.searchRepositories(query, 1, 10);
+            if (!res.items || res.items.length === 0) {
+                searchResults.innerHTML = '<div>No repositories found.</div>';
+                return;
+            }
+            
+            searchResults.innerHTML = '';
+            res.items.forEach(repo => {
+                const div = document.createElement('div');
+                div.className = 'repo-item';
+                
+                // Check if this repo was previously scanned
+                const previouslyScanneIndex = scannedTemplates.findIndex(t => 
+                    t.repoUrl.includes(repo.full_name) || 
+                    repo.html_url.includes(t.repoUrl.split('github.com/')[1]));
+                
+                const isPreviouslyScanned = previouslyScanneIndex !== -1;
+                
+                if (isPreviouslyScanned) {
+                    div.classList.add('previously-scanned');
+                }
+                
+                // Check if it belongs to the authenticated user
+                const isUserRepo = repo.owner.login === github.currentUser?.login;
+                
+                div.innerHTML = `
+                    <div>
+                        <div class="repo-name" data-tooltip="${repo.full_name}" class="has-permanent-tooltip">
+                            ${repo.full_name}
+                            ${isPreviouslyScanned ? '<span class="scanned-badge">Previously Scanned</span>' : ''}
+                        </div>
+                        <div class="repo-description" data-tooltip="${repo.description || ''}" class="has-permanent-tooltip">${repo.description || ''}</div>
+                    </div>
+                    <div class="action-buttons">
+                        ${isPreviouslyScanned ? 
+                            `<button class="view-report-btn" data-index="${previouslyScanneIndex}">View Report</button>` : 
+                            ''}
+                        <button class="analyze-btn">${isPreviouslyScanned ? 'Rescan' : (isUserRepo ? 'Scan Template' : 'Fork and Scan Template')}</button>
+                    </div>
+                `;
+                
+                div.querySelector('.analyze-btn').addEventListener('click', () => {
+                    if (isUserRepo || isPreviouslyScanned) {
+                        analyzeRepo(repo.html_url);
+                    } else {
+                        // Would need to implement fork functionality
+                        if (confirm(`This will fork ${repo.full_name} to your account before scanning. Continue?`)) {
+                            // For now, just analyze without forking
+                            analyzeRepo(repo.html_url);
+                        }
+                    }
+                });
+                
+                if (isPreviouslyScanned) {
+                    div.querySelector('.view-report-btn').addEventListener('click', (e) => {
+                        const index = parseInt(e.target.getAttribute('data-index'));
+                        const template = scannedTemplates[index];
+                        
+                        // Open the report in a new tab - path should be directly to the HTML file
+                        window.open(template.relativePath, '_blank');
+                        debug('app', `Opening report at path: ${template.relativePath}`);
+                        
+                        // Also scroll to the template card and highlight it
+                        const templateId = `template-${template.relativePath.split('/')[0]}`.replace(/[^a-zA-Z0-9-]/g, '-');
+                        scrollAndHighlightTemplate(templateId);
+                    });
+                }
+                
+                searchResults.appendChild(div);
+                
+                // If this repo was previously scanned, highlight the template
+                if (isPreviouslyScanned) {
+                    const template = scannedTemplates[previouslyScanneIndex];
+                    const templateId = `template-${template.relativePath.split('/')[0]}`.replace(/[^a-zA-Z0-9-]/g, '-');
+                    scrollAndHighlightTemplate(templateId);
+                    highlightRescanButton(templateId);
+                }
+            });
+        } catch (err) {
+            searchResults.innerHTML = `<div>Error: ${err.message}</div>`;
+        }
+    }
+    
+    function scrollAndHighlightTemplate(templateId) {
+        const templateElement = document.getElementById(templateId);
+        if (templateElement) {
+            // Make sure the template section is visible
+            if (scannedTemplatesSection) {
+                scannedTemplatesSection.style.display = 'block';
+            }
+            
+            // Scroll to the element with smooth behavior
+            setTimeout(() => {
+                templateElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // Add highlight class for blinking border
+                templateElement.classList.add('highlight-template');
+                
+                // Remove highlight after animation completes
+                setTimeout(() => {
+                    templateElement.classList.remove('highlight-template');
+                }, 4000);
+            }, 300); // Small delay to ensure DOM is ready
+        }
+    }
+    
+    function highlightRescanButton(templateId) {
+        const templateElement = document.getElementById(templateId);
+        if (templateElement) {
+            const rescanButton = templateElement.querySelector('.rescan-btn');
+            if (rescanButton) {
+                // Add highlight class for blinking effect
+                rescanButton.classList.add('highlight-button');
+                
+                // Remove highlight after animation completes
+                setTimeout(() => {
+                    rescanButton.classList.remove('highlight-button');
+                }, 4000);
+            }
+        }
+    }
+
+    // --- Analysis Flow ---
+    async function analyzeRepo(repoUrl) {
+        // First verify we have necessary modules initialized
+        if (!analyzer) {
+            debug('app', 'Template analyzer not available');
+            alert('Template analyzer is not initialized. Please reload the page and try again.');
+            return;
+        }
+        
+        if (!dashboard) {
+            debug('app', 'Dashboard renderer not available');
+            alert('Dashboard renderer is not initialized. Please reload the page and try again.');
+            return;
+        }
+        
+        // UI state
+        document.getElementById('search-section').style.display = 'none';
+        analysisSection.style.display = 'block';
+        resultsContainer.style.display = 'none';
+        loadingContainer.style.display = 'flex';
+        errorSection.style.display = 'none';
+        
+        // Set repo info
+        document.getElementById('repo-name').textContent = repoUrl.split('github.com/')[1] || repoUrl;
+        document.getElementById('repo-url').textContent = repoUrl;
+        
+        // Save to recent
+        updateRecentSearches(repoUrl);
+        
+        try {
+            debug('app', `Starting analysis of repo: ${repoUrl}`);
+            const result = await analyzer.analyzeTemplate(repoUrl, 'dod');
+            
+            loadingContainer.style.display = 'none';
+            resultsContainer.style.display = 'block';
+            
+            debug('app', 'Analysis complete, rendering dashboard');
+            dashboard.render(result, resultsContainer);
+            
+        } catch (err) {
+            debug('app', `Error analyzing repo: ${err.message}`, err);
+            loadingContainer.style.display = 'none';
+            errorSection.style.display = 'block';
+            errorMessage.textContent = err.message || 'An unknown error occurred during analysis';
+        }
+    }
+
+    // --- Event Listeners ---
+    if (searchButton) searchButton.addEventListener('click', searchRepos);
+    if (searchInput) searchInput.addEventListener('keydown', e => {
+        if (e.key === 'Enter') searchRepos();
+    });
+    if (backButton) backButton.addEventListener('click', () => {
+        analysisSection.style.display = 'none';
+        document.getElementById('search-section').style.display = 'block';
+        resultsContainer.innerHTML = '';
+    });
+    if (errorBackButton) errorBackButton.addEventListener('click', () => {
+        errorSection.style.display = 'none';
+        analysisSection.style.display = 'none';
+        document.getElementById('search-section').style.display = 'block';
+    });
+
+    // --- Auth Error Handling ---
+    function showAuthError(errorMessage) {
+        const welcomeSection = document.getElementById('welcome-section');
+        if (welcomeSection) {
+            // Create an error message element
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'auth-error';
+            errorDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    <strong>Authentication Error:</strong> ${errorMessage}
+                    <button class="close-btn">&times;</button>
+                </div>
+            `;
+            
+            // Add close button functionality
+            errorDiv.querySelector('.close-btn').addEventListener('click', () => {
+                errorDiv.style.display = 'none';
+            });
+            
+            // Add it to the welcome section
+            welcomeSection.prepend(errorDiv);
+        }
+    }
+    
+    // --- Initial Render ---
+    renderRecentSearches();
+    
+    // Try loading scanned templates
+    if (!loadScannedTemplates()) {
+        // If templates are not immediately available, wait for the event
+        document.addEventListener('template-data-loaded', function() {
+            debug('app', 'Template data loaded event received');
+            loadScannedTemplates();
+        });
+    }
+    
+    debug('app', 'Application initialized');
+});

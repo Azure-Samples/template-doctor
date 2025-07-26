@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>GitHub OAuth Callback</title>
+  <script src="js/auth.js"></script>
+</head>
+<body>
+  <h1>GitHub Authentication</h1>
+  <p>Authentication complete. Redirecting back to the application...</p>
+  <script>
+    // Debug logging utility
+    function debug(module, message, data) {
+      const timestamp = new Date().toISOString();
+      console.log(`[${timestamp}][${module}] ${message}`, data !== undefined ? data : '');
+    }
+    
+    // Handle the GitHub OAuth callback
+    function handleOAuthCallback() {
+      debug('callback', 'Processing authentication callback');
+      
+      // Extract code and state from URL
+      const query = new URLSearchParams(window.location.search);
+      const code = query.get('code');
+      const state = query.get('state');
+      
+      debug('callback', 'Parameters from URL', { code: code ? `${code.substring(0, 5)}...` : 'missing', state });
+      
+      if (!code) {
+        debug('callback', 'No authorization code found in URL');
+        document.querySelector('p').innerText = 'Error: No authorization code received from GitHub.';
+        return;
+      }
+      
+      // Store the code in sessionStorage so we can retry if needed
+      sessionStorage.setItem('github_auth_code', code);
+      sessionStorage.setItem('github_auth_state', state);
+      sessionStorage.setItem('github_auth_timestamp', new Date().toISOString());
+      
+      // Check if GitHubAuth is available
+      if (window.GitHubAuth) {
+        debug('callback', 'GitHubAuth is available, handling code exchange');
+        
+        try {
+          // Explicitly call the exchange method
+          window.GitHubAuth.exchangeCodeForToken(code);
+          debug('callback', 'Code exchange initiated');
+        } catch (error) {
+          debug('callback', 'Error during code exchange', error.message);
+          document.querySelector('p').innerText = 'Error during authentication: ' + error.message;
+        }
+      } else {
+        debug('callback', 'GitHubAuth not found! May need to wait for script to load');
+        document.querySelector('p').innerText = 'Waiting for authentication handler to load...';
+      }
+    }
+    
+    // Add a load event listener to handle the callback
+    document.addEventListener('DOMContentLoaded', function() {
+      debug('callback', 'Callback page loaded');
+      
+      // Check if the script loaded
+      if (document.querySelector('script[src="js/auth.js"]').complete) {
+        debug('callback', 'Auth script already loaded');
+        handleOAuthCallback();
+      } else {
+        debug('callback', 'Waiting for auth script to load');
+        document.querySelector('script[src="js/auth.js"]').onload = function() {
+          debug('callback', 'Auth script loaded');
+          handleOAuthCallback();
+        };
+      }
+      
+      // Set a timer to check if authentication completed successfully
+      let checkCount = 0;
+      const checkInterval = setInterval(function() {
+        checkCount++;
+        const token = localStorage.getItem('gh_access_token');
+        debug('callback', `Checking authentication status (${checkCount}/10)`, token ? 'Token exists' : 'No token yet');
+        
+        if (token) {
+          // Auth completed successfully
+          debug('callback', 'Authentication completed successfully');
+          document.querySelector('p').innerText = 'Authentication successful! Redirecting...';
+          clearInterval(checkInterval);
+          window.location.href = '/';
+        } else if (checkCount >= 10) {
+          // We've waited long enough, redirect anyway
+          debug('callback', 'Timed out waiting for authentication, redirecting anyway');
+          document.querySelector('p').innerText = 'Authentication may not have completed. Redirecting...';
+          clearInterval(checkInterval);
+          window.location.href = '/?auth_error=timeout';
+        }
+      }, 1000); // Check every second for up to 10 seconds
+    });
+  </script>
+</body>
+</html>
