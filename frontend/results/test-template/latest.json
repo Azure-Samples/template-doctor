@@ -1,0 +1,149 @@
+{
+  "repoUrl": "https://github.com/example/test-template",
+  "ruleSet": "dod",
+  "timestamp": "2025-07-27T12:00:00.000Z",
+  "compliance": {
+    "issues": [
+      {
+        "id": "missing-file-LICENSE",
+        "severity": "error",
+        "message": "Missing required file: LICENSE",
+        "error": "File LICENSE not found in repository"
+      },
+      {
+        "id": "missing-workflow-azure-dev",
+        "severity": "error",
+        "message": "Missing required GitHub workflow: azure-dev.yml",
+        "error": "Missing required GitHub workflow: azure-dev.yml"
+      },
+      {
+        "id": "readme-missing-architecture-diagram-image",
+        "severity": "error",
+        "message": "Architecture Diagram section does not contain an image",
+        "error": "README.md has Architecture Diagram heading but is missing an image"
+      }
+    ],
+    "compliant": [
+      {
+        "id": "file-README.md",
+        "category": "requiredFile",
+        "message": "Required file found: README.md",
+        "details": {
+          "fileName": "README.md"
+        }
+      },
+      {
+        "id": "file-azure.yaml",
+        "category": "requiredFile",
+        "message": "Required file found: azure.yaml",
+        "details": {
+          "fileName": "azure.yaml"
+        }
+      },
+      {
+        "id": "folder-infra",
+        "category": "requiredFolder",
+        "message": "Required folder found: infra/",
+        "details": {
+          "folderPath": "infra",
+          "fileCount": 5
+        }
+      },
+      {
+        "id": "folder-.github",
+        "category": "requiredFolder",
+        "message": "Required folder found: .github/",
+        "details": {
+          "folderPath": ".github",
+          "fileCount": 2
+        }
+      },
+      {
+        "id": "readme-heading-prerequisites",
+        "category": "readmeHeading",
+        "message": "README.md contains required h2 heading: Prerequisites",
+        "details": {
+          "heading": "Prerequisites",
+          "level": 2
+        }
+      },
+      {
+        "id": "readme-heading-getting-started",
+        "category": "readmeHeading",
+        "message": "README.md contains required h2 heading: Getting Started",
+        "details": {
+          "heading": "Getting Started",
+          "level": 2
+        }
+      },
+      {
+        "id": "readme-architecture-diagram-heading",
+        "category": "readmeHeading",
+        "message": "README.md contains required h2 heading: Architecture",
+        "details": {
+          "heading": "Architecture",
+          "level": 2
+        }
+      },
+      {
+        "id": "bicep-files-exist",
+        "category": "bicepFiles",
+        "message": "Bicep files found in infra/ directory: 3 files",
+        "details": {
+          "count": 3,
+          "files": [
+            "infra/main.bicep",
+            "infra/core.bicep",
+            "infra/web.bicep"
+          ]
+        }
+      },
+      {
+        "id": "bicep-resource-microsoft.resources/resourcegroups-infra/main.bicep",
+        "category": "bicepResource",
+        "message": "Found required resource \"Microsoft.Resources/resourceGroups\" in infra/main.bicep",
+        "details": {
+          "resource": "Microsoft.Resources/resourceGroups",
+          "file": "infra/main.bicep"
+        }
+      },
+      {
+        "id": "bicep-resource-microsoft.keyvault/vaults-infra/core.bicep",
+        "category": "bicepResource",
+        "message": "Found required resource \"Microsoft.KeyVault/vaults\" in infra/core.bicep",
+        "details": {
+          "resource": "Microsoft.KeyVault/vaults",
+          "file": "infra/core.bicep"
+        }
+      },
+      {
+        "id": "azure-yaml-exists",
+        "category": "azureYaml",
+        "message": "Found azure.yaml file: azure.yaml",
+        "details": {
+          "fileName": "azure.yaml"
+        }
+      },
+      {
+        "id": "azure-yaml-services-defined",
+        "category": "azureYaml",
+        "message": "\"services:\" section found in azure.yaml",
+        "details": {
+          "fileName": "azure.yaml"
+        }
+      },
+      {
+        "id": "compliance-summary",
+        "category": "meta",
+        "message": "Compliance: 80%",
+        "details": {
+          "issueCount": 3,
+          "compliantCount": 12,
+          "totalChecks": 15,
+          "percentageCompliant": 80
+        }
+      }
+    ],
+    "summary": "Issues found - Compliance: 80%"
+  }
+}
