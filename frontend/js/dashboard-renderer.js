@@ -51,20 +51,25 @@
                 // Clear the container
                 container.innerHTML = '';
                 
-                // First, show the raw data at the top for debugging
+                // First, show the raw data toggle section for debugging
                 const debugSection = document.createElement('div');
                 debugSection.className = 'debug-section';
                 debugSection.style.cssText = 'margin-bottom: 30px; padding: 15px; background: #f8f9fa; border-radius: 5px; border: 1px solid #ddd;';
                 debugSection.innerHTML = `
-                    <h3 style="margin-top: 0;">Raw Report Data (Debug View)</h3>
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                        <button id="toggle-raw-data" style="padding: 5px 10px; background: #e9ecef; border: none; border-radius: 3px; cursor: pointer;">
-                            Show Raw Data
-                        </button>
-                        <span style="color: #6c757d; font-size: 0.9em;">This debug section will be removed in production</span>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <h3 style="margin: 0;">Template Analysis Report</h3>
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <span style="color: #6c757d; font-size: 0.9em; font-style: italic;">Developer Tools</span>
+                            <button id="toggle-raw-data" class="btn" style="padding: 5px 10px; font-size: 0.9em;">
+                                <i class="fas fa-code"></i> Raw Data
+                            </button>
+                        </div>
                     </div>
-                    <div id="raw-data-content" style="display: none;">
-                        <pre style="background: #f5f5f5; padding: 10px; border-radius: 3px; max-height: 300px; overflow: auto;">${JSON.stringify(result, null, 2)}</pre>
+                    <div id="raw-data-content" style="display: none; margin-top: 15px;">
+                        <div style="background: #2d2d2d; color: #eee; padding: 10px; border-radius: 5px; font-size: 0.9em; margin-bottom: 10px;">
+                            <i class="fas fa-info-circle"></i> This is the raw report data used to generate the dashboard.
+                        </div>
+                        <pre style="background: #2d2d2d; color: #eee; padding: 15px; border-radius: 5px; max-height: 400px; overflow: auto; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace; font-size: 13px;">${JSON.stringify(result, null, 2)}</pre>
                     </div>
                 `;
                 container.appendChild(debugSection);
@@ -77,10 +82,14 @@
                         toggleBtn.addEventListener('click', function() {
                             if (rawContent.style.display === 'none') {
                                 rawContent.style.display = 'block';
-                                toggleBtn.textContent = 'Hide Raw Data';
+                                toggleBtn.innerHTML = '<i class="fas fa-times"></i> Hide Raw Data';
+                                toggleBtn.style.backgroundColor = '#dc3545';
+                                toggleBtn.style.color = 'white';
                             } else {
                                 rawContent.style.display = 'none';
-                                toggleBtn.textContent = 'Show Raw Data';
+                                toggleBtn.innerHTML = '<i class="fas fa-code"></i> Raw Data';
+                                toggleBtn.style.backgroundColor = '';
+                                toggleBtn.style.color = '';
                             }
                         });
                     }

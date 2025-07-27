@@ -902,14 +902,36 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === 'Enter') searchRepos();
     });
     if (backButton) backButton.addEventListener('click', () => {
+        // Go back to search section and clear results
         analysisSection.style.display = 'none';
         document.getElementById('search-section').style.display = 'block';
         resultsContainer.innerHTML = '';
+        
+        // Make sure the scanned templates section is visible and up to date
+        if (window.templatesData && window.templatesData.length > 0) {
+            loadScannedTemplates(); // This will render the templates
+            
+            // Make sure the scanned templates section is visible
+            if (scannedTemplatesSection) {
+                scannedTemplatesSection.style.display = 'block';
+            }
+        }
     });
     if (errorBackButton) errorBackButton.addEventListener('click', () => {
+        // Go back from error view to search section
         errorSection.style.display = 'none';
         analysisSection.style.display = 'none';
         document.getElementById('search-section').style.display = 'block';
+        
+        // Make sure the scanned templates section is visible and up to date
+        if (window.templatesData && window.templatesData.length > 0) {
+            loadScannedTemplates(); // This will render the templates
+            
+            // Make sure the scanned templates section is visible
+            if (scannedTemplatesSection) {
+                scannedTemplatesSection.style.display = 'block';
+            }
+        }
     });
 
     // --- Auth Error Handling ---
