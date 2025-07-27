@@ -7,6 +7,32 @@ class GitHubClient {
         this.auth = window.GitHubAuth; // Reference to the auth instance
         this.currentUser = null;
         
+        // Wait for DOM to be ready before trying to load user info
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                this.initializeAfterAuth();
+            });
+        } else {
+            // DOM already loaded, initialize now
+            this.initializeAfterAuth();
+        }
+    }
+    
+    /**
+     * Initialize the client after auth is ready
+     */
+    initializeAfterAuth() {
+        console.log('Initializing GitHub client after auth');
+        // If auth isn't ready yet, try again in a moment
+        if (!this.auth) {
+            this.auth = window.GitHubAuth;
+            if (!this.auth) {
+                console.log('Auth not ready yet, retrying in 500ms');
+                setTimeout(() => this.initializeAfterAuth(), 500);
+                return;
+            }
+        }
+        
         // Try to load the current user info if authenticated
         this.loadCurrentUser();
     }
@@ -15,13 +41,23 @@ class GitHubClient {
      * Load current authenticated user info
      */
     async loadCurrentUser() {
-        if (this.auth.isAuthenticated()) {
+        console.log('Loading current user, auth state:', this.auth ? 'Auth exists' : 'No auth');
+        
+        if (this.auth && this.auth.isAuthenticated()) {
+            console.log('User is authenticated, getting user info');
             try {
                 this.currentUser = await this.getAuthenticatedUser();
                 console.log('Loaded current user:', this.currentUser.login);
             } catch (err) {
                 console.error('Failed to load current user:', err);
+                // If we get a 401, the token might be invalid
+                if (err.status === 401 && this.auth) {
+                    console.log('Token appears invalid, logging out');
+                    this.auth.logout();
+                }
             }
+        } else {
+            console.log('User is not authenticated or auth not available');
         }
     }
 
@@ -32,8 +68,10 @@ class GitHubClient {
      * @returns {Promise} - The fetch promise
      */
     async request(path, options = {}) {
+        console.log(`[GitHubClient] Making request to: ${path}`);
         const token = this.auth.getAccessToken();
         if (!token) {
+            console.error('[GitHubClient] Not authenticated, no token available');
             throw new Error('Not authenticated');
         }
 
@@ -49,20 +87,37 @@ class GitHubClient {
             headers
         };
 
-        const response = await fetch(url, requestOptions);
-        
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            const error = new Error(
-                errorData.message || `GitHub API error: ${response.status} ${response.statusText}`
-            );
-            error.status = response.status;
-            error.response = response;
-            error.data = errorData;
-            throw error;
-        }
+        console.log(`[GitHubClient] Sending request to: ${url}`, {
+            method: requestOptions.method || 'GET',
+            hasToken: !!token
+        });
 
-        return response.json();
+        try {
+            const response = await fetch(url, requestOptions);
+            console.log(`[GitHubClient] Response received: ${response.status} ${response.statusText}`);
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                console.error(`[GitHubClient] Error response:`, errorData);
+                const error = new Error(
+                    errorData.message || `GitHub API error: ${response.status} ${response.statusText}`
+                );
+                error.status = response.status;
+                error.response = response;
+                error.data = errorData;
+                throw error;
+            }
+
+            const data = await response.json();
+            console.log(`[GitHubClient] Response data received:`, {
+                type: Array.isArray(data) ? 'array' : typeof data,
+                length: Array.isArray(data) ? data.length : (data ? Object.keys(data).length : 0)
+            });
+            return data;
+        } catch (err) {
+            console.error(`[GitHubClient] Request failed:`, err);
+            throw err;
+        }
     }
 
     /**

@@ -7,6 +7,92 @@ function debug(module, message, data) {
     console.log(`[${timestamp}][${module}] ${message}`, data !== undefined ? data : '');   
 }
 
+// Enhanced debug function for report loading
+function debugReport(stage, data) {
+    console.group(`REPORT DEBUG - ${stage}`);
+    console.log('Data:', data);
+    if (data && typeof data === 'object') {
+        console.log('Keys:', Object.keys(data));
+        console.log('Is empty:', Object.keys(data).length === 0);
+        if (data.repoUrl) console.log('RepoUrl:', data.repoUrl);
+        if (data.compliance) console.log('Compliance:', data.compliance);
+        if (data.timestamp) console.log('Timestamp:', data.timestamp);
+        if (data.issues) console.log('Issues count:', data.issues.length);
+        if (data.passedRules) console.log('Passed rules count:', data.passedRules.length);
+    } else {
+        console.log('Invalid data type:', typeof data);
+    }
+    console.groupEnd();
+}
+
+// Simple function to help with debugging
+function debugReportData(label, data) {
+    console.group(`REPORT DEBUG - ${label}`);
+    console.log('Data:', data ? 'present' : 'null/undefined');
+    if (data && typeof data === 'object') {
+        console.log('Keys:', Object.keys(data));
+        console.log('Compliance:', data.compliance ? 'present' : 'missing');
+        if (data.compliance) {
+            console.log('Issues:', Array.isArray(data.compliance.issues) ? data.compliance.issues.length : 'not an array');
+            console.log('Compliant:', Array.isArray(data.compliance.compliant) ? data.compliance.compliant.length : 'not an array');
+        }
+    }
+    console.groupEnd();
+}
+
+// Direct data loading function - uses direct loading with a script tag
+function directLoadDataFile(folderName, dataFileName, successCallback, errorCallback) {
+    // Clear any previous reportData
+    window.reportData = null;
+    
+    console.log(`DIRECT LOAD: Loading /results/${folderName}/${dataFileName}`);
+    
+    // Create a script element to load the data.js file
+    const script = document.createElement('script');
+    script.src = `/results/${folderName}/${dataFileName}`; 
+    script.id = `data-js-${Date.now()}`;
+    script.async = true;
+    
+    // Set up onload handler
+    script.onload = function() {
+        console.log(`DIRECT LOAD: Script loaded successfully!`);
+        
+        // Use a brief timeout to ensure the script has executed
+        setTimeout(function() {
+            // Check if window.reportData was set by the script
+            if (window.reportData) {
+                console.log(`DIRECT LOAD: Found window.reportData, calling success callback`);
+                debugReportData('DirectLoad Success', window.reportData);
+                
+                if (typeof successCallback === 'function') {
+                    // Make a copy of the data to avoid reference issues
+                    const data = JSON.parse(JSON.stringify(window.reportData));
+                    successCallback(data);
+                }
+            } else {
+                console.error(`DIRECT LOAD: Script loaded but window.reportData is undefined!`);
+                if (typeof errorCallback === 'function') {
+                    errorCallback('Data file loaded but did not set window.reportData');
+                }
+            }
+        }, 100); // Small delay to ensure script execution
+    };
+    
+    // Set up error handler
+    script.onerror = function(e) {
+        console.error(`DIRECT LOAD: Error loading script:`, e);
+        if (typeof errorCallback === 'function') {
+            errorCallback(`Failed to load data file: ${dataFileName}`);
+        }
+    };
+    
+    // Add the script to the document
+    document.head.appendChild(script);
+    console.log(`DIRECT LOAD: Script tag added to document head with ID ${script.id}`);
+}
+
+
+
 document.addEventListener('DOMContentLoaded', () => {
     debug('app', 'Application initializing');
     
@@ -142,14 +228,276 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Add click handlers
             card.querySelector('.view-report-btn').addEventListener('click', () => {
-                // Ensure proper path resolution for the report
-                const basePath = window.location.hostname.includes('localhost') ? '/results' : '/frontend/results';
-                const reportUrl = `${basePath}/${template.relativePath}`;
+                // Instead of opening in a new tab, load the report and render it inline
+                debug('app', `Loading report for template: ${template.relativePath}`);
                 
-                window.open(reportUrl, '_blank');
+                // Show loading state
+                document.getElementById('search-section').style.display = 'none';
+                if (scannedTemplatesSection) scannedTemplatesSection.style.display = 'none';
+                analysisSection.style.display = 'block';
+                resultsContainer.style.display = 'none';
+                loadingContainer.style.display = 'flex';
+                errorSection.style.display = 'none';
                 
-                // Log for debugging
-                debug('app', `Opening report at path: ${reportUrl}`);
+                // Set repo info
+                document.getElementById('repo-name').textContent = template.repoUrl.split('github.com/')[1] || template.repoUrl;
+                document.getElementById('repo-url').textContent = template.repoUrl;
+                
+                // Extract the folder name from the template path
+                const folderName = template.relativePath ? template.relativePath.split('/')[0] : null;
+                
+                if (!folderName) {
+                    debug('app', 'Error: No folder name could be extracted from template');
+                    loadingContainer.style.display = 'none';
+                    errorSection.style.display = 'block';
+                    errorMessage.textContent = 'Could not determine template folder';
+                    return;
+                }
+                
+                console.log(`HANDLER: Loading report for ${folderName}`);
+                
+                // First, try to load latest.json to find the current data file
+                const latestJsonPath = `/results/${folderName}/latest.json`;
+                console.log(`HANDLER: Fetching latest.json from: ${latestJsonPath}`);
+                
+                // Clear any existing reportData
+                resultsContainer.innerHTML = '';
+                
+                fetch(latestJsonPath)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+                        return response.json();
+                    })
+                    .then(latestData => {
+                        console.log(`HANDLER: Loaded latest.json:`, latestData);
+                        
+                        if (latestData && latestData.dataPath) {
+                            console.log(`HANDLER: Found dataPath in latest.json: ${latestData.dataPath}`);
+                            
+                            // DISPLAY RAW DATA APPROACH: Use a direct fetch to get the data
+                            const dataUrl = `/results/${folderName}/${latestData.dataPath}`;
+                            console.log(`Loading data from: ${dataUrl}`);
+                            
+                            // First display a message to show we're trying
+                            loadingContainer.style.display = 'none';
+                            resultsContainer.style.display = 'block';
+                            resultsContainer.innerHTML = `
+                                <div style="padding: 20px; background: #f8f9fa; border-radius: 5px; margin-bottom: 20px;">
+                                    <h3>Loading Data (Debug Mode)</h3>
+                                    <p>Attempting to load data from: <code>${dataUrl}</code></p>
+                                    <div id="raw-data-container">Loading...</div>
+                                </div>
+                            `;
+                            
+                            // Try to load via script tag
+                            const scriptTag = document.createElement('script');
+                            scriptTag.src = dataUrl;
+                            
+                            // When script loads, immediately display the data
+                            scriptTag.onload = function() {
+                                console.log("Script loaded! Window.reportData:", window.reportData);
+                                
+                                const rawDataContainer = document.getElementById('raw-data-container');
+                                
+                                // Check if data is available
+                                if (window.reportData) {
+                                    // Display raw JSON
+                                    rawDataContainer.innerHTML = `
+                                        <h4>Data loaded successfully!</h4>
+                                        <p>Here's the raw data:</p>
+                                        <pre style="background: #333; color: #fff; padding: 10px; border-radius: 5px; max-height: 400px; overflow: auto;">${JSON.stringify(window.reportData, null, 2)}</pre>
+                                        <div style="display: flex; gap: 10px; margin-top: 15px;">
+                                            <button id="render-dashboard-btn" style="padding: 8px 15px; background: #0078d4; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                                Try to render dashboard with this data
+                                            </button>
+                                            <button id="fixed-render-btn" style="padding: 8px 15px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                                Render with fixed data format
+                                            </button>
+                                        </div>
+                                    `;
+                                    
+                                    // Add click handler for the render buttons
+                                    setTimeout(() => {
+                                        // Standard render button
+                                        const renderBtn = document.getElementById('render-dashboard-btn');
+                                        if (renderBtn) {
+                                            renderBtn.addEventListener('click', function() {
+                                                try {
+                                                    // Make a copy of the data
+                                                    const data = JSON.parse(JSON.stringify(window.reportData));
+                                                    
+                                                    // Clear the container
+                                                    resultsContainer.innerHTML = '';
+                                                    
+                                                    // Try to render
+                                                    dashboard.render(data, resultsContainer);
+                                                    
+                                                    // Scroll to the top of the analysis section
+                                                    analysisSection.scrollIntoView({ behavior: 'smooth' });
+                                                } catch (error) {
+                                                    resultsContainer.innerHTML = `<div style="padding: 20px; background: #f8d7da; color: #721c24; border-radius: 5px;">
+                                                        <h3>Render Error</h3>
+                                                        <p>Error rendering dashboard: ${error.message}</p>
+                                                        <pre>${error.stack}</pre>
+                                                    </div>`;
+                                                }
+                                            });
+                                        }
+                                        
+                                        // Fixed format button - this ensures the data is properly structured
+                                        const fixedBtn = document.getElementById('fixed-render-btn');
+                                        if (fixedBtn) {
+                                            fixedBtn.addEventListener('click', function() {
+                                                try {
+                                                    // Get the data and ensure it's properly structured
+                                                    let data = JSON.parse(JSON.stringify(window.reportData));
+                                                    
+                                                    // Ensure compliance structure exists
+                                                    if (!data.compliance) {
+                                                        data.compliance = {};
+                                                    }
+                                                    
+                                                    // Ensure compliance issues array exists
+                                                    if (!Array.isArray(data.compliance.issues)) {
+                                                        // If issues don't exist, create an empty array
+                                                        data.compliance.issues = [];
+                                                    }
+                                                    
+                                                    // Ensure there's a repoUrl
+                                                    if (!data.repoUrl) {
+                                                        data.repoUrl = window.location.href;
+                                                    }
+                                                    
+                                                    // Clear the container
+                                                    resultsContainer.innerHTML = '';
+                                                    
+                                                    // Try to render
+                                                    dashboard.render(data, resultsContainer);
+                                                    
+                                                    // Scroll to the top of the analysis section
+                                                    analysisSection.scrollIntoView({ behavior: 'smooth' });
+                                                } catch (error) {
+                                                    resultsContainer.innerHTML = `<div style="padding: 20px; background: #f8d7da; color: #721c24; border-radius: 5px;">
+                                                        <h3>Render Error</h3>
+                                                        <p>Error rendering dashboard with fixed data: ${error.message}</p>
+                                                        <pre>${error.stack}</pre>
+                                                    </div>`;
+                                                }
+                                            });
+                                        }
+                                    }, 100);
+                                } else {
+                                    rawDataContainer.innerHTML = `
+                                        <div style="padding: 15px; background: #f8d7da; color: #721c24; border-radius: 5px;">
+                                            <h4>Error: No Data Found</h4>
+                                            <p>The script loaded but window.reportData is not defined!</p>
+                                        </div>
+                                    `;
+                                }
+                            };
+                            
+                            // Handle load errors
+                            scriptTag.onerror = function(error) {
+                                console.error("Script loading error:", error);
+                                const rawDataContainer = document.getElementById('raw-data-container');
+                                
+                                // Try alternative approach - fetch the content
+                                rawDataContainer.innerHTML = `
+                                    <div style="padding: 15px; background: #fff3cd; color: #856404; border-radius: 5px; margin-bottom: 15px;">
+                                        <h4>Script loading failed</h4>
+                                        <p>Trying alternative approach (fetch)...</p>
+                                    </div>
+                                `;
+                                
+                                // Try to fetch the content directly
+                                fetch(dataUrl)
+                                    .then(response => {
+                                        rawDataContainer.innerHTML += `
+                                            <div style="margin-bottom: 10px;">
+                                                <strong>Fetch status:</strong> ${response.status} ${response.statusText}
+                                            </div>
+                                        `;
+                                        return response.text();
+                                    })
+                                    .then(content => {
+                                        // Show the raw file content
+                                        rawDataContainer.innerHTML += `
+                                            <h4>Raw file content:</h4>
+                                            <pre style="background: #333; color: #fff; padding: 10px; border-radius: 5px; max-height: 300px; overflow: auto;">${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
+                                        `;
+                                    })
+                                    .catch(fetchError => {
+                                        rawDataContainer.innerHTML += `
+                                            <div style="padding: 15px; background: #f8d7da; color: #721c24; border-radius: 5px;">
+                                                <h4>Fetch Error</h4>
+                                                <p>${fetchError.message}</p>
+                                            </div>
+                                        `;
+                                    });
+                            };
+                            
+                            // Add the script to the document
+                            document.head.appendChild(scriptTag);
+                        } else {
+                            throw new Error('No dataPath found in latest.json');
+                        }
+                    })
+                    .catch(error => {
+                        console.error(`HANDLER: Error in fetch process: ${error.message}`);
+                        loadingContainer.style.display = 'none';
+                        errorSection.style.display = 'block';
+                        errorMessage.textContent = `Error loading report: ${error.message}`;
+                        
+                        // Try to load report with ReportLoader instead
+                        if (window.ReportLoader) {
+                            console.log(`HANDLER: Falling back to ReportLoader`);
+                            // Add folderName to template object for better context
+                            const templateWithFolder = { ...template, folderName: folderName };
+                            console.log(`HANDLER: Template object for ReportLoader:`, templateWithFolder);
+                            
+                            window.ReportLoader.loadReportData(
+                                templateWithFolder,
+                                (result) => {
+                                    // Success callback
+                                    loadingContainer.style.display = 'none';
+                                    resultsContainer.style.display = 'block';
+                                    
+                                    console.log(`HANDLER: ReportLoader SUCCESS callback received:`, result);
+                                    debugReport('Report Data Loaded via ReportLoader', result);
+                                    
+                                    if (!result || typeof result !== 'object' || Object.keys(result).length === 0) {
+                                        console.warn(`HANDLER: Empty/invalid data from ReportLoader`);
+                                        debug('app', 'WARNING: Report data is empty or invalid');
+                                        loadingContainer.style.display = 'none';
+                                        errorSection.style.display = 'block';
+                                        errorMessage.textContent = 'Report data is empty or invalid. This could be due to a missing data.js file.';
+                                        return;
+                                    }
+                                    
+                                    debug('app', 'Report loaded successfully via ReportLoader, rendering dashboard', result);
+                                    dashboard.render(result, resultsContainer);
+                                    
+                                    // Scroll to the top of the analysis section
+                                    analysisSection.scrollIntoView({ behavior: 'smooth' });
+                                },
+                                (errorMsg) => {
+                                    // Error callback
+                                    console.error(`HANDLER: ReportLoader ERROR callback received: ${errorMsg}`);
+                                    debug('app', `Error loading report: ${errorMsg}`);
+                                    loadingContainer.style.display = 'none';
+                                    errorSection.style.display = 'block';
+                                    errorMessage.textContent = errorMsg || 'An unknown error occurred loading the report';
+                                }
+                            );
+                        } else {
+                            debug('app', 'Report loader not available');
+                            loadingContainer.style.display = 'none';
+                            errorSection.style.display = 'block';
+                            errorMessage.textContent = 'Report loader not initialized. Please reload the page and try again.';
+                        }
+            });
             });
             
             card.querySelector('.rescan-btn').addEventListener('click', () => {
@@ -275,12 +623,51 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             
             div.querySelector('.view-report-btn').addEventListener('click', () => {
-                // Ensure proper path resolution for the report
-                const basePath = window.location.hostname.includes('localhost') ? '/results' : '/frontend/results';
-                const reportUrl = `${basePath}/${matchedTemplate.relativePath}`;
+                // Instead of opening in a new tab, load the report and render it inline
+                debug('app', `Loading report for template: ${matchedTemplate.relativePath}`);
                 
-                window.open(reportUrl, '_blank');
-                debug('app', `Opening report at path: ${reportUrl}`);
+                // Show loading state
+                document.getElementById('search-section').style.display = 'none';
+                if (scannedTemplatesSection) scannedTemplatesSection.style.display = 'none';
+                analysisSection.style.display = 'block';
+                resultsContainer.style.display = 'none';
+                loadingContainer.style.display = 'flex';
+                errorSection.style.display = 'none';
+                
+                // Set repo info
+                document.getElementById('repo-name').textContent = matchedTemplate.repoUrl.split('github.com/')[1] || matchedTemplate.repoUrl;
+                document.getElementById('repo-url').textContent = matchedTemplate.repoUrl;
+                
+                // Use the ReportLoader to load the data
+                if (window.ReportLoader) {
+                    window.ReportLoader.loadReportData(
+                        matchedTemplate,
+                        (result) => {
+                            // Success callback
+                            loadingContainer.style.display = 'none';
+                            resultsContainer.style.display = 'block';
+                            
+                            debug('app', 'Report loaded successfully, rendering dashboard', result);
+                            dashboard.render(result, resultsContainer);
+                            
+                            // Scroll to the top of the analysis section
+                            analysisSection.scrollIntoView({ behavior: 'smooth' });
+                        },
+                        (errorMsg) => {
+                            // Error callback
+                            debug('app', `Error loading report: ${errorMsg}`);
+                            loadingContainer.style.display = 'none';
+                            errorSection.style.display = 'block';
+                            errorMessage.textContent = errorMsg || 'An unknown error occurred loading the report';
+                        }
+                    );
+                } else {
+                    debug('app', 'Report loader not available');
+                    loadingContainer.style.display = 'none';
+                    errorSection.style.display = 'block';
+                    errorMessage.textContent = 'Report loader not initialized. Please reload the page and try again.';
+                }
+                
                 scrollAndHighlightTemplate(templateId);
             });
             
@@ -357,13 +744,50 @@ document.addEventListener('DOMContentLoaded', () => {
                         const index = parseInt(e.target.getAttribute('data-index'));
                         const template = scannedTemplates[index];
                         
-                        // Ensure proper path resolution for the report
-                        const basePath = window.location.hostname.includes('localhost') ? '/results' : '/frontend/results';
-                        const reportUrl = `${basePath}/${template.relativePath}`;
+                        // Instead of opening in a new tab, load the report and render it inline
+                        debug('app', `Loading report for template: ${template.relativePath}`);
                         
-                        // Open the report in a new tab
-                        window.open(reportUrl, '_blank');
-                        debug('app', `Opening report at path: ${reportUrl}`);
+                        // Show loading state
+                        document.getElementById('search-section').style.display = 'none';
+                        if (scannedTemplatesSection) scannedTemplatesSection.style.display = 'none';
+                        analysisSection.style.display = 'block';
+                        resultsContainer.style.display = 'none';
+                        loadingContainer.style.display = 'flex';
+                        errorSection.style.display = 'none';
+                        
+                        // Set repo info
+                        document.getElementById('repo-name').textContent = template.repoUrl.split('github.com/')[1] || template.repoUrl;
+                        document.getElementById('repo-url').textContent = template.repoUrl;
+                        
+                        // Use the ReportLoader to load the data
+                        if (window.ReportLoader) {
+                            window.ReportLoader.loadReportData(
+                                template,
+                                (result) => {
+                                    // Success callback
+                                    loadingContainer.style.display = 'none';
+                                    resultsContainer.style.display = 'block';
+                                    
+                                    debug('app', 'Report loaded successfully, rendering dashboard', result);
+                                    dashboard.render(result, resultsContainer);
+                                    
+                                    // Scroll to the top of the analysis section
+                                    analysisSection.scrollIntoView({ behavior: 'smooth' });
+                                },
+                                (errorMsg) => {
+                                    // Error callback
+                                    debug('app', `Error loading report: ${errorMsg}`);
+                                    loadingContainer.style.display = 'none';
+                                    errorSection.style.display = 'block';
+                                    errorMessage.textContent = errorMsg || 'An unknown error occurred loading the report';
+                                }
+                            );
+                        } else {
+                            debug('app', 'Report loader not available');
+                            loadingContainer.style.display = 'none';
+                            errorSection.style.display = 'block';
+                            errorMessage.textContent = 'Report loader not initialized. Please reload the page and try again.';
+                        }
                         
                         // Also scroll to the template card and highlight it
                         const templateId = `template-${template.relativePath.split('/')[0]}`.replace(/[^a-zA-Z0-9-]/g, '-');

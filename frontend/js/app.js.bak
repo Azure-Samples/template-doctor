@@ -4,16 +4,64 @@
 // Debug logging utility - consistent with auth.js
 function debug(module, message, data) {
     const timestamp = new Date().toISOString();
-    console.lo            div.querySelector('.rescan-btn').addEventListener('click', () => {
-                if (analyzer) {
-                    debug('app', `Rescanning template: ${matchedTemplate.owner}/${matchedTemplate.repo}`);
-                    analyzeRepo(matchedTemplate.owner, matchedTemplate.repo);
-                    scrollAndHighlightTemplate(templateId);
-                } else {
-                    debug('app', 'Analyzer not initialized for rescan');
-                    showError('Please wait for the analyzer to initialize before rescanning');
-                }
-            });[${timestamp}][${module}] ${message}`, data !== undefined ? data : '');
+    console.log(`[${timestamp}][${module}] ${message}`, data !== undefined ? data : '');   
+}
+
+// Enhanced debug function for report loading
+function debugReport(stage, data) {
+    console.group(`REPORT DEBUG - ${stage}`);
+    console.log('Data:', data);
+    if (data && typeof data === 'object') {
+        console.log('Keys:', Object.keys(data));
+        console.log('Is empty:', Object.keys(data).length === 0);
+        if (data.repoUrl) console.log('RepoUrl:', data.repoUrl);
+        if (data.compliance) console.log('Compliance:', data.compliance);
+        if (data.timestamp) console.log('Timestamp:', data.timestamp);
+        if (data.issues) console.log('Issues count:', data.issues.length);
+        if (data.passedRules) console.log('Passed rules count:', data.passedRules.length);
+    } else {
+        console.log('Invalid data type:', typeof data);
+    }
+    console.groupEnd();
+}
+
+// Direct data loading function - much simpler approach
+function directLoadDataFile(folderName, dataFileName, successCallback, errorCallback) {
+    // Clear any previous reportData
+    window.reportData = null;
+    
+    console.log(`DIRECT LOAD: Loading /results/${folderName}/${dataFileName}`);
+    
+    // Create a new script element
+    const script = document.createElement('script');
+    script.src = `/results/${folderName}/${dataFileName}`;
+    script.id = `data-js-${Date.now()}`;
+    
+    // Set up onload handler
+    script.onload = function() {
+        console.log(`DIRECT LOAD: Script loaded successfully!`);
+        
+        // Check if window.reportData was set
+        if (window.reportData) {
+            console.log(`DIRECT LOAD: Found window.reportData with ${Object.keys(window.reportData).length} keys`);
+            const data = { ...window.reportData };
+            window.reportData = null; // Clean up
+            successCallback(data);
+        } else {
+            console.error(`DIRECT LOAD: Script loaded but window.reportData is undefined!`);
+            errorCallback('Data file loaded but did not set window.reportData');
+        }
+    };
+    
+    // Set up error handler
+    script.onerror = function(e) {
+        console.error(`DIRECT LOAD: Error loading script:`, e);
+        errorCallback(`Failed to load data file: ${dataFileName}`);
+    };
+    
+    // Add the script to the document
+    document.head.appendChild(script);
+    console.log(`DIRECT LOAD: Script tag added to document head with ID ${script.id}`);
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -151,11 +199,122 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Add click handlers
             card.querySelector('.view-report-btn').addEventListener('click', () => {
-                // Template path should already point directly to the HTML file
-                window.open(template.relativePath, '_blank');
+                // Instead of opening in a new tab, load the report and render it inline
+                debug('app', `Loading report for template: ${template.relativePath}`);
                 
-                // Log for debugging
-                debug('app', `Opening report at path: ${template.relativePath}`);
+                // Show loading state
+                document.getElementById('search-section').style.display = 'none';
+                if (scannedTemplatesSection) scannedTemplatesSection.style.display = 'none';
+                analysisSection.style.display = 'block';
+                resultsContainer.style.display = 'none';
+                loadingContainer.style.display = 'flex';
+                errorSection.style.display = 'none';
+                
+                // Set repo info
+                document.getElementById('repo-name').textContent = template.repoUrl.split('github.com/')[1] || template.repoUrl;
+                document.getElementById('repo-url').textContent = template.repoUrl;
+                
+                // Extract the folder name from the template path
+                const folderName = template.relativePath ? template.relativePath.split('/')[0] : null;
+                
+                if (!folderName) {
+                    debug('app', 'Error: No folder name could be extracted from template');
+                    loadingContainer.style.display = 'none';
+                    errorSection.style.display = 'block';
+                    errorMessage.textContent = 'Could not determine template folder';
+                    return;
+                }
+                
+                console.log(`HANDLER: Loading report for ${folderName}`);
+                
+                // First, try to load latest.json to find the current data file
+                fetch(`/results/${folderName}/latest.json`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+                        return response.json();
+                    })
+                    .then(latestData => {
+                        console.log(`HANDLER: Loaded latest.json:`, latestData);
+                        
+                        if (latestData && latestData.dataPath) {
+                            // We found the data path, use it to load the data directly
+                            directLoadDataFile(
+                                folderName,
+                                latestData.dataPath,
+                                function(data) {
+                                    // Success callback
+                                    console.log(`HANDLER: Data loaded successfully`);
+                                    loadingContainer.style.display = 'none';
+                                    resultsContainer.style.display = 'block';
+                                    
+                                    // Render the data in the dashboard
+                                    dashboard.render(data, resultsContainer);
+                                    
+                                    // Scroll to the top of the analysis section
+                                    analysisSection.scrollIntoView({ behavior: 'smooth' });
+                                },
+                                function(errorMsg) {
+                                    // Error callback
+                                    console.error(`HANDLER: Error loading data: ${errorMsg}`);
+                                    loadingContainer.style.display = 'none';
+                                    errorSection.style.display = 'block';
+                                    errorMessage.textContent = errorMsg;
+                                }
+                            );
+                        } else {
+                            throw new Error('No dataPath found in latest.json');
+                        }
+                    })
+                    .catch(error => {
+                        console.error(`HANDLER: Error in fetch process: ${error.message}`);
+                        loadingContainer.style.display = 'none';
+                        errorSection.style.display = 'block';
+                        errorMessage.textContent = `Error loading report: ${error.message}`;
+                        
+                        // Try to load report with ReportLoader instead
+                        if (window.ReportLoader) {
+                            console.log(`HANDLER: Falling back to ReportLoader`);
+                            window.ReportLoader.loadReportData(
+                                template,
+                                (result) => {
+                                    // Success callback
+                                    loadingContainer.style.display = 'none';
+                                    resultsContainer.style.display = 'block';
+                                    
+                                    debugReport('Report Data Loaded', result);
+                                    
+                                    if (!result || typeof result !== 'object' || Object.keys(result).length === 0) {
+                                        debug('app', 'WARNING: Report data is empty or invalid');
+                                        loadingContainer.style.display = 'none';
+                                        errorSection.style.display = 'block';
+                                        errorMessage.textContent = 'Report data is empty or invalid. This could be due to a missing data.js file.';
+                                        return;
+                                    }
+                                    
+                                    debug('app', 'Report loaded successfully, rendering dashboard', result);
+                                    dashboard.render(result, resultsContainer);
+                                    
+                                    // Scroll to the top of the analysis section
+                                    analysisSection.scrollIntoView({ behavior: 'smooth' });
+                                },
+                                (errorMsg) => {
+                                    // Error callback
+                                    debug('app', `Error loading report: ${errorMsg}`);
+                                    loadingContainer.style.display = 'none';
+                                    errorSection.style.display = 'block';
+                                    errorMessage.textContent = errorMsg || 'An unknown error occurred loading the report';
+                                }
+                            );
+                        } else {
+                            debug('app', 'Report loader not available');
+                            loadingContainer.style.display = 'none';
+                            errorSection.style.display = 'block';
+                            errorMessage.textContent = 'Report loader not initialized. Please reload the page and try again.';
+                        }
+                    });
+            });
             });
             
             card.querySelector('.rescan-btn').addEventListener('click', () => {
@@ -281,8 +440,51 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             
             div.querySelector('.view-report-btn').addEventListener('click', () => {
-                window.open(matchedTemplate.relativePath, '_blank');
-                debug('app', `Opening report at path: ${matchedTemplate.relativePath}`);
+                // Instead of opening in a new tab, load the report and render it inline
+                debug('app', `Loading report for template: ${matchedTemplate.relativePath}`);
+                
+                // Show loading state
+                document.getElementById('search-section').style.display = 'none';
+                if (scannedTemplatesSection) scannedTemplatesSection.style.display = 'none';
+                analysisSection.style.display = 'block';
+                resultsContainer.style.display = 'none';
+                loadingContainer.style.display = 'flex';
+                errorSection.style.display = 'none';
+                
+                // Set repo info
+                document.getElementById('repo-name').textContent = matchedTemplate.repoUrl.split('github.com/')[1] || matchedTemplate.repoUrl;
+                document.getElementById('repo-url').textContent = matchedTemplate.repoUrl;
+                
+                // Use the ReportLoader to load the data
+                if (window.ReportLoader) {
+                    window.ReportLoader.loadReportData(
+                        matchedTemplate,
+                        (result) => {
+                            // Success callback
+                            loadingContainer.style.display = 'none';
+                            resultsContainer.style.display = 'block';
+                            
+                            debug('app', 'Report loaded successfully, rendering dashboard', result);
+                            dashboard.render(result, resultsContainer);
+                            
+                            // Scroll to the top of the analysis section
+                            analysisSection.scrollIntoView({ behavior: 'smooth' });
+                        },
+                        (errorMsg) => {
+                            // Error callback
+                            debug('app', `Error loading report: ${errorMsg}`);
+                            loadingContainer.style.display = 'none';
+                            errorSection.style.display = 'block';
+                            errorMessage.textContent = errorMsg || 'An unknown error occurred loading the report';
+                        }
+                    );
+                } else {
+                    debug('app', 'Report loader not available');
+                    loadingContainer.style.display = 'none';
+                    errorSection.style.display = 'block';
+                    errorMessage.textContent = 'Report loader not initialized. Please reload the page and try again.';
+                }
+                
                 scrollAndHighlightTemplate(templateId);
             });
             
@@ -359,9 +561,50 @@ document.addEventListener('DOMContentLoaded', () => {
                         const index = parseInt(e.target.getAttribute('data-index'));
                         const template = scannedTemplates[index];
                         
-                        // Open the report in a new tab - path should be directly to the HTML file
-                        window.open(template.relativePath, '_blank');
-                        debug('app', `Opening report at path: ${template.relativePath}`);
+                        // Instead of opening in a new tab, load the report and render it inline
+                        debug('app', `Loading report for template: ${template.relativePath}`);
+                        
+                        // Show loading state
+                        document.getElementById('search-section').style.display = 'none';
+                        if (scannedTemplatesSection) scannedTemplatesSection.style.display = 'none';
+                        analysisSection.style.display = 'block';
+                        resultsContainer.style.display = 'none';
+                        loadingContainer.style.display = 'flex';
+                        errorSection.style.display = 'none';
+                        
+                        // Set repo info
+                        document.getElementById('repo-name').textContent = template.repoUrl.split('github.com/')[1] || template.repoUrl;
+                        document.getElementById('repo-url').textContent = template.repoUrl;
+                        
+                        // Use the ReportLoader to load the data
+                        if (window.ReportLoader) {
+                            window.ReportLoader.loadReportData(
+                                template,
+                                (result) => {
+                                    // Success callback
+                                    loadingContainer.style.display = 'none';
+                                    resultsContainer.style.display = 'block';
+                                    
+                                    debug('app', 'Report loaded successfully, rendering dashboard', result);
+                                    dashboard.render(result, resultsContainer);
+                                    
+                                    // Scroll to the top of the analysis section
+                                    analysisSection.scrollIntoView({ behavior: 'smooth' });
+                                },
+                                (errorMsg) => {
+                                    // Error callback
+                                    debug('app', `Error loading report: ${errorMsg}`);
+                                    loadingContainer.style.display = 'none';
+                                    errorSection.style.display = 'block';
+                                    errorMessage.textContent = errorMsg || 'An unknown error occurred loading the report';
+                                }
+                            );
+                        } else {
+                            debug('app', 'Report loader not available');
+                            loadingContainer.style.display = 'none';
+                            errorSection.style.display = 'block';
+                            errorMessage.textContent = 'Report loader not initialized. Please reload the page and try again.';
+                        }
                         
                         // Also scroll to the template card and highlight it
                         const templateId = `template-${template.relativePath.split('/')[0]}`.replace(/[^a-zA-Z0-9-]/g, '-');

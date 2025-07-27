@@ -488,6 +488,51 @@ class TemplateAnalyzer {
     }
 }
 
-// Create and export the analyzer instance
-const templateAnalyzer = new TemplateAnalyzer();
-window.TemplateAnalyzer = templateAnalyzer;
+// Create and export the analyzer instance after a small delay to ensure GitHub client is fully initialized
+setTimeout(() => {
+    console.log('[TemplateAnalyzer] Initializing analyzer with GitHub client:', {
+        clientInitialized: !!window.GitHubClient,
+        authenticated: window.GitHubClient?.auth?.isAuthenticated() || false
+    });
+    
+    // If the analyzer already exists and the token changes, re-initialize it
+    if (window.TemplateAnalyzer && window.GitHubClient) {
+        window.TemplateAnalyzer.githubClient = window.GitHubClient;
+        console.log('[TemplateAnalyzer] Updated existing analyzer with current GitHub client');
+    } else {
+        // Create new analyzer
+        const templateAnalyzer = new TemplateAnalyzer();
+        window.TemplateAnalyzer = templateAnalyzer;
+        console.log('[TemplateAnalyzer] Analyzer initialized and assigned to window.TemplateAnalyzer');
+    }
+    
+    // Dispatch event that analyzer is ready
+    const event = new CustomEvent('template-analyzer-ready');
+    document.dispatchEvent(event);
+}, 1000); // 1 second delay
+
+// Add extra initialization safety checks
+window.checkAnalyzerReady = function() {
+    if (!window.TemplateAnalyzer || !window.GitHubClient || !window.GitHubClient.auth || !window.GitHubClient.auth.isAuthenticated()) {
+        console.log('[TemplateAnalyzer] Analyzer or GitHub client not ready, reinitializing');
+        
+        // Force re-initialization
+        setTimeout(() => {
+            if (window.GitHubClient && window.GitHubClient.auth && window.GitHubClient.auth.isAuthenticated()) {
+                const templateAnalyzer = new TemplateAnalyzer();
+                window.TemplateAnalyzer = templateAnalyzer;
+                console.log('[TemplateAnalyzer] Analyzer re-initialized and ready');
+                
+                // Dispatch event that analyzer is ready
+                const event = new CustomEvent('template-analyzer-ready');
+                document.dispatchEvent(event);
+                
+                return true;
+            } else {
+                console.error('[TemplateAnalyzer] GitHub client not authenticated, cannot initialize analyzer');
+                return false;
+            }
+        }, 500);
+    }
+    return true;
+};

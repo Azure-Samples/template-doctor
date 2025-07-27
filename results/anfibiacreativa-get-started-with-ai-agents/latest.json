@@ -1,0 +1,12 @@
+{
+  "timestamp": "2025-07-25T10:14:02.435Z",
+  "dashboardPath": "1753438442443-dashboard.html",
+  "dataPath": "1753438442443-data.js",
+  "repoUrl": "https://github.com/anfibiacreativa/get-started-with-ai-agents",
+  "ruleSet": "partner",
+  "compliance": {
+    "percentage": 56,
+    "issues": 19,
+    "passed": 24
+  }
+}

@@ -13,7 +13,11 @@
     function DashboardRendererClass() {
         // Debug utility
         this.debug = function(message, data) {
-            console.log(`[DashboardRenderer] ${message}`, data !== undefined ? data : '');
+            if (typeof window.debug === 'function') {
+                window.debug('dashboard-renderer', message, data);
+            } else {
+                console.log(`[DashboardRenderer] ${message}`, data !== undefined ? data : '');
+            }
         };
         
         this.debug('Dashboard renderer initialized');
@@ -28,159 +32,625 @@
             
             if (!result || !container) {
                 console.error('Missing result data or container element');
+                container.innerHTML = `
+                    <div style="padding: 20px; background: #f8d7da; border-radius: 5px; margin: 20px 0; color: #721c24;">
+                        <h3>Error: Cannot render dashboard</h3>
+                        <p>Missing required data or container element</p>
+                        <pre style="background: #f5f5f5; padding: 10px; border-radius: 3px;">${JSON.stringify({
+                            resultExists: !!result,
+                            containerExists: !!container,
+                            resultType: result ? typeof result : 'undefined',
+                            containerType: container ? typeof container : 'undefined'
+                        }, null, 2)}</pre>
+                    </div>
+                `;
                 return;
             }
 
-            // Clear the container
-            container.innerHTML = '';
+            try {
+                // Clear the container
+                container.innerHTML = '';
+                
+                // First, show the raw data at the top for debugging
+                const debugSection = document.createElement('div');
+                debugSection.className = 'debug-section';
+                debugSection.style.cssText = 'margin-bottom: 30px; padding: 15px; background: #f8f9fa; border-radius: 5px; border: 1px solid #ddd;';
+                debugSection.innerHTML = `
+                    <h3 style="margin-top: 0;">Raw Report Data (Debug View)</h3>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                        <button id="toggle-raw-data" style="padding: 5px 10px; background: #e9ecef; border: none; border-radius: 3px; cursor: pointer;">
+                            Show Raw Data
+                        </button>
+                        <span style="color: #6c757d; font-size: 0.9em;">This debug section will be removed in production</span>
+                    </div>
+                    <div id="raw-data-content" style="display: none;">
+                        <pre style="background: #f5f5f5; padding: 10px; border-radius: 3px; max-height: 300px; overflow: auto;">${JSON.stringify(result, null, 2)}</pre>
+                    </div>
+                `;
+                container.appendChild(debugSection);
+                
+                // Add toggle functionality
+                setTimeout(() => {
+                    const toggleBtn = document.getElementById('toggle-raw-data');
+                    const rawContent = document.getElementById('raw-data-content');
+                    if (toggleBtn && rawContent) {
+                        toggleBtn.addEventListener('click', function() {
+                            if (rawContent.style.display === 'none') {
+                                rawContent.style.display = 'block';
+                                toggleBtn.textContent = 'Hide Raw Data';
+                            } else {
+                                rawContent.style.display = 'none';
+                                toggleBtn.textContent = 'Show Raw Data';
+                            }
+                        });
+                    }
+                }, 100);
+                
+                // Adapt result data to the format needed for rendering
+                const adaptedData = this.adaptResultData(result);
+                window.reportData = adaptedData; // Store for GitHub issue creation
+                
+                // Create overview section
+                this.renderOverview(adaptedData, container);
+                
+                // Create issues section
+                this.renderIssuesPanel(adaptedData, container);
+                
+                // Create passed checks section
+                this.renderPassedPanel(adaptedData, container);
+                
+                // Create action buttons footer
+                this.renderActionFooter(adaptedData, container);
+                
+                // Add event listeners for expandable sections
+                this.addEventListeners(container);
+            } catch (error) {
+                console.error('Error rendering dashboard:', error);
+                container.innerHTML = `
+                    <div style="padding: 20px; background: #f8d7da; border-radius: 5px; margin: 20px 0; color: #721c24;">
+                        <h3>Dashboard Rendering Error</h3>
+                        <p>${error.message}</p>
+                        <pre style="background: #f5f5f5; padding: 10px; border-radius: 3px;">${error.stack}</pre>
+                        <h4 style="margin-top: 20px;">Raw Data</h4>
+                        <pre style="background: #f5f5f5; padding: 10px; border-radius: 3px; max-height: 300px; overflow: auto;">${JSON.stringify(result, null, 2)}</pre>
+                    </div>
+                `;
+            }
+        };
+
+        /**
+         * Adapts the result data from the API format to the format expected by the rendering functions
+         * @param {Object} result - The original result data
+         * @returns {Object} - The adapted data
+         */
+        this.adaptResultData = function(result) {
+            console.log("Adapting data format:", result);
             
-            // Create overview section
-            this.renderOverview(result, container);
+            // Separate issues and compliant items
+            const issues = [];
+            const compliant = [];
             
-            // Create sections for each category
-            if (result.categories && Array.isArray(result.categories)) {
+            // Handle the new data format where issues are directly in result.compliance.issues
+            if (result.compliance && Array.isArray(result.compliance.issues)) {
+                // Direct issues array format (newer format)
+                result.compliance.issues.forEach(issue => {
+                    issues.push({
+                        id: issue.id || `issue-${issues.length}`,
+                        category: issue.id ? issue.id.split('-')[0] : 'general',
+                        message: issue.message || 'Unknown issue',
+                        error: issue.error || issue.message || 'No details available',
+                        details: {},
+                    });
+                });
+                
+                // If there are compliant items in the result
+                if (result.compliance.compliant && Array.isArray(result.compliance.compliant)) {
+                    result.compliance.compliant.forEach(item => {
+                        compliant.push({
+                            id: item.id || `passed-${compliant.length}`,
+                            category: item.id ? item.id.split('-')[0] : 'general',
+                            message: item.message || 'Passed check',
+                            error: '',
+                            details: {},
+                        });
+                    });
+                }
+            }
+            // Handle the older format with categories and checks
+            else if (result.categories && Array.isArray(result.categories)) {
                 result.categories.forEach(category => {
-                    this.renderCategory(category, container);
+                    if (category.checks && Array.isArray(category.checks)) {
+                        category.checks.forEach(check => {
+                            // Convert each check to the expected format
+                            const item = {
+                                id: `${category.id}-${check.id}`,
+                                category: category.id,
+                                message: check.name,
+                                error: check.details || check.description,
+                                details: {},
+                            };
+                            
+                            if (check.status === 'passed') {
+                                compliant.push(item);
+                            } else {
+                                issues.push(item);
+                            }
+                        });
+                    }
                 });
             }
             
-            // Add event listeners for expandable sections
-            this.addEventListeners(container);
-        }
+            // Calculate compliance percentage
+            const totalChecks = issues.length + compliant.length;
+            const percentageCompliant = totalChecks > 0 
+                ? Math.round((compliant.length / totalChecks) * 100) 
+                : 0;
+                
+            // Add meta item with compliance details
+            compliant.push({
+                category: 'meta',
+                message: 'Compliance Summary',
+                details: {
+                    percentageCompliant: percentageCompliant,
+                    totalChecks: totalChecks,
+                    passedChecks: compliant.length,
+                    issuesCount: issues.length
+                }
+            });
+            
+            // Create the adapted result data object
+            return {
+                repoUrl: result.repoUrl || window.location.href,
+                compliance: {
+                    issues: issues,
+                    compliant: compliant,
+                    summary: `${percentageCompliant}% compliant`
+                },
+                totalIssues: issues.length,
+                totalPassed: compliant.length
+            };
+        };
         
         /**
          * Renders the overview section with compliance scores
-         * @param {Object} result - The analysis result data
+         * @param {Object} data - The adapted result data
          * @param {HTMLElement} container - The container element to render into
          */
-        this.renderOverview = function(result, container) {
+        this.renderOverview = function(data, container) {
             const overviewSection = document.createElement('section');
-            overviewSection.className = 'overview-section';
+            overviewSection.className = 'overview';
             
-            const overallCompliance = Math.round(
-                (result.totalPassed / (result.totalPassed + result.totalIssues)) * 100
-            ) || 0;
+            const compliancePercentage = data.compliance.compliant.find(item => item.category === 'meta')?.details?.percentageCompliant || 0;
             
             overviewSection.innerHTML = `
                 <h2>Compliance Overview</h2>
-                <div class="compliance-summary">
-                    <div class="compliance-score">
-                        <div class="score-circle">
-                            <span class="score-value">${overallCompliance}%</span>
-                        </div>
-                        <span class="score-label">Compliance</span>
-                    </div>
-                    <div class="compliance-stats">
-                        <div class="stat-item passed">
-                            <i class="fas fa-check-circle"></i>
-                            <span>${result.totalPassed} checks passed</span>
-                        </div>
-                        <div class="stat-item issues">
+                <p class="overview-text">
+                    This dashboard provides an overview for your Azure template compliance status with the 'Azure Developer CLI Template Framework' <a href="https://github.com/Azure-Samples/azd-template-artifacts/blob/main/docs/development-guidelines/definition-of-done.md" title="Definition of Done">Definition of Done</a>. Browse the list below to
+                    fix specific issues or use the AI agent to automatically fix all compliance issues in VS Code.
+                </p>
+                <p>For more information about compliance and collections, go here <a href="https://github.com/Azure-Samples/azd-template-artifacts">Azure Developer CLI Template Framework Docs</a></p>
+                <div class="compliance-gauge">
+                    <div class="gauge-fill" id="complianceGauge" style="width: ${compliancePercentage}%; background-position: ${compliancePercentage}% 0;"></div>
+                    <div class="gauge-label" id="compliancePercentage">${compliancePercentage}%</div>
+                </div>
+                
+                <div class="overview-tiles">
+                    <div class="tile tile-issues">
+                        <div class="tile-icon">
                             <i class="fas fa-exclamation-triangle"></i>
-                            <span>${result.totalIssues} issues found</span>
+                        </div>
+                        <div class="tile-value" id="issuesCount">${data.totalIssues}</div>
+                        <div class="tile-title">Issues Found</div>
+                    </div>
+                    
+                    <div class="tile tile-passed">
+                        <div class="tile-icon">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div class="tile-value" id="passedCount">${data.totalPassed - 1}</div>
+                        <div class="tile-title">Passed Checks</div>
+                    </div>
+                    
+                    <div class="tile tile-trend">
+                        <div class="tile-header">
+                            <div class="tile-icon">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
+                            <div class="tile-title">Compliance Trend</div>
+                        </div>
+                        <div id="trendChart" class="trend-chart">
+                            <div class="no-data-message">Not enough historical data available yet.</div>
                         </div>
                     </div>
                 </div>
             `;
             
             container.appendChild(overviewSection);
-        }
+        };
         
         /**
-         * Renders a category section with its checks
-         * @param {Object} category - The category data
+         * Renders the issues panel with all failed checks
+         * @param {Object} data - The adapted result data
          * @param {HTMLElement} container - The container element to render into
          */
-        this.renderCategory = function(category, container) {
-            const categorySection = document.createElement('section');
-            categorySection.className = 'category-section';
+        this.renderIssuesPanel = function(data, container) {
+            const issuesPanel = document.createElement('section');
+            issuesPanel.className = 'panel';
+            issuesPanel.id = 'issuesPanel';
             
-            const passedChecks = category.checks.filter(check => check.status === 'passed');
-            const failedChecks = category.checks.filter(check => check.status === 'failed');
+            // Auto-expand the issues panel if there are issues
+            if (data.compliance.issues.length > 0) {
+                issuesPanel.classList.add('panel-open');
+            }
             
-            // Calculate compliance percentage for this category
-            const totalChecks = passedChecks.length + failedChecks.length;
-            const compliancePercentage = totalChecks > 0 
-                ? Math.round((passedChecks.length / totalChecks) * 100) 
-                : 0;
-            
-            categorySection.innerHTML = `
-                <div class="category-header">
-                    <h3>${category.name}</h3>
-                    <div class="category-stats">
-                        <div class="category-compliance">
-                            <div class="compliance-bar">
-                                <div class="compliance-fill" style="width: ${compliancePercentage}%"></div>
-                            </div>
-                            <span class="compliance-value">${compliancePercentage}%</span>
-                        </div>
-                        <div class="check-counts">
-                            <span class="passed-count">${passedChecks.length} passed</span>
-                            <span class="failed-count">${failedChecks.length} failed</span>
-                        </div>
-                        <button class="expand-btn">
-                            <i class="fas fa-chevron-down"></i>
-                        </button>
+            issuesPanel.innerHTML = `
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <span>Issues</span>
                     </div>
+                    <i class="fas fa-chevron-down panel-toggle"></i>
                 </div>
-                <div class="checks-list" style="display: none;">
-                    ${this.renderChecks(category.checks)}
+                <div class="panel-body">
+                    <div class="panel-content">
+                        <ul class="item-list" id="issuesList">
+                            ${this.renderIssueItems(data.compliance.issues)}
+                        </ul>
+                    </div>
                 </div>
             `;
             
-            container.appendChild(categorySection);
-        }
+            container.appendChild(issuesPanel);
+        };
         
         /**
-         * Renders the list of checks for a category
-         * @param {Array} checks - The checks array
-         * @returns {string} HTML for the checks list
+         * Renders the passed checks panel
+         * @param {Object} data - The adapted result data
+         * @param {HTMLElement} container - The container element to render into
          */
-        this.renderChecks = function(checks) {
-            if (!checks || !Array.isArray(checks)) return '';
+        this.renderPassedPanel = function(data, container) {
+            const passedPanel = document.createElement('section');
+            passedPanel.className = 'panel';
+            passedPanel.id = 'passedPanel';
             
-            return checks.map(check => `
-                <div class="check-item ${check.status}">
-                    <div class="check-status">
-                        <i class="fas ${check.status === 'passed' ? 'fa-check-circle' : 'fa-exclamation-triangle'}"></i>
+            // Auto-expand the passed panel if there are no issues
+            if (data.compliance.issues.length === 0) {
+                passedPanel.classList.add('panel-open');
+            }
+            
+            // Filter out the meta item
+            const passedItems = data.compliance.compliant.filter(item => item.category !== 'meta');
+            
+            passedPanel.innerHTML = `
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <i class="fas fa-check-circle"></i>
+                        <span>Passed Checks</span>
                     </div>
-                    <div class="check-content">
-                        <h4>${check.name}</h4>
-                        <p class="check-description">${check.description}</p>
-                        ${check.details ? `<p class="check-details">${check.details}</p>` : ''}
-                        ${check.recommendation ? `
-                            <div class="check-recommendation">
-                                <h5>Recommendation</h5>
-                                <p>${check.recommendation}</p>
-                            </div>
-                        ` : ''}
+                    <i class="fas fa-chevron-down panel-toggle"></i>
+                </div>
+                <div class="panel-body">
+                    <div class="panel-content">
+                        <ul class="item-list" id="passedList">
+                            ${this.renderPassedItems(passedItems)}
+                        </ul>
                     </div>
                 </div>
-            `).join('');
-        }
+            `;
+            
+            container.appendChild(passedPanel);
+        };
+        
+        /**
+         * Renders HTML for issue items
+         * @param {Array} issues - Array of issue objects
+         * @returns {string} HTML for issue items
+         */
+        this.renderIssueItems = function(issues) {
+            if (!issues || issues.length === 0) {
+                return '<li class="item"><div class="item-message">No issues found. Great job!</div></li>';
+            }
+            
+            return issues.map(issue => {
+                // Determine the category display name
+                let category;
+                if (issue.id.includes('missing-file')) {
+                    category = 'Missing File';
+                } else if (issue.id.includes('missing-folder')) {
+                    category = 'Missing Folder';
+                } else if (issue.id.includes('missing-workflow')) {
+                    category = 'Missing Workflow';
+                } else if (issue.id.includes('missing-doc')) {
+                    category = 'Missing Documentation';
+                } else if (issue.id.includes('readme')) {
+                    category = 'README Issue';
+                } else if (issue.id.includes('bicep')) {
+                    category = 'Bicep Issue';
+                } else if (issue.id.includes('azure-yaml')) {
+                    category = 'Azure YAML Issue';
+                } else {
+                    category = 'General Issue';
+                }
+                
+                // Generate a fix hint based on the issue type
+                let fixHint;
+                if (issue.id.includes('missing-file') || issue.id.includes('missing-folder')) {
+                    fixHint = `Create the missing ${issue.id.includes('file') ? 'file' : 'folder'} in your repository.`;
+                } else if (issue.id.includes('missing-workflow')) {
+                    fixHint = "Add the required workflow file to your .github/workflows directory.";
+                } else if (issue.id.includes('readme')) {
+                    fixHint = "Update your README.md with the required headings and content.";
+                } else if (issue.id.includes('bicep')) {
+                    fixHint = "Add the missing resources to your Bicep files.";
+                } else if (issue.id.includes('azure-yaml')) {
+                    fixHint = "Update your azure.yaml file to include required sections.";
+                } else {
+                    fixHint = "Review the issue details and make appropriate changes.";
+                }
+                
+                return `
+                    <li class="item issue-item">
+                        <div class="item-header">
+                            <div class="item-title">${issue.message}</div>
+                            <div class="item-category">${category}</div>
+                        </div>
+                        <div class="item-message">${issue.error || issue.message}</div>
+                        <div class="item-details">
+                            <strong>How to fix:</strong> ${fixHint}
+                        </div>
+                        <div class="item-actions">
+                            <a href="#" 
+                               class="item-link"
+                               onclick="return openEditorWithFile(event, '${issue.id}')">
+                                <i class="fas fa-external-link-alt"></i> Fix in editor
+                            </a>
+                            <a href="#"
+                               class="item-link"
+                               style="margin-left: 15px;"
+                               onclick="return createSingleIssue(event, '${issue.id}')">
+                                <i class="fab fa-github"></i> Create issue
+                            </a>
+                        </div>
+                    </li>
+                `;
+            }).join('');
+        };
+        
+        /**
+         * Renders HTML for passed items
+         * @param {Array} passedItems - Array of passed item objects
+         * @returns {string} HTML for passed items
+         */
+        this.renderPassedItems = function(passedItems) {
+            if (!passedItems || passedItems.length === 0) {
+                return '<li class="item"><div class="item-message">No passed checks yet.</div></li>';
+            }
+            
+            return passedItems.map(item => {
+                // Format category for display
+                const categoryDisplay = item.category
+                    .replace(/([A-Z])/g, ' $1')
+                    .replace(/^./, str => str.toUpperCase());
+                
+                let detailsHtml = '';
+                if (item.details && Object.keys(item.details).length > 0) {
+                    detailsHtml = '<div class="item-details">';
+                    
+                    for (const [key, value] of Object.entries(item.details)) {
+                        // Skip displaying arrays if they're too long
+                        if (Array.isArray(value) && value.length > 3) {
+                            detailsHtml += `<div><strong>${key}:</strong> ${value.length} items</div>`;
+                        } else if (typeof value === 'object' && value !== null) {
+                            detailsHtml += `<div><strong>${key}:</strong> ${JSON.stringify(value)}</div>`;
+                        } else {
+                            detailsHtml += `<div><strong>${key}:</strong> ${value}</div>`;
+                        }
+                    }
+                    
+                    detailsHtml += '</div>';
+                }
+                
+                return `
+                    <li class="item passed-item">
+                        <div class="item-header">
+                            <div class="item-title">${item.message}</div>
+                            <div class="item-category">${categoryDisplay}</div>
+                        </div>
+                        ${detailsHtml}
+                    </li>
+                `;
+            }).join('');
+        };
+        
+        /**
+         * Renders the action footer with buttons
+         * @param {Object} data - The adapted result data
+         * @param {HTMLElement} container - The container element to render into
+         */
+        this.renderActionFooter = function(data, container) {
+            const actionFooter = document.createElement('div');
+            actionFooter.className = 'action-footer';
+            
+            // Generate a prompt for the agent based on issues
+            const agentPrompt = this.generateAgentPrompt(data);
+            
+            actionFooter.innerHTML = `
+                <div class="tooltip">
+                    <a href="#" class="btn" id="fixButton">
+                        <i class="fas fa-code"></i>
+                        Fix with AI Agent
+                    </a>
+                    <span class="tooltiptext">Opens your template in VS Code with an AI agent prompt.</span>
+                </div>
+                
+                <div class="tooltip">
+                    <button id="create-github-issue-btn" class="btn" style="background-color: #2b3137;">
+                        <i class="fab fa-github"></i>
+                        Create GitHub Issue
+                    </button>
+                    <span class="tooltiptext">Creates an issue in your repository with compliance details.</span>
+                </div>
+                
+                <div class="tooltip">
+                    <button id="testProvisionButton" class="btn" style="background-color: #0078d4;">
+                        <i class="fas fa-rocket"></i>
+                        Test AZD Provision
+                    </button>
+                    <span class="tooltiptext">Tests if your template can be successfully provisioned with AZD.</span>
+                </div>
+            `;
+            
+            container.appendChild(actionFooter);
+            
+            // Add event listeners for the buttons
+            this.setupActionButtons(data);
+        };
+        
+        /**
+         * Generate an intelligent prompt for the agent
+         * @param {Object} data - The adapted result data
+         * @returns {string} - The generated prompt
+         */
+        this.generateAgentPrompt = function(data) {
+            const issues = data.compliance.issues;
+            const compliancePercentage = data.compliance.compliant.find(item => item.category === 'meta')?.details?.percentageCompliant || 0;
+            
+            // Create a concise bulleted list format for the agent
+            let prompt = `Fix Azure Template Compliance Issues (${compliancePercentage}%)\n\n`;
+            
+            // Keep a flat list of all issues for cleaner bullet points
+            if (issues.length === 0) {
+                prompt += "• No issues found! The template is fully compliant.";
+                return prompt;
+            }
+            
+            // Add header for issues
+            prompt += `Issues that need fixing:\n\n`;
+            
+            // Add all issues as bullet points
+            issues.forEach(issue => {
+                let issueText = issue.message;
+                // Extract file/folder names when available
+                if (issue.id.includes('missing-file')) {
+                    const fileName = issue.message.match(/Missing required file: (.+)/)?.[1] || issue.message;
+                    prompt += `• Create file: ${fileName}\n`;
+                } else if (issue.id.includes('missing-folder')) {
+                    const folderName = issue.message.match(/Missing required folder: (.+)/)?.[1] || issue.message;
+                    prompt += `• Create folder: ${folderName}\n`;
+                } else if (issue.id.includes('missing-workflow')) {
+                    prompt += `• ${issue.message}\n`;
+                } else if (issue.id.includes('readme')) {
+                    prompt += `• ${issue.message}\n`;
+                } else if (issue.id.includes('bicep')) {
+                    prompt += `• ${issue.message}\n`;
+                } else if (issue.id.includes('azure-yaml')) {
+                    prompt += `• ${issue.message}\n`;
+                } else {
+                    prompt += `• ${issue.message}\n`;
+                }
+            });
+            
+            // Add reference to standards
+            prompt += `\nPlease fix these issues following Azure template best practices.`;
+            
+            return prompt;
+        };
+        
+        /**
+         * Setup event listeners for action buttons
+         * @param {Object} data - The adapted result data
+         */
+        this.setupActionButtons = function(data) {
+            // Fix with AI Agent button
+            const fixButton = document.getElementById('fixButton');
+            if (fixButton) {
+                // Update the fix button URL with the Azure template URL format
+                const templateUrl = encodeURIComponent(data.repoUrl);
+                fixButton.href = `https://insiders.vscode.dev/azure?azdTemplateUrl=${templateUrl}`;
+            }
+            
+            // Create GitHub Issue button
+            const createIssueButton = document.getElementById('create-github-issue-btn');
+            if (createIssueButton) {
+                createIssueButton.addEventListener('click', () => {
+                    console.log("Create GitHub Issue button clicked");
+                    // The createGitHubIssue function will be defined globally
+                    if (typeof window.createGitHubIssue === 'function') {
+                        window.createGitHubIssue();
+                    } else {
+                        alert("GitHub issue creation is not available in this view");
+                    }
+                });
+            }
+            
+            // Test AZD Provision button
+            const testProvisionButton = document.getElementById('testProvisionButton');
+            if (testProvisionButton) {
+                testProvisionButton.addEventListener('click', () => {
+                    console.log("Test AZD Provision button clicked");
+                    // The testAzdProvision function will be defined globally
+                    if (typeof window.testAzdProvision === 'function') {
+                        window.testAzdProvision();
+                    } else {
+                        alert("AZD provision testing is not available in this view");
+                    }
+                });
+            }
+        };
         
         /**
          * Adds event listeners to expandable sections
          * @param {HTMLElement} container - The container element
          */
         this.addEventListeners = function(container) {
-            const expandButtons = container.querySelectorAll('.expand-btn');
-            expandButtons.forEach(btn => {
-                btn.addEventListener('click', () => {
-                    // Find the parent category section
-                    const categorySection = btn.closest('.category-section');
-                    const checksList = categorySection.querySelector('.checks-list');
-                    
-                    // Toggle visibility
-                    if (checksList.style.display === 'none') {
-                        checksList.style.display = 'block';
-                        btn.querySelector('i').className = 'fas fa-chevron-up';
-                    } else {
-                        checksList.style.display = 'none';
-                        btn.querySelector('i').className = 'fas fa-chevron-down';
-                    }
+            // Setup panel toggle functionality
+            container.querySelectorAll('.panel-header').forEach(header => {
+                header.addEventListener('click', () => {
+                    const panel = header.parentElement;
+                    panel.classList.toggle('panel-open');
                 });
             });
+            
+            // Define global handler functions for issue item actions
+            window.openEditorWithFile = function(event, issueId) {
+                event.preventDefault();
+                
+                const issue = window.reportData.compliance.issues.find(i => i.id === issueId);
+                if (!issue) return true;
+                
+                // Determine the file path based on issue type
+                let filePath = '';
+                
+                if (issueId.includes('missing-file')) {
+                    filePath = issueId.replace('missing-file-', '');
+                } else if (issueId.includes('missing-workflow')) {
+                    const workflowName = issueId.replace('missing-workflow-', '');
+                    filePath = `.github/workflows/${workflowName}.yml`;
+                } else if (issueId.includes('readme')) {
+                    filePath = "README.md";
+                } else if (issueId.includes('bicep') && issueId.includes('main')) {
+                    filePath = "infra/main.bicep";
+                } else if (issueId.includes('azure-yaml')) {
+                    filePath = "azure.yaml";
+                }
+                
+                const templateUrl = encodeURIComponent(window.reportData.repoUrl);
+                let url = `https://insiders.vscode.dev/azure?azdTemplateUrl=${templateUrl}`;
+                
+                // Add file path if available
+                if (filePath) {
+                    url += `&path=${encodeURIComponent(filePath)}`;
+                }
+                
+                window.open(url, '_blank');
+                return false;
+            };
+            
+            window.createSingleIssue = function(event, issueId) {
+                event.preventDefault();
+                alert(`GitHub issue creation for individual issues is not available in this view. Please use the 'Create GitHub Issue' button to create issues for all compliance problems.`);
+                return false;
+            };
         }
     }
     

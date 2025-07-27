@@ -1,0 +1,41 @@
+[
+  {
+    "timestamp": "2025-07-25T07:37:50.279Z",
+    "percentage": 52,
+    "issues": 12,
+    "passed": 13,
+    "dashboardPath": "1753429070299-dashboard.html"
+  },
+  {
+    "timestamp": "2025-07-25T08:08:55.163Z",
+    "ruleSet": "partner",
+    "percentage": 60,
+    "issues": 6,
+    "passed": 9,
+    "dashboardPath": "1753430935168-dashboard.html"
+  },
+  {
+    "timestamp": "2025-07-25T08:09:19.990Z",
+    "ruleSet": "partner",
+    "percentage": 60,
+    "issues": 6,
+    "passed": 9,
+    "dashboardPath": "1753430960000-dashboard.html"
+  },
+  {
+    "timestamp": "2025-07-25T08:37:12.678Z",
+    "ruleSet": "partner",
+    "percentage": 60,
+    "issues": 6,
+    "passed": 9,
+    "dashboardPath": "1753432632685-dashboard.html"
+  },
+  {
+    "timestamp": "2025-07-25T08:38:45.913Z",
+    "ruleSet": "partner",
+    "percentage": 60,
+    "issues": 6,
+    "passed": 9,
+    "dashboardPath": "1753432725919-dashboard.html"
+  }
+]
