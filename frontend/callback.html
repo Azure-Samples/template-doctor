@@ -2,97 +2,111 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>GitHub OAuth Callback</title>
-  <script src="js/auth.js"></script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f5f5f5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
+      color: #333;
+    }
+    .container {
+      background-color: white;
+      border-radius: 8px;
+      padding: 30px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      max-width: 500px;
+      width: 100%;
+    }
+    .spinner {
+      border: 4px solid rgba(0, 0, 0, 0.1);
+      border-left-color: #0078d4;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 20px auto;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    h2 {
+      color: #0078d4;
+      margin-top: 0;
+    }
+    p {
+      margin: 15px 0;
+    }
+    .error {
+      color: #d83b01;
+    }
+  </style>
 </head>
 <body>
-  <h1>GitHub Authentication</h1>
-  <p>Authentication complete. Redirecting back to the application...</p>
+  <div class="container">
+    <h2>GitHub Authentication</h2>
+    <div id="loading">
+      <div class="spinner"></div>
+      <p>Processing authentication...</p>
+    </div>
+    <div id="error-message" style="display: none;" class="error"></div>
+  </div>
+
   <script>
-    // Debug logging utility
-    function debug(module, message, data) {
-      const timestamp = new Date().toISOString();
-      console.log(`[${timestamp}][${module}] ${message}`, data !== undefined ? data : '');
+    // Parse the URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    const state = urlParams.get('state');
+    const error = urlParams.get('error');
+    const errorDescription = urlParams.get('error_description');
+
+    // Show error if present
+    if (error) {
+      document.getElementById('loading').style.display = 'none';
+      const errorElement = document.getElementById('error-message');
+      errorElement.textContent = `Error: ${error}${errorDescription ? ' - ' + errorDescription : ''}`;
+      errorElement.style.display = 'block';
+      
+      // Store error in session storage to show on main page
+      sessionStorage.setItem('auth_error', errorDescription || error);
+      
+      // Redirect back to main page after 3 seconds
+      setTimeout(() => {
+        window.location.href = window.location.origin + '/index.html';
+      }, 3000);
+    } 
+    // Process code
+    else if (code && state) {
+      // Send code and state back to index page and redirect
+      sessionStorage.setItem('gh_auth_code', code);
+      sessionStorage.setItem('gh_auth_state', state);
+      
+      // Redirect back to index.html
+      window.location.href = window.location.origin + '/index.html';
+    } 
+    // No code or error
+    else {
+      document.getElementById('loading').style.display = 'none';
+      const errorElement = document.getElementById('error-message');
+      errorElement.textContent = 'Error: No authorization code received from GitHub.';
+      errorElement.style.display = 'block';
+      
+      // Store error
+      sessionStorage.setItem('auth_error', 'No authorization code received from GitHub.');
+      
+      // Redirect back to main page after 3 seconds
+      setTimeout(() => {
+        window.location.href = window.location.origin + '/index.html';
+      }, 3000);
     }
-    
-    // Handle the GitHub OAuth callback
-    function handleOAuthCallback() {
-      debug('callback', 'Processing authentication callback');
-      
-      // Extract code and state from URL
-      const query = new URLSearchParams(window.location.search);
-      const code = query.get('code');
-      const state = query.get('state');
-      
-      debug('callback', 'Parameters from URL', { code: code ? `${code.substring(0, 5)}...` : 'missing', state });
-      
-      if (!code) {
-        debug('callback', 'No authorization code found in URL');
-        document.querySelector('p').innerText = 'Error: No authorization code received from GitHub.';
-        return;
-      }
-      
-      // Store the code in sessionStorage so we can retry if needed
-      sessionStorage.setItem('github_auth_code', code);
-      sessionStorage.setItem('github_auth_state', state);
-      sessionStorage.setItem('github_auth_timestamp', new Date().toISOString());
-      
-      // Check if GitHubAuth is available
-      if (window.GitHubAuth) {
-        debug('callback', 'GitHubAuth is available, handling code exchange');
-        
-        try {
-          // Explicitly call the exchange method
-          window.GitHubAuth.exchangeCodeForToken(code);
-          debug('callback', 'Code exchange initiated');
-        } catch (error) {
-          debug('callback', 'Error during code exchange', error.message);
-          document.querySelector('p').innerText = 'Error during authentication: ' + error.message;
-        }
-      } else {
-        debug('callback', 'GitHubAuth not found! May need to wait for script to load');
-        document.querySelector('p').innerText = 'Waiting for authentication handler to load...';
-      }
-    }
-    
-    // Add a load event listener to handle the callback
-    document.addEventListener('DOMContentLoaded', function() {
-      debug('callback', 'Callback page loaded');
-      
-      // Check if the script loaded
-      if (document.querySelector('script[src="js/auth.js"]').complete) {
-        debug('callback', 'Auth script already loaded');
-        handleOAuthCallback();
-      } else {
-        debug('callback', 'Waiting for auth script to load');
-        document.querySelector('script[src="js/auth.js"]').onload = function() {
-          debug('callback', 'Auth script loaded');
-          handleOAuthCallback();
-        };
-      }
-      
-      // Set a timer to check if authentication completed successfully
-      let checkCount = 0;
-      const checkInterval = setInterval(function() {
-        checkCount++;
-        const token = localStorage.getItem('gh_access_token');
-        debug('callback', `Checking authentication status (${checkCount}/10)`, token ? 'Token exists' : 'No token yet');
-        
-        if (token) {
-          // Auth completed successfully
-          debug('callback', 'Authentication completed successfully');
-          document.querySelector('p').innerText = 'Authentication successful! Redirecting...';
-          clearInterval(checkInterval);
-          window.location.href = '/';
-        } else if (checkCount >= 10) {
-          // We've waited long enough, redirect anyway
-          debug('callback', 'Timed out waiting for authentication, redirecting anyway');
-          document.querySelector('p').innerText = 'Authentication may not have completed. Redirecting...';
-          clearInterval(checkInterval);
-          window.location.href = '/?auth_error=timeout';
-        }
-      }, 1000); // Check every second for up to 10 seconds
-    });
   </script>
 </body>
 </html>

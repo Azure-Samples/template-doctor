@@ -84,28 +84,31 @@ class GitHubAuth {
      * This should be called when the page loads
      */
     handleCallback() {
-        console.log('handleCallback: Checking for code in URL');
-        // Check if we have a code in the URL (callback from GitHub OAuth)
-        const query = new URLSearchParams(window.location.search);
-        const code = query.get('code');
-        const state = query.get('state');
+        debug('handleCallback', 'Checking for code in sessionStorage');
+        
+        // In our app, we're storing the code in sessionStorage from the callback.html page
+        const code = sessionStorage.getItem('gh_auth_code');
+        const state = sessionStorage.getItem('gh_auth_state');
         const expectedState = localStorage.getItem('oauth_state');
         
-        console.log('handleCallback: Code:', code, 'State:', state, 'Expected State:', expectedState);
+        debug('handleCallback', 'Code from sessionStorage:', code, 'State:', state, 'Expected State:', expectedState);
         
         if (code) {
-            console.log('handleCallback: Found code in URL');
+            debug('handleCallback', 'Found code in sessionStorage');
             
             if (state !== expectedState) {
-                console.warn('handleCallback: State mismatch, potential CSRF attack');
+                debug('handleCallback', 'State mismatch, potential CSRF attack');
+                // We'll still try the exchange but log the warning
             }
             
             // Exchange the code for a token using our Azure Function
             this.exchangeCodeForToken(code);
             
-            // Don't clear URL parameters yet - let the exchange complete first
+            // Clear the session storage variables now that we've used them
+            sessionStorage.removeItem('gh_auth_code');
+            sessionStorage.removeItem('gh_auth_state');
         } else {
-            console.log('handleCallback: No code found in URL');
+            debug('handleCallback', 'No code found in sessionStorage');
         }
     }
 
@@ -124,8 +127,11 @@ class GitHubAuth {
         // Store the code temporarily in sessionStorage so we can retry if needed
         sessionStorage.setItem('last_auth_code', code);
         
-        // Make sure we're using the correct URL
-        const apiUrl = 'http://localhost:7071/api/github-oauth-token';
+        // Determine the correct API URL based on the environment
+        const isLocalhost = window.location.hostname === 'localhost';
+        const apiUrl = isLocalhost 
+            ? 'http://localhost:7071/api/github-oauth-token'
+            : 'https://template-doctor-api.azurewebsites.net/api/github-oauth-token';
         debug('exchangeCodeForToken', `API URL: ${apiUrl}`);
         
         // Simple fetch with minimal options to reduce CORS complexity

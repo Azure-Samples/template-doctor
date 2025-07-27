@@ -4,18 +4,7 @@
 // Debug logging utility - consistent with auth.js
 function debug(module, message, data) {
     const timestamp = new Date().toISOString();
-    console.log(`[${timestamp}][${module}] ${message}`, data !== undefined ? data : '');
-
-    div.querySelector('.rescan-btn').addEventListener('click', () => {
-                if (analyzer) {
-                    debug('app', `Rescanning template: ${matchedTemplate.owner}/${matchedTemplate.repo}`);
-                    analyzeRepo(matchedTemplate.owner, matchedTemplate.repo);
-                    scrollAndHighlightTemplate(templateId);
-                } else {
-                    debug('app', 'Analyzer not initialized for rescan');
-                    showError('Please wait for the analyzer to initialize before rescanning');
-                }
-            });
+    console.log(`[${timestamp}][${module}] ${message}`, data !== undefined ? data : '');   
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -153,11 +142,14 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Add click handlers
             card.querySelector('.view-report-btn').addEventListener('click', () => {
-                // Template path should already point directly to the HTML file
-                window.open(template.relativePath, '_blank');
+                // Ensure proper path resolution for the report
+                const basePath = window.location.hostname.includes('localhost') ? '/results' : '/frontend/results';
+                const reportUrl = `${basePath}/${template.relativePath}`;
+                
+                window.open(reportUrl, '_blank');
                 
                 // Log for debugging
-                debug('app', `Opening report at path: ${template.relativePath}`);
+                debug('app', `Opening report at path: ${reportUrl}`);
             });
             
             card.querySelector('.rescan-btn').addEventListener('click', () => {
@@ -283,8 +275,12 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
             
             div.querySelector('.view-report-btn').addEventListener('click', () => {
-                window.open(matchedTemplate.relativePath, '_blank');
-                debug('app', `Opening report at path: ${matchedTemplate.relativePath}`);
+                // Ensure proper path resolution for the report
+                const basePath = window.location.hostname.includes('localhost') ? '/results' : '/frontend/results';
+                const reportUrl = `${basePath}/${matchedTemplate.relativePath}`;
+                
+                window.open(reportUrl, '_blank');
+                debug('app', `Opening report at path: ${reportUrl}`);
                 scrollAndHighlightTemplate(templateId);
             });
             
@@ -361,9 +357,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         const index = parseInt(e.target.getAttribute('data-index'));
                         const template = scannedTemplates[index];
                         
-                        // Open the report in a new tab - path should be directly to the HTML file
-                        window.open(template.relativePath, '_blank');
-                        debug('app', `Opening report at path: ${template.relativePath}`);
+                        // Ensure proper path resolution for the report
+                        const basePath = window.location.hostname.includes('localhost') ? '/results' : '/frontend/results';
+                        const reportUrl = `${basePath}/${template.relativePath}`;
+                        
+                        // Open the report in a new tab
+                        window.open(reportUrl, '_blank');
+                        debug('app', `Opening report at path: ${reportUrl}`);
                         
                         // Also scroll to the template card and highlight it
                         const templateId = `template-${template.relativePath.split('/')[0]}`.replace(/[^a-zA-Z0-9-]/g, '-');

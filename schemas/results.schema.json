@@ -16,11 +16,11 @@
     },
     "compliance": {
       "type": "object",
-      "required": ["issues", "compliant", "summary"],
+      "required": ["issues", "summary"],
       "properties": {
         "summary": {
           "type": "string",
-          "description": "Overall compliance summary with percentage"
+          "description": "Overall compliance summary"
         },
         "issues": {
           "type": "array",
@@ -45,32 +45,6 @@
               "error": {
                 "type": "string",
                 "description": "Optional error message if the issue was due to an error reading a file"
-              }
-            }
-          }
-        },
-        "compliant": {
-          "type": "array",
-          "description": "List of compliant items",
-          "items": {
-            "type": "object",
-            "required": ["id", "category", "message"],
-            "properties": {
-              "id": {
-                "type": "string",
-                "description": "Unique identifier for the compliant item"
-              },
-              "category": {
-                "type": "string",
-                "description": "Category of the compliant item (e.g., requiredFile, requiredFolder, readmeHeading, etc.)"
-              },
-              "message": {
-                "type": "string",
-                "description": "Human-readable description of the compliant item"
-              },
-              "details": {
-                "type": "object",
-                "description": "Additional details about the compliant item"
               }
             }
           }

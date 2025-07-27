@@ -1,0 +1,8 @@
+            // Ensure proper path resolution for the report
+            const basePath = window.location.hostname.includes('localhost') ? '/results' : '/frontend/results';
+            const reportUrl = `${basePath}/${template.relativePath}`;
+
+            window.open(reportUrl, '_blank');
+
+            // Log for debugging
+            debug('app', `Opening report at path: ${reportUrl}`);
