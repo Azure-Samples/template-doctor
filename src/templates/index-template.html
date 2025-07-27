@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Template Doctor - Template Index</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #0078d4;
+            --primary-light: #60a5fa;
+            --primary-dark: #005a9e;
+            --success-color: #107c10;
+            --success-light: #dff6dd;
+            --warning-color: #d83b01;
+            --warning-light: #fed9cc;
+            --background-color: #f5f5f5;
+            --card-background: #ffffff;
+            --text-color: #323130;
+            --text-secondary: #605e5c;
+            --border-color: #edebe9;
+            --shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--background-color);
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Header Styles */
+        header {
+            background-color: var(--card-background);
+            box-shadow: var(--shadow);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            padding: 16px 0;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo img {
+            height: 36px;
+            width: auto;
+        }
+
+        .logo h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        /* Main Content Styles */
+        main {
+            padding: 32px 0;
+        }
+
+        .overview {
+            background-color: var(--card-background);
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: var(--shadow);
+            margin-bottom: 24px;
+        }
+
+        .overview h2 {
+            font-size: 1.25rem;
+            margin-bottom: 16px;
+            color: var(--primary-color);
+        }
+
+        .overview-text {
+            margin-bottom: 24px;
+            color: var(--text-secondary);
+        }
+
+        /* Template Card Styles */
+        .templates-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .template-card {
+            background-color: var(--card-background);
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            padding: 20px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .template-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+        }
+
+        .template-header {
+            margin-bottom: 12px;
+        }
+
+        .template-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: var(--primary-color);
+        }
+
+        .template-url {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .template-stats {
+            display: flex;
+            justify-content: space-between;
+            margin: 16px 0;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .template-timestamp {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            margin-top: auto;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-color);
+            text-align: right;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 8px 16px;
+            background-color: var(--primary-color);
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-top: 12px;
+            text-align: center;
+            transition: background-color 0.2s, transform 0.2s;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        .gauge {
+            width: 100%;
+            height: 8px;
+            background-color: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 8px 0;
+        }
+
+        .gauge-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 1s;
+        }
+
+        .high {
+            background-color: var(--success-color);
+        }
+
+        .medium {
+            background-color: #f0ad4e;
+        }
+
+        .low {
+            background-color: var(--warning-color);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        /* Footer Styles */
+        .site-footer {
+            background-color: var(--primary-dark);
+            color: white;
+            padding: 16px 0;
+            text-align: center;
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+            z-index: 100;
+        }
+
+        .footer-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .copyright {
+            font-size: 0.9rem;
+        }
+
+        /* Add padding to ensure content isn't hidden behind fixed footer */
+        body {
+            padding-bottom: 60px;
+        }
+
+        @media (max-width: 768px) {
+            .templates-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .action-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin-top: 20px;
+        }
+        
+        .action-button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 10px 16px;
+            font-size: 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background-color 0.2s, transform 0.2s;
+        }
+        
+        .action-button:hover {
+            background-color: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+        
+        .rule-set-badge {
+            display: inline-block;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-left: 5px;
+        }
+        
+        .rule-dod {
+            background-color: #005a9e;
+            color: white;
+        }
+        
+        .rule-partner {
+            background-color: #6b2eb3;
+            color: white;
+        }
+        
+        .rule-custom {
+            background-color: #c19c00;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container header-content">
+            <div class="logo">
+                <img src="assets/images/logo.svg" alt="Template Doctor Logo">
+                <h1>Template Doctor</h1>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <section class="overview">
+            <h2>Azure Template Index</h2>
+            <p class="overview-text">
+                This page displays all Azure templates that have been analyzed with Template Doctor.
+                Select a template to view its detailed compliance report.
+            </p>
+            
+            <div class="action-buttons">
+                <button class="action-button" onclick="window.location.href='https://github.com/azure/awesome-azd'">
+                    <i class="fab fa-github"></i>
+                    Browse Azure Templates
+                </button>
+                <button class="action-button" onclick="window.location.href='https://learn.microsoft.com/azure/developer/azure-developer-cli/azd-templates'">
+                    <i class="fas fa-book"></i>
+                    Template Documentation
+                </button>
+            </div>
+        </section>
+
+        <div class="templates-grid" id="templates-container">
+            <!-- Templates will be populated here via JavaScript -->
+            <div class="empty-state" id="empty-state">
+                <i class="fas fa-search fa-3x" style="margin-bottom: 16px;"></i>
+                <p>No templates have been analyzed yet.</p>
+                <p style="margin-top: 10px; font-size: 0.9rem;">Run <code>template-doctor analyze --repo=&lt;url&gt;</code> to analyze a template.</p>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Wait for templatesData to be available
+            function initIndex() {
+                if (typeof window.templatesData === 'undefined') {
+                    setTimeout(initIndex, 100);
+                    return;
+                }
+                
+                const templatesContainer = document.getElementById('templates-container');
+                const emptyState = document.getElementById('empty-state');
+                
+                // If no templates, show empty state
+                if (!window.templatesData || window.templatesData.length === 0) {
+                    return;
+                }
+                
+                // Hide empty state if we have templates
+                emptyState.style.display = 'none';
+                
+                // Render template cards
+                window.templatesData.forEach(template => {
+                    const card = createTemplateCard(template);
+                    templatesContainer.appendChild(card);
+                });
+            }
+            
+            function createTemplateCard(template) {
+                const div = document.createElement('div');
+                div.className = 'template-card';
+                
+                // Determine repository name for display
+                const repoNameMatch = template.repoUrl.match(/github\.com\/([^/]+)\/([^/.]+)/);
+                const repoName = repoNameMatch ? `${repoNameMatch[1]}/${repoNameMatch[2]}` : 'Unknown';
+                
+                // Determine gauge class based on compliance percentage
+                let gaugeClass = 'low';
+                if (template.compliance.percentage >= 80) {
+                    gaugeClass = 'high';
+                } else if (template.compliance.percentage >= 50) {
+                    gaugeClass = 'medium';
+                }
+                
+                // Format date
+                const date = new Date(template.timestamp);
+                const formattedDate = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+                
+                // Format rule set for display - capitalize first letter
+                const ruleSet = template.ruleSet ? 
+                    template.ruleSet.charAt(0).toUpperCase() + template.ruleSet.slice(1) : 
+                    'DoD';
+                const ruleClass = `rule-${template.ruleSet || 'dod'}`;
+                
+                div.innerHTML = `
+                    <div class="template-header">
+                        <div class="template-name">${repoName}</div>
+                        <div class="template-url" title="${template.repoUrl}">${template.repoUrl}</div>
+                    </div>
+                    
+                    <div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <div>Compliance <span class="rule-set-badge ${ruleClass}">${ruleSet}</span>:</div>
+                            <div><strong>${template.compliance.percentage}%</strong></div>
+                        </div>
+                        <div class="gauge">
+                            <div class="gauge-fill ${gaugeClass}" style="width: ${template.compliance.percentage}%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="template-stats">
+                        <div class="stat-item">
+                            <div class="stat-value">${template.compliance.issues}</div>
+                            <div class="stat-label">Issues</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${template.compliance.passed}</div>
+                            <div class="stat-label">Passed</div>
+                        </div>
+                    </div>
+                    
+                    <a href="${template.relativePath}" class="btn">
+                        <i class="fas fa-chart-bar"></i> View Report
+                    </a>
+                    
+                    <div class="template-timestamp">
+                        <i class="far fa-clock"></i> ${formattedDate}
+                    </div>
+                `;
+                
+                return div;
+            }
+            
+            initIndex();
+        });
+    </script>
+    
+    <footer class="site-footer">
+        <div class="container footer-content">
+            <div class="copyright">©2025 - DevDiv Microsoft</div>
+        </div>
+    </footer>
+</body>
+</html>
