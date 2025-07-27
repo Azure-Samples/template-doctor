@@ -25,44 +25,73 @@ function debugReport(stage, data) {
     console.groupEnd();
 }
 
-// Direct data loading function - much simpler approach
+// Simple function to help with debugging
+function debugReportData(label, data) {
+    console.group(`REPORT DEBUG - ${label}`);
+    console.log('Data:', data ? 'present' : 'null/undefined');
+    if (data && typeof data === 'object') {
+        console.log('Keys:', Object.keys(data));
+        console.log('Compliance:', data.compliance ? 'present' : 'missing');
+        if (data.compliance) {
+            console.log('Issues:', Array.isArray(data.compliance.issues) ? data.compliance.issues.length : 'not an array');
+            console.log('Compliant:', Array.isArray(data.compliance.compliant) ? data.compliance.compliant.length : 'not an array');
+        }
+    }
+    console.groupEnd();
+}
+
+// Direct data loading function - uses direct loading with a script tag
 function directLoadDataFile(folderName, dataFileName, successCallback, errorCallback) {
     // Clear any previous reportData
     window.reportData = null;
     
     console.log(`DIRECT LOAD: Loading /results/${folderName}/${dataFileName}`);
     
-    // Create a new script element
+    // Create a script element to load the data.js file
     const script = document.createElement('script');
-    script.src = `/results/${folderName}/${dataFileName}`;
+    script.src = `/results/${folderName}/${dataFileName}`; 
     script.id = `data-js-${Date.now()}`;
+    script.async = true;
     
     // Set up onload handler
     script.onload = function() {
         console.log(`DIRECT LOAD: Script loaded successfully!`);
         
-        // Check if window.reportData was set
-        if (window.reportData) {
-            console.log(`DIRECT LOAD: Found window.reportData with ${Object.keys(window.reportData).length} keys`);
-            const data = { ...window.reportData };
-            window.reportData = null; // Clean up
-            successCallback(data);
-        } else {
-            console.error(`DIRECT LOAD: Script loaded but window.reportData is undefined!`);
-            errorCallback('Data file loaded but did not set window.reportData');
-        }
+        // Use a brief timeout to ensure the script has executed
+        setTimeout(function() {
+            // Check if window.reportData was set by the script
+            if (window.reportData) {
+                console.log(`DIRECT LOAD: Found window.reportData, calling success callback`);
+                debugReportData('DirectLoad Success', window.reportData);
+                
+                if (typeof successCallback === 'function') {
+                    // Make a copy of the data to avoid reference issues
+                    const data = JSON.parse(JSON.stringify(window.reportData));
+                    successCallback(data);
+                }
+            } else {
+                console.error(`DIRECT LOAD: Script loaded but window.reportData is undefined!`);
+                if (typeof errorCallback === 'function') {
+                    errorCallback('Data file loaded but did not set window.reportData');
+                }
+            }
+        }, 100); // Small delay to ensure script execution
     };
     
     // Set up error handler
     script.onerror = function(e) {
         console.error(`DIRECT LOAD: Error loading script:`, e);
-        errorCallback(`Failed to load data file: ${dataFileName}`);
+        if (typeof errorCallback === 'function') {
+            errorCallback(`Failed to load data file: ${dataFileName}`);
+        }
     };
     
     // Add the script to the document
     document.head.appendChild(script);
     console.log(`DIRECT LOAD: Script tag added to document head with ID ${script.id}`);
 }
+
+
 
 document.addEventListener('DOMContentLoaded', () => {
     debug('app', 'Application initializing');
@@ -80,6 +109,21 @@ document.addEventListener('DOMContentLoaded', () => {
         debug('app', 'Auth error detected in session storage', storedAuthError);
         showAuthError(storedAuthError);
         sessionStorage.removeItem('auth_error');
+    }
+    
+    // Check if user was redirected after logout due to missing permissions
+    if (urlParams.has('require_permissions') && urlParams.has('logged_out')) {
+        debug('app', 'User needs to log back in with required permissions');
+        // Show notification after a slight delay to ensure the notification system is initialized
+        setTimeout(() => {
+            if (window.NotificationSystem) {
+                window.NotificationSystem.showWarning(
+                    'GitHub Permissions Required', 
+                    'Please login with GitHub to grant the "public_repo" permission needed to create issues.',
+                    10000
+                );
+            }
+        }, 500);
     }
     
     const auth = window.GitHubAuth;
@@ -228,7 +272,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log(`HANDLER: Loading report for ${folderName}`);
                 
                 // First, try to load latest.json to find the current data file
-                fetch(`/results/${folderName}/latest.json`)
+                const latestJsonPath = `/results/${folderName}/latest.json`;
+                console.log(`HANDLER: Fetching latest.json from: ${latestJsonPath}`);
+                
+                // Clear any existing reportData
+                resultsContainer.innerHTML = '';
+                
+                fetch(latestJsonPath)
                     .then(response => {
                         if (!response.ok) {
                             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -239,30 +289,172 @@ document.addEventListener('DOMContentLoaded', () => {
                         console.log(`HANDLER: Loaded latest.json:`, latestData);
                         
                         if (latestData && latestData.dataPath) {
-                            // We found the data path, use it to load the data directly
-                            directLoadDataFile(
-                                folderName,
-                                latestData.dataPath,
-                                function(data) {
-                                    // Success callback
-                                    console.log(`HANDLER: Data loaded successfully`);
-                                    loadingContainer.style.display = 'none';
-                                    resultsContainer.style.display = 'block';
+                            console.log(`HANDLER: Found dataPath in latest.json: ${latestData.dataPath}`);
+                            
+                            // DISPLAY RAW DATA APPROACH: Use a direct fetch to get the data
+                            const dataUrl = `/results/${folderName}/${latestData.dataPath}`;
+                            console.log(`Loading data from: ${dataUrl}`);
+                            
+                            // First display a message to show we're trying
+                            loadingContainer.style.display = 'none';
+                            resultsContainer.style.display = 'block';
+                            resultsContainer.innerHTML = `
+                                <div style="padding: 20px; background: #f8f9fa; border-radius: 5px; margin-bottom: 20px;">
+                                    <h3>Loading Data (Debug Mode)</h3>
+                                    <p>Attempting to load data from: <code>${dataUrl}</code></p>
+                                    <div id="raw-data-container">Loading...</div>
+                                </div>
+                            `;
+                            
+                            // Try to load via script tag
+                            const scriptTag = document.createElement('script');
+                            scriptTag.src = dataUrl;
+                            
+                            // When script loads, immediately display the data
+                            scriptTag.onload = function() {
+                                console.log("Script loaded! Window.reportData:", window.reportData);
+                                
+                                const rawDataContainer = document.getElementById('raw-data-container');
+                                
+                                // Check if data is available
+                                if (window.reportData) {
+                                    // Display raw JSON
+                                    rawDataContainer.innerHTML = `
+                                        <h4>Data loaded successfully!</h4>
+                                        <p>Here's the raw data:</p>
+                                        <pre style="background: #333; color: #fff; padding: 10px; border-radius: 5px; max-height: 400px; overflow: auto;">${JSON.stringify(window.reportData, null, 2)}</pre>
+                                        <div style="display: flex; gap: 10px; margin-top: 15px;">
+                                            <button id="render-dashboard-btn" style="padding: 8px 15px; background: #0078d4; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                                Try to render dashboard with this data
+                                            </button>
+                                            <button id="fixed-render-btn" style="padding: 8px 15px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                                Render with fixed data format
+                                            </button>
+                                        </div>
+                                    `;
                                     
-                                    // Render the data in the dashboard
-                                    dashboard.render(data, resultsContainer);
-                                    
-                                    // Scroll to the top of the analysis section
-                                    analysisSection.scrollIntoView({ behavior: 'smooth' });
-                                },
-                                function(errorMsg) {
-                                    // Error callback
-                                    console.error(`HANDLER: Error loading data: ${errorMsg}`);
-                                    loadingContainer.style.display = 'none';
-                                    errorSection.style.display = 'block';
-                                    errorMessage.textContent = errorMsg;
+                                    // Add click handler for the render buttons
+                                    setTimeout(() => {
+                                        // Standard render button
+                                        const renderBtn = document.getElementById('render-dashboard-btn');
+                                        if (renderBtn) {
+                                            renderBtn.addEventListener('click', function() {
+                                                try {
+                                                    // Make a copy of the data
+                                                    const data = JSON.parse(JSON.stringify(window.reportData));
+                                                    
+                                                    // Clear the container
+                                                    resultsContainer.innerHTML = '';
+                                                    
+                                                    // Try to render
+                                                    dashboard.render(data, resultsContainer);
+                                                    
+                                                    // Scroll to the top of the analysis section
+                                                    analysisSection.scrollIntoView({ behavior: 'smooth' });
+                                                } catch (error) {
+                                                    resultsContainer.innerHTML = `<div style="padding: 20px; background: #f8d7da; color: #721c24; border-radius: 5px;">
+                                                        <h3>Render Error</h3>
+                                                        <p>Error rendering dashboard: ${error.message}</p>
+                                                        <pre>${error.stack}</pre>
+                                                    </div>`;
+                                                }
+                                            });
+                                        }
+                                        
+                                        // Fixed format button - this ensures the data is properly structured
+                                        const fixedBtn = document.getElementById('fixed-render-btn');
+                                        if (fixedBtn) {
+                                            fixedBtn.addEventListener('click', function() {
+                                                try {
+                                                    // Get the data and ensure it's properly structured
+                                                    let data = JSON.parse(JSON.stringify(window.reportData));
+                                                    
+                                                    // Ensure compliance structure exists
+                                                    if (!data.compliance) {
+                                                        data.compliance = {};
+                                                    }
+                                                    
+                                                    // Ensure compliance issues array exists
+                                                    if (!Array.isArray(data.compliance.issues)) {
+                                                        // If issues don't exist, create an empty array
+                                                        data.compliance.issues = [];
+                                                    }
+                                                    
+                                                    // Ensure there's a repoUrl
+                                                    if (!data.repoUrl) {
+                                                        data.repoUrl = window.location.href;
+                                                    }
+                                                    
+                                                    // Clear the container
+                                                    resultsContainer.innerHTML = '';
+                                                    
+                                                    // Try to render
+                                                    dashboard.render(data, resultsContainer);
+                                                    
+                                                    // Scroll to the top of the analysis section
+                                                    analysisSection.scrollIntoView({ behavior: 'smooth' });
+                                                } catch (error) {
+                                                    resultsContainer.innerHTML = `<div style="padding: 20px; background: #f8d7da; color: #721c24; border-radius: 5px;">
+                                                        <h3>Render Error</h3>
+                                                        <p>Error rendering dashboard with fixed data: ${error.message}</p>
+                                                        <pre>${error.stack}</pre>
+                                                    </div>`;
+                                                }
+                                            });
+                                        }
+                                    }, 100);
+                                } else {
+                                    rawDataContainer.innerHTML = `
+                                        <div style="padding: 15px; background: #f8d7da; color: #721c24; border-radius: 5px;">
+                                            <h4>Error: No Data Found</h4>
+                                            <p>The script loaded but window.reportData is not defined!</p>
+                                        </div>
+                                    `;
                                 }
-                            );
+                            };
+                            
+                            // Handle load errors
+                            scriptTag.onerror = function(error) {
+                                console.error("Script loading error:", error);
+                                const rawDataContainer = document.getElementById('raw-data-container');
+                                
+                                // Try alternative approach - fetch the content
+                                rawDataContainer.innerHTML = `
+                                    <div style="padding: 15px; background: #fff3cd; color: #856404; border-radius: 5px; margin-bottom: 15px;">
+                                        <h4>Script loading failed</h4>
+                                        <p>Trying alternative approach (fetch)...</p>
+                                    </div>
+                                `;
+                                
+                                // Try to fetch the content directly
+                                fetch(dataUrl)
+                                    .then(response => {
+                                        rawDataContainer.innerHTML += `
+                                            <div style="margin-bottom: 10px;">
+                                                <strong>Fetch status:</strong> ${response.status} ${response.statusText}
+                                            </div>
+                                        `;
+                                        return response.text();
+                                    })
+                                    .then(content => {
+                                        // Show the raw file content
+                                        rawDataContainer.innerHTML += `
+                                            <h4>Raw file content:</h4>
+                                            <pre style="background: #333; color: #fff; padding: 10px; border-radius: 5px; max-height: 300px; overflow: auto;">${content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
+                                        `;
+                                    })
+                                    .catch(fetchError => {
+                                        rawDataContainer.innerHTML += `
+                                            <div style="padding: 15px; background: #f8d7da; color: #721c24; border-radius: 5px;">
+                                                <h4>Fetch Error</h4>
+                                                <p>${fetchError.message}</p>
+                                            </div>
+                                        `;
+                                    });
+                            };
+                            
+                            // Add the script to the document
+                            document.head.appendChild(scriptTag);
                         } else {
                             throw new Error('No dataPath found in latest.json');
                         }
@@ -276,16 +468,22 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Try to load report with ReportLoader instead
                         if (window.ReportLoader) {
                             console.log(`HANDLER: Falling back to ReportLoader`);
+                            // Add folderName to template object for better context
+                            const templateWithFolder = { ...template, folderName: folderName };
+                            console.log(`HANDLER: Template object for ReportLoader:`, templateWithFolder);
+                            
                             window.ReportLoader.loadReportData(
-                                template,
+                                templateWithFolder,
                                 (result) => {
                                     // Success callback
                                     loadingContainer.style.display = 'none';
                                     resultsContainer.style.display = 'block';
                                     
-                                    debugReport('Report Data Loaded', result);
+                                    console.log(`HANDLER: ReportLoader SUCCESS callback received:`, result);
+                                    debugReport('Report Data Loaded via ReportLoader', result);
                                     
                                     if (!result || typeof result !== 'object' || Object.keys(result).length === 0) {
+                                        console.warn(`HANDLER: Empty/invalid data from ReportLoader`);
                                         debug('app', 'WARNING: Report data is empty or invalid');
                                         loadingContainer.style.display = 'none';
                                         errorSection.style.display = 'block';
@@ -293,7 +491,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                         return;
                                     }
                                     
-                                    debug('app', 'Report loaded successfully, rendering dashboard', result);
+                                    debug('app', 'Report loaded successfully via ReportLoader, rendering dashboard', result);
                                     dashboard.render(result, resultsContainer);
                                     
                                     // Scroll to the top of the analysis section
@@ -301,6 +499,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 },
                                 (errorMsg) => {
                                     // Error callback
+                                    console.error(`HANDLER: ReportLoader ERROR callback received: ${errorMsg}`);
                                     debug('app', `Error loading report: ${errorMsg}`);
                                     loadingContainer.style.display = 'none';
                                     errorSection.style.display = 'block';
@@ -313,7 +512,6 @@ document.addEventListener('DOMContentLoaded', () => {
                             errorSection.style.display = 'block';
                             errorMessage.textContent = 'Report loader not initialized. Please reload the page and try again.';
                         }
-                    });
             });
             });
             
@@ -719,14 +917,36 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === 'Enter') searchRepos();
     });
     if (backButton) backButton.addEventListener('click', () => {
+        // Go back to search section and clear results
         analysisSection.style.display = 'none';
         document.getElementById('search-section').style.display = 'block';
         resultsContainer.innerHTML = '';
+        
+        // Make sure the scanned templates section is visible and up to date
+        if (window.templatesData && window.templatesData.length > 0) {
+            loadScannedTemplates(); // This will render the templates
+            
+            // Make sure the scanned templates section is visible
+            if (scannedTemplatesSection) {
+                scannedTemplatesSection.style.display = 'block';
+            }
+        }
     });
     if (errorBackButton) errorBackButton.addEventListener('click', () => {
+        // Go back from error view to search section
         errorSection.style.display = 'none';
         analysisSection.style.display = 'none';
         document.getElementById('search-section').style.display = 'block';
+        
+        // Make sure the scanned templates section is visible and up to date
+        if (window.templatesData && window.templatesData.length > 0) {
+            loadScannedTemplates(); // This will render the templates
+            
+            // Make sure the scanned templates section is visible
+            if (scannedTemplatesSection) {
+                scannedTemplatesSection.style.display = 'block';
+            }
+        }
     });
 
     // --- Auth Error Handling ---

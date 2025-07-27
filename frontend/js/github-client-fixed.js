@@ -386,42 +386,6 @@ class GitHubClient {
     }
 
     /**
-     * Get a user's node_id by login (for assignee)
-     * @param {string} login - GitHub username
-     * @returns {Promise<string>} - The user's node_id
-     */
-    async getUserNodeId(login) {
-        console.log(`Looking up GitHub user ID for username: ${login}`);
-        
-        // Extended query to get more user info for verification
-        const query = `query($login: String!) { 
-            user(login: $login) { 
-                id 
-                login
-                name
-                url
-            } 
-        }`;
-        
-        try {
-            const data = await this.graphql(query, { login });
-            
-            // Detailed logging of the user lookup result
-            console.log('User lookup successful:', {
-                login: data.user.login,
-                id: data.user.id,
-                name: data.user.name || '(No name provided)',
-                url: data.user.url
-            });
-            
-            return data.user.id;
-        } catch (error) {
-            console.error(`User lookup failed for "${login}":`, error);
-            throw new Error(`Unable to find GitHub user "${login}": ${error.message}`);
-        }
-    }
-
-    /**
      * Get a repository's node_id by owner/name
      * @param {string} owner
      * @param {string} name
@@ -456,7 +420,7 @@ class GitHubClient {
     }
 
     /**
-     * Create an issue using GraphQL and assign to copilot-agent-swe
+     * Create an issue using GraphQL and assign to the Copilot agent
      * @param {string} owner
      * @param {string} repo
      * @param {string} title
@@ -477,7 +441,7 @@ class GitHubClient {
                 throw new Error('Your GitHub token does not have the "public_repo" permission required to create issues');
             }
             
-            // Try to get node IDs for repository
+            // Get repository ID
             console.log('Getting repository ID');
             let repoId;
             
@@ -489,445 +453,81 @@ class GitHubClient {
                 throw new Error(`Could not find repository: ${owner}/${repo}`);
             }
             
-            // Get suggested actors that can be assigned (including the Copilot agent)
-            console.log('Checking for Copilot agent in available assignees...');
-            let copilotActor = null;
-            
-            try {
-                const suggestedActorsQuery = `
-                    query GetRepoAndCopilotInfo($owner: String!, $repo: String!) {
-                        repository(owner: $owner, name: $repo) {
-                            id
-                            suggestedActors(capabilities: [CAN_BE_ASSIGNED], first: 10) {
-                                nodes {
-                                    login
-                                    __typename
-                                    ... on Bot {
-                                        id
-                                    }
-                                    ... on User {
-                                        id
-                                    }
-                                }
-                            }
-                        }
-                    }
-                `;
-                
-                const repoData = await this.graphql(suggestedActorsQuery, { owner, repo });
-                
-                // Find the Copilot bot in the suggested actors
-                copilotActor = repoData.repository.suggestedActors.nodes.find(
-                    actor => actor.login === "copilot-agent-swe"
-                );
-                
-                if (copilotActor) {
-                    console.log('Found Copilot agent in suggested actors:', copilotActor);
-                } else {
-                    // Try alternate name
-                    copilotActor = repoData.repository.suggestedActors.nodes.find(
-                        actor => actor.login === "copilot-swe-agent"
-                    );
-                    
-                    if (copilotActor) {
-                        console.log('Found Copilot agent with alternate name:', copilotActor);
-                    } else {
-                        console.warn('⚠️ Copilot agent not found in suggested actors. Issue will be created without assignment.');
-                    }
-                }
-            } catch (error) {
-                console.error('Error getting suggested actors:', error);
-                // Continue without assignment if we can't get the Copilot actor
-            }
-            
-            // Get label IDs if available
+            // Get label IDs
             let labelIds = [];
             try {
                 labelIds = await this.getLabelNodeIds(owner, repo, labelNames);
                 console.log('Label IDs:', labelIds);
             } catch (error) {
                 console.error('Error getting label IDs:', error);
-                // Continue without labels if we can't get them
+                // Continue without labels
             }
             
-            // Get a timestamp for tracking request duration
-            const startTime = Date.now();
-            
-            let data;
-            
-            if (copilotActor) {
-                // If we found the Copilot actor, create the issue with assignment
-                console.log('Creating issue with Copilot assignment in one step...');
-                
-                const createMutation = `
-                    mutation CreateIssue($input: CreateIssueInput!) {
-                        createIssue(input: $input) {
-                            issue {
-                                id
-                                number
-                                url
-                                title
-                                assignees(first: 5) {
-                                    nodes {
-                                        login
-                                        id
-                                    }
-                                }
-                            }
-                        }
-                    }
-                `;
-                
-                data = await this.graphql(createMutation, {
-                    input: {
-                        repositoryId: repoId,
-                        title: title,
-                        body: body,
-                        assigneeIds: [copilotActor.id],
-                        labelIds: labelIds
-                    }
-                });
-                
-                console.log('Issue created with assignment:', data);
-            } else {
-                // Create the issue without assignment
-                console.log('Creating issue without Copilot assignment...');
-                
-                const createMutation = `
-                    mutation CreateIssue($repositoryId: ID!, $title: String!, $body: String, $labelIds: [ID!]) {
-                        createIssue(input: {
-                            repositoryId: $repositoryId,
-                            title: $title,
-                            body: $body,
-                            labelIds: $labelIds
-                        }) {
-                            issue {
-                                id
-                                number
-                                url
-                                title
-                            }
-                        }
-                    }
-                `;
-                
-                data = await this.graphql(createMutation, {
-                    repositoryId: repoId,
-                    title: title,
-                    body: body,
-                    labelIds: labelIds
-                });
-                
-                console.log('Issue created without assignment:', data);
-                
-                // Try to assign the issue using REST API as a fallback
-                try {
-                    const issueNumber = data.createIssue.issue.number;
-                    console.log(`Attempting to assign issue #${issueNumber} to @copilot-agent-swe using REST API fallback...`);
-                    
-                    const response = await fetch(`${this.baseUrl}/repos/${owner}/${repo}/issues/${issueNumber}/assignees`, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `token ${this.auth.getAccessToken()}`,
-                            'Accept': 'application/vnd.github.v3+json',
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            assignees: ["@copilot-agent-swe"]  // Using @ prefix as per GitHub docs
-                        })
-                    });
-                    
-                    if (response.ok) {
-                        const assignData = await response.json();
-                        console.log('✅ Successfully assigned issue using REST API fallback:', assignData);
-                    } else {
-                        console.warn('❌ Failed to assign issue using REST API fallback:', await response.text());
-                        
-                        // Try another approach - using the assignIssueToCopilotBot method
-                        console.log(`Falling back to GraphQL assignment approach...`);
-                        const assignSuccess = await this.assignIssueToCopilotBot(owner, repo, issueNumber);
-                        if (assignSuccess) {
-                            console.log(`✅ Successfully assigned issue #${issueNumber} to Copilot using GraphQL approach`);
-                        } else {
-                            console.warn(`❌ Could not assign issue #${issueNumber} to Copilot using any method`);
-                        }
-                    }
-                } catch (assignError) {
-                    console.error('Error during REST API fallback assignment:', assignError);
-                }
-            }
-            
-            // Calculate how long the request took
-            const duration = Date.now() - startTime;
-            console.log(`Issue #${data.createIssue.issue.number} created in ${duration}ms`);
-            
-            // Return the created issue data
-            return data.createIssue.issue;
-        } catch (error) {
-            console.error('Error creating issue via GraphQL:', error);
-            
-            // Special handling for scope errors
-            if (error.message && (error.message.includes('scope') || error.message.includes('permission'))) {
-                if (window.NotificationSystem) {
-                    window.NotificationSystem.showError(
-                        'Permission Error',
-                        `Your GitHub token doesn't have the permissions required to create issues. Please log out and log back in with the correct permissions.`,
-                        15000,
-                        {
-                            actions: [
-                                {
-                                    label: 'Log Out Now',
-                                    onClick: () => {
-                                        if (this.auth) this.auth.logout();
-                                    },
-                                    primary: true
-                                }
-                            ]
-                        }
-                    );
-                }
-            }
-            
-            throw error;
-        }
-    }
-    
-    /**
-     * Assigns an issue directly to the Copilot bot using the proper GraphQL API approach
-     * @param {string} owner - Repository owner
-     * @param {string} repo - Repository name
-     * @param {number} issueNumber - Issue number to assign
-     * @returns {Promise<boolean>} - True if successful, false otherwise
-     */
-    async assignIssueToCopilotBot(owner, repo, issueNumber) {
-        try {
-            console.log(`Attempting to assign issue #${issueNumber} to Copilot bot...`);
-            
-            // First, get both the issue ID and verify that Copilot is available for assignment
-            const repoData = await this.graphql(`
-                query GetIssueIdAndCopilotInfo($owner: String!, $repo: String!, $number: Int!) {
-                    repository(owner: $owner, name: $repo) {
-                        issue(number: $number) {
-                            id
-                        }
-                        # Check for available actors that can be assigned
-                        suggestedActors(capabilities: [CAN_BE_ASSIGNED], first: 10) {
-                            nodes {
-                                login
-                                __typename
-                                ... on Bot {
-                                    id
-                                }
-                                ... on User {
-                                    id
-                                }
-                            }
-                        }
+            // First create the issue without assignment (we'll assign it in a separate step)
+            const createMutation = `mutation CreateIssue($repositoryId: ID!, $title: String!, $body: String, $labelIds: [ID!]) {
+                createIssue(input: {
+                    repositoryId: $repositoryId,
+                    title: $title,
+                    body: $body,
+                    labelIds: $labelIds
+                }) {
+                    issue { 
+                        id 
+                        number 
+                        url 
+                        title
                     }
                 }
-            `, {
-                owner,
-                repo,
-                number: issueNumber
-            });
+            }`;
             
-            const issueId = repoData.repository.issue.id;
+            const variables = {
+                repositoryId: repoId,
+                title,
+                body,
+                labelIds
+            };
             
-            // Find the Copilot bot in the suggested actors
-            const copilotActor = repoData.repository.suggestedActors.nodes.find(
-                actor => actor.login === "copilot-agent-swe" || actor.login === "copilot-swe-agent"
-            );
+            console.log('Creating issue without assignment first');
+            const data = await this.graphql(createMutation, variables);
             
-            if (!copilotActor) {
-                console.warn("Copilot bot not found in suggested actors. Make sure Copilot is enabled for this repository.");
-                return false;
-            }
+            console.log('Issue created successfully:', data.createIssue.issue);
             
-            // Then assign the issue to Copilot bot using its actual ID
-            await this.graphql(`
-                mutation AssignCopilot($issueId: ID!, $assigneeId: ID!) {
-                    addAssigneesToAssignable(input: {
-                        assignableId: $issueId,
-                        assigneeIds: [$assigneeId]
-                    }) {
-                        clientMutationId
-                    }
-                }
-            `, {
-                issueId,
-                assigneeId: copilotActor.id
-            });
-            
-            console.log(`✅ Successfully assigned issue #${issueNumber} to Copilot bot`);
-            return true;
-        } catch (error) {
-            console.error(`Failed to assign issue to Copilot bot:`, error);
-            return false;
-        }
-    }
-            
-            // Now let's try to assign the issue to Copilot using the correct method
-            // Based on the backend implementation in mcpClient.ts
-            console.log(`Attempting to assign issue to Copilot...`);
-            
+            // Now try to assign the issue to the Copilot agent
             try {
-                const issueNumber = data.createIssue.issue.number;
                 const issueId = data.createIssue.issue.id;
+                const issueNumber = data.createIssue.issue.number;
                 
-                console.log(`Checking for available assignees for issue #${issueNumber}...`);
+                // Using the REST API to assign the Copilot agent with @ prefix
+                console.log(`Attempting to assign issue #${issueNumber} to @copilot-agent-swe using REST API...`);
                 
-                // First get suggested actors that can be assigned
-                const suggestedActorsQuery = `query GetSuggestedActors($owner: String!, $repo: String!) {
-                    repository(owner: $owner, name: $repo) {
-                        suggestedActors(capabilities: [CAN_BE_ASSIGNED], first: 10) {
-                            nodes {
-                                login
-                                __typename
-                                ... on Bot {
-                                    id
-                                }
-                                ... on User {
-                                    id
-                                }
-                            }
-                        }
-                    }
-                }`;
+                const response = await fetch(`${this.baseUrl}/repos/${owner}/${repo}/issues/${issueNumber}/assignees`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `token ${this.auth.getAccessToken()}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        assignees: ["@copilot-agent-swe"]  // Using the @ prefix as per GitHub docs
+                    })
+                });
                 
-                const suggestedActorsResult = await this.graphql(suggestedActorsQuery, { owner, repo });
-                console.log(`Suggested actors for assignment:`, suggestedActorsResult.repository.suggestedActors.nodes.map(a => a.login));
-                
-                // Find the Copilot bot in the suggested actors
-                const copilotActor = suggestedActorsResult.repository.suggestedActors.nodes.find(
-                    actor => actor.login === "copilot-agent-swe" || actor.login === "copilot-swe-agent"
-                );
-                
-                if (!copilotActor) {
-                    console.warn("Copilot bot not found in suggested actors. Will try REST API fallback.");
-                    
-                    // Try the REST API fallback with @ prefix
-                    console.log(`Attempting to assign issue #${issueNumber} to @copilot-agent-swe using REST API...`);
-                    
-                    const response = await fetch(`${this.baseUrl}/repos/${owner}/${repo}/issues/${issueNumber}/assignees`, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `token ${this.auth.getAccessToken()}`,
-                            'Accept': 'application/vnd.github.v3+json',
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            assignees: ["@copilot-agent-swe"]  // Note the @ prefix for the Copilot agent as per GitHub docs
-                        })
-                    });
-                    
+                if (response.ok) {
                     const responseData = await response.json();
-                    
-                    if (response.ok) {
-                        console.log('✅ Issue successfully assigned using REST API:', responseData);
-                    } else {
-                        console.error('❌ Failed to assign issue using REST API:', responseData);
-                    }
+                    console.log('✅ Successfully assigned issue to Copilot:', responseData);
                 } else {
-                    // If we found the Copilot actor, use GraphQL to assign the issue
-                    console.log(`Found Copilot bot in suggested actors: ${copilotActor.login} with ID ${copilotActor.id}`);
-                    console.log(`Assigning issue to Copilot bot using GraphQL...`);
-                    
-                    // Use the add assignees mutation
-                    const assignMutation = `mutation AssignCopilot($issueId: ID!, $assigneeId: ID!) {
-                        addAssigneesToAssignable(input: {
-                            assignableId: $issueId,
-                            assigneeIds: [$assigneeId]
-                        }) {
-                            clientMutationId
-                        }
-                    }`;
-                    
-                    const assignResult = await this.graphql(assignMutation, {
-                        issueId: issueId,
-                        assigneeId: copilotActor.id
-                    });
-                    
-                    console.log('✅ Issue successfully assigned to Copilot using GraphQL:', assignResult);
+                    const errorText = await response.text();
+                    console.warn(`❌ Could not assign issue to Copilot (status ${response.status}):`, errorText);
                 }
-                    
-                    const responseData = await response.json();
-                    
-                    if (response.ok) {
-                        console.log('✅ Issue successfully assigned using REST API:', responseData);
-                        // Update our issue data with the assignment
-                        data.createIssue.issue.assignees = {
-                            nodes: responseData.assignees.map(a => ({ login: a.login, id: a.id, url: a.url }))
-                        };
-                    } else {
-                        console.error('❌ Failed to assign issue using REST API:', responseData);
-                        
-                        // Add note in the UI about assignment issue
-                        if (window.NotificationSystem) {
-                            window.NotificationSystem.showInfo(
-                                'Assignment Note', 
-                                `Issue #${data.createIssue.issue.number} was created successfully but could not be assigned to the Copilot agent automatically.
-                                <br><br>You may need to manually assign it or add "copilot-agent-swe" as a collaborator to your repository.`,
-                                10000
-                            );
-                        }
-                    }
-                } catch (assignError) {
-                    console.error('Error during alternative assignment method:', assignError);
-                }
+            } catch (assignError) {
+                console.error('Error assigning issue to Copilot:', assignError);
+                // Continue even if assignment fails - the issue was created
             }
+            
             return data.createIssue.issue;
         } catch (error) {
             console.error('Error creating issue via GraphQL:', error);
-            
-            // Special handling for scope errors
-            if (error.message && (error.message.includes('scope') || error.message.includes('permission'))) {
-                if (window.NotificationSystem) {
-                    window.NotificationSystem.showError(
-                        'Permission Error',
-                        `Your GitHub token doesn't have the "public_repo" permission required to create issues. Please log out and log back in with the correct permissions.`,
-                        15000,
-                        {
-                            actions: [
-                                {
-                                    label: 'Log Out Now',
-                                    onClick: () => {
-                                        if (this.auth) this.auth.logout();
-                                    },
-                                    primary: true
-                                }
-                            ]
-                        }
-                    );
-                }
-            }
-            
             throw error;
-        }
-    }
-
-    /**
-     * Check if a user is a collaborator on a repository
-     * @param {string} owner - Repository owner
-     * @param {string} repo - Repository name
-     * @param {string} username - GitHub username
-     * @returns {Promise<boolean>} - Whether the user is a collaborator
-     */
-    async isUserCollaborator(owner, repo, username) {
-        console.log(`Checking if ${username} is a collaborator on ${owner}/${repo}`);
-        try {
-            const response = await fetch(`${this.baseUrl}/repos/${owner}/${repo}/collaborators/${username}`, {
-                headers: {
-                    'Authorization': `token ${this.auth.getAccessToken()}`,
-                    'Accept': 'application/vnd.github.v3+json'
-                }
-            });
-            
-            console.log(`Collaborator check status: ${response.status}`);
-            // 204 means the user is a collaborator
-            return response.status === 204;
-        } catch (error) {
-            console.error(`Error checking if ${username} is a collaborator:`, error);
-            return false;
         }
     }
 
@@ -940,7 +540,6 @@ class GitHubClient {
      * @returns {Promise<Array>} - Array of matching issues
      */
     async findIssuesByTitle(owner, repo, title, labelName) {
-        // Remove the $title parameter since we're not using it in the query
         // We'll filter by title client-side after getting the issues
         const query = `query($owner: String!, $name: String!) {
             repository(owner: $owner, name: $name) {
@@ -1052,6 +651,32 @@ class GitHubClient {
                 stack: error.stack
             });
             return [];
+        }
+    }
+    
+    /**
+     * Check if a user is a collaborator on a repository
+     * @param {string} owner - Repository owner
+     * @param {string} repo - Repository name
+     * @param {string} username - GitHub username
+     * @returns {Promise<boolean>} - Whether the user is a collaborator
+     */
+    async isUserCollaborator(owner, repo, username) {
+        console.log(`Checking if ${username} is a collaborator on ${owner}/${repo}`);
+        try {
+            const response = await fetch(`${this.baseUrl}/repos/${owner}/${repo}/collaborators/${username}`, {
+                headers: {
+                    'Authorization': `token ${this.auth.getAccessToken()}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            });
+            
+            console.log(`Collaborator check status: ${response.status}`);
+            // 204 means the user is a collaborator
+            return response.status === 204;
+        } catch (error) {
+            console.error(`Error checking if ${username} is a collaborator:`, error);
+            return false;
         }
     }
     

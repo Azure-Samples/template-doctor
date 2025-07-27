@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test GitHub Client with Copilot Assignment</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1, h2 {
+            color: #0366d6;
+        }
+        pre {
+            background-color: #f6f8fa;
+            border-radius: 3px;
+            padding: 16px;
+            overflow: auto;
+        }
+        button {
+            background-color: #2ea44f;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #2c974b;
+        }
+        input, select {
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+            width: 100%;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        #results {
+            margin-top: 20px;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+        #console {
+            height: 200px;
+            overflow: auto;
+            background: #f1f1f1;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .log {
+            margin: 0;
+            padding: 2px 0;
+        }
+        .log.info {
+            color: #0366d6;
+        }
+        .log.warn {
+            color: #f66a0a;
+        }
+        .log.error {
+            color: #d73a49;
+        }
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            max-width: 300px;
+            background: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+        .notification .title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .notification .message {
+            font-size: 14px;
+        }
+        .notification.info {
+            border-left: 4px solid #0366d6;
+        }
+        .notification.success {
+            border-left: 4px solid #2ea043;
+        }
+        .notification.warning {
+            border-left: 4px solid #f66a0a;
+        }
+        .notification.error {
+            border-left: 4px solid #d73a49;
+        }
+        .notification .close {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            cursor: pointer;
+        }
+        .notification .actions {
+            margin-top: 10px;
+            display: flex;
+            justify-content: flex-end;
+        }
+        .notification .actions button {
+            margin-left: 10px;
+            padding: 4px 8px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test GitHub Client with Copilot Assignment</h1>
+    
+    <div class="form-group">
+        <label for="repo-url">GitHub Repository URL:</label>
+        <input type="text" id="repo-url" placeholder="e.g., https://github.com/username/repo" value="">
+    </div>
+    
+    <div class="form-group">
+        <label for="issue-title">Issue Title:</label>
+        <input type="text" id="issue-title" placeholder="Enter issue title" value="Test issue for Copilot assignment">
+    </div>
+    
+    <div class="form-group">
+        <label for="issue-body">Issue Body:</label>
+        <textarea id="issue-body" rows="5" style="width: 100%;">This is a test issue for Copilot assignment. Please assign this issue to copilot-agent-swe.
+
+## What's happening?
+Testing automatic assignment to Copilot
+
+## Expected behavior
+Issue should be assigned to Copilot automatically</textarea>
+    </div>
+    
+    <div class="form-group">
+        <label for="issue-labels">Issue Labels (comma separated):</label>
+        <input type="text" id="issue-labels" placeholder="e.g., bug, enhancement" value="test,copilot-test">
+    </div>
+    
+    <button id="create-issue-btn">Create Issue with Copilot Assignment</button>
+    
+    <div id="results">
+        <h2>Results</h2>
+        <div id="console"></div>
+    </div>
+
+    <script>
+        // Mock notification system
+        window.NotificationSystem = {
+            showNotification(type, title, message, duration = 5000, options = {}) {
+                const notif = document.createElement('div');
+                notif.className = `notification ${type}`;
+                notif.innerHTML = `
+                    <div class="title">${title}</div>
+                    <div class="message">${message}</div>
+                    <span class="close">✕</span>
+                `;
+                
+                if (options.actions && options.actions.length > 0) {
+                    const actionsDiv = document.createElement('div');
+                    actionsDiv.className = 'actions';
+                    
+                    options.actions.forEach(action => {
+                        const btn = document.createElement('button');
+                        btn.textContent = action.label;
+                        if (action.primary) btn.style.fontWeight = 'bold';
+                        btn.onclick = () => {
+                            action.onClick();
+                            document.body.removeChild(notif);
+                        };
+                        actionsDiv.appendChild(btn);
+                    });
+                    
+                    notif.appendChild(actionsDiv);
+                }
+                
+                document.body.appendChild(notif);
+                
+                // Add close functionality
+                notif.querySelector('.close').addEventListener('click', () => {
+                    document.body.removeChild(notif);
+                });
+                
+                if (duration > 0) {
+                    setTimeout(() => {
+                        if (document.body.contains(notif)) {
+                            document.body.removeChild(notif);
+                        }
+                    }, duration);
+                }
+                
+                return notif;
+            },
+            
+            showInfo(title, message, duration, options) {
+                return this.showNotification('info', title, message, duration, options);
+            },
+            
+            showSuccess(title, message, duration, options) {
+                return this.showNotification('success', title, message, duration, options);
+            },
+            
+            showWarning(title, message, duration, options) {
+                return this.showNotification('warning', title, message, duration, options);
+            },
+            
+            showError(title, message, duration, options) {
+                return this.showNotification('error', title, message, duration, options);
+            }
+        };
+        
+        // Mock auth system
+        window.GitHubAuth = {
+            isAuthenticated() {
+                return localStorage.getItem('githubToken') !== null;
+            },
+            
+            getAccessToken() {
+                return localStorage.getItem('githubToken');
+            },
+            
+            logout() {
+                localStorage.removeItem('githubToken');
+                console.log('Logged out');
+                location.reload();
+            },
+            
+            login() {
+                const token = prompt('Enter your GitHub personal access token:');
+                if (token) {
+                    localStorage.setItem('githubToken', token);
+                    console.log('Logged in');
+                    location.reload();
+                }
+            }
+        };
+        
+        // Console logging override
+        const consoleEl = document.getElementById('console');
+        const originalConsole = {
+            log: console.log,
+            warn: console.warn,
+            error: console.error,
+            info: console.info
+        };
+        
+        function addToConsole(type, ...args) {
+            const log = document.createElement('p');
+            log.className = `log ${type}`;
+            
+            // Format the arguments
+            const formattedArgs = args.map(arg => {
+                if (typeof arg === 'object') {
+                    try {
+                        return JSON.stringify(arg, null, 2);
+                    } catch (e) {
+                        return String(arg);
+                    }
+                }
+                return String(arg);
+            }).join(' ');
+            
+            log.textContent = `${type}: ${formattedArgs}`;
+            consoleEl.appendChild(log);
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+            
+            // Call original console method
+            originalConsole[type](...args);
+        }
+        
+        console.log = (...args) => addToConsole('info', ...args);
+        console.warn = (...args) => addToConsole('warn', ...args);
+        console.error = (...args) => addToConsole('error', ...args);
+        console.info = (...args) => addToConsole('info', ...args);
+        
+        // Check if user is authenticated
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!window.GitHubAuth.isAuthenticated()) {
+                console.log('Not authenticated. Please login.');
+                window.NotificationSystem.showInfo(
+                    'Authentication Required',
+                    'You need to login with a GitHub token to use this test page.',
+                    0,
+                    {
+                        actions: [
+                            {
+                                label: 'Login',
+                                onClick: () => window.GitHubAuth.login(),
+                                primary: true
+                            }
+                        ]
+                    }
+                );
+            } else {
+                console.log('Authenticated with token. Ready to test.');
+            }
+            
+            // Load the script after checking auth
+            const script = document.createElement('script');
+            script.src = 'js/github-client-new.js'; // Use the new implementation
+            document.body.appendChild(script);
+        });
+        
+        // Create issue button functionality
+        document.getElementById('create-issue-btn').addEventListener('click', async () => {
+            if (!window.GitHubAuth.isAuthenticated()) {
+                window.NotificationSystem.showError('Authentication Required', 'Please login first.');
+                window.GitHubAuth.login();
+                return;
+            }
+            
+            const repoUrl = document.getElementById('repo-url').value.trim();
+            if (!repoUrl) {
+                window.NotificationSystem.showError('Missing Data', 'Please enter a repository URL.');
+                return;
+            }
+            
+            try {
+                // Parse the URL to get owner and repo
+                const urlParts = new URL(repoUrl).pathname.split('/').filter(Boolean);
+                const owner = urlParts[0];
+                const repo = urlParts[1];
+                
+                if (!owner || !repo) {
+                    window.NotificationSystem.showError('Invalid Repository URL', 'Please enter a valid GitHub repository URL.');
+                    return;
+                }
+                
+                const title = document.getElementById('issue-title').value.trim();
+                const body = document.getElementById('issue-body').value.trim();
+                const labels = document.getElementById('issue-labels').value.trim().split(',').map(l => l.trim()).filter(Boolean);
+                
+                console.log(`Creating issue in ${owner}/${repo}`);
+                console.log(`Title: ${title}`);
+                console.log(`Labels: ${labels.join(', ')}`);
+                
+                try {
+                    window.NotificationSystem.showInfo('Creating Issue', 'Creating issue and assigning to Copilot...');
+                    
+                    // Wait for client to be ready
+                    if (!window.GitHubClient) {
+                        console.log('Waiting for GitHub client to load...');
+                        await new Promise(resolve => {
+                            const checkClient = () => {
+                                if (window.GitHubClient) {
+                                    resolve();
+                                } else {
+                                    setTimeout(checkClient, 100);
+                                }
+                            };
+                            checkClient();
+                        });
+                    }
+                    
+                    const issue = await window.GitHubClient.createIssueGraphQL(owner, repo, title, body, labels);
+                    
+                    console.log('Issue created:', issue);
+                    window.NotificationSystem.showSuccess(
+                        'Issue Created',
+                        `Successfully created issue #${issue.number}. <a href="${issue.url}" target="_blank">View issue</a>`,
+                        10000
+                    );
+                } catch (error) {
+                    console.error('Failed to create issue:', error);
+                    window.NotificationSystem.showError(
+                        'Error Creating Issue',
+                        `Failed to create issue: ${error.message}`,
+                        10000
+                    );
+                }
+            } catch (error) {
+                console.error('Invalid repository URL:', error);
+                window.NotificationSystem.showError('Invalid URL', 'Please enter a valid GitHub repository URL.');
+            }
+        });
+    </script>
+</body>
+</html>

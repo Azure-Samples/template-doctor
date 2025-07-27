@@ -650,6 +650,16 @@ class GitHubClient {
                             console.log(`✅ Successfully assigned issue #${issueNumber} to Copilot using GraphQL approach`);
                         } else {
                             console.warn(`❌ Could not assign issue #${issueNumber} to Copilot using any method`);
+                            
+                            // Add note in the UI about assignment issue
+                            if (window.NotificationSystem) {
+                                window.NotificationSystem.showInfo(
+                                    'Assignment Note', 
+                                    `Issue #${data.createIssue.issue.number} was created successfully but could not be assigned to the Copilot agent automatically.
+                                    <br><br>You may need to manually assign it or add "copilot-agent-swe" as a collaborator to your repository.`,
+                                    10000
+                                );
+                            }
                         }
                     }
                 } catch (assignError) {
@@ -763,145 +773,6 @@ class GitHubClient {
         } catch (error) {
             console.error(`Failed to assign issue to Copilot bot:`, error);
             return false;
-        }
-    }
-            
-            // Now let's try to assign the issue to Copilot using the correct method
-            // Based on the backend implementation in mcpClient.ts
-            console.log(`Attempting to assign issue to Copilot...`);
-            
-            try {
-                const issueNumber = data.createIssue.issue.number;
-                const issueId = data.createIssue.issue.id;
-                
-                console.log(`Checking for available assignees for issue #${issueNumber}...`);
-                
-                // First get suggested actors that can be assigned
-                const suggestedActorsQuery = `query GetSuggestedActors($owner: String!, $repo: String!) {
-                    repository(owner: $owner, name: $repo) {
-                        suggestedActors(capabilities: [CAN_BE_ASSIGNED], first: 10) {
-                            nodes {
-                                login
-                                __typename
-                                ... on Bot {
-                                    id
-                                }
-                                ... on User {
-                                    id
-                                }
-                            }
-                        }
-                    }
-                }`;
-                
-                const suggestedActorsResult = await this.graphql(suggestedActorsQuery, { owner, repo });
-                console.log(`Suggested actors for assignment:`, suggestedActorsResult.repository.suggestedActors.nodes.map(a => a.login));
-                
-                // Find the Copilot bot in the suggested actors
-                const copilotActor = suggestedActorsResult.repository.suggestedActors.nodes.find(
-                    actor => actor.login === "copilot-agent-swe" || actor.login === "copilot-swe-agent"
-                );
-                
-                if (!copilotActor) {
-                    console.warn("Copilot bot not found in suggested actors. Will try REST API fallback.");
-                    
-                    // Try the REST API fallback with @ prefix
-                    console.log(`Attempting to assign issue #${issueNumber} to @copilot-agent-swe using REST API...`);
-                    
-                    const response = await fetch(`${this.baseUrl}/repos/${owner}/${repo}/issues/${issueNumber}/assignees`, {
-                        method: 'POST',
-                        headers: {
-                            'Authorization': `token ${this.auth.getAccessToken()}`,
-                            'Accept': 'application/vnd.github.v3+json',
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            assignees: ["@copilot-agent-swe"]  // Note the @ prefix for the Copilot agent as per GitHub docs
-                        })
-                    });
-                    
-                    const responseData = await response.json();
-                    
-                    if (response.ok) {
-                        console.log('✅ Issue successfully assigned using REST API:', responseData);
-                    } else {
-                        console.error('❌ Failed to assign issue using REST API:', responseData);
-                    }
-                } else {
-                    // If we found the Copilot actor, use GraphQL to assign the issue
-                    console.log(`Found Copilot bot in suggested actors: ${copilotActor.login} with ID ${copilotActor.id}`);
-                    console.log(`Assigning issue to Copilot bot using GraphQL...`);
-                    
-                    // Use the add assignees mutation
-                    const assignMutation = `mutation AssignCopilot($issueId: ID!, $assigneeId: ID!) {
-                        addAssigneesToAssignable(input: {
-                            assignableId: $issueId,
-                            assigneeIds: [$assigneeId]
-                        }) {
-                            clientMutationId
-                        }
-                    }`;
-                    
-                    const assignResult = await this.graphql(assignMutation, {
-                        issueId: issueId,
-                        assigneeId: copilotActor.id
-                    });
-                    
-                    console.log('✅ Issue successfully assigned to Copilot using GraphQL:', assignResult);
-                }
-                    
-                    const responseData = await response.json();
-                    
-                    if (response.ok) {
-                        console.log('✅ Issue successfully assigned using REST API:', responseData);
-                        // Update our issue data with the assignment
-                        data.createIssue.issue.assignees = {
-                            nodes: responseData.assignees.map(a => ({ login: a.login, id: a.id, url: a.url }))
-                        };
-                    } else {
-                        console.error('❌ Failed to assign issue using REST API:', responseData);
-                        
-                        // Add note in the UI about assignment issue
-                        if (window.NotificationSystem) {
-                            window.NotificationSystem.showInfo(
-                                'Assignment Note', 
-                                `Issue #${data.createIssue.issue.number} was created successfully but could not be assigned to the Copilot agent automatically.
-                                <br><br>You may need to manually assign it or add "copilot-agent-swe" as a collaborator to your repository.`,
-                                10000
-                            );
-                        }
-                    }
-                } catch (assignError) {
-                    console.error('Error during alternative assignment method:', assignError);
-                }
-            }
-            return data.createIssue.issue;
-        } catch (error) {
-            console.error('Error creating issue via GraphQL:', error);
-            
-            // Special handling for scope errors
-            if (error.message && (error.message.includes('scope') || error.message.includes('permission'))) {
-                if (window.NotificationSystem) {
-                    window.NotificationSystem.showError(
-                        'Permission Error',
-                        `Your GitHub token doesn't have the "public_repo" permission required to create issues. Please log out and log back in with the correct permissions.`,
-                        15000,
-                        {
-                            actions: [
-                                {
-                                    label: 'Log Out Now',
-                                    onClick: () => {
-                                        if (this.auth) this.auth.logout();
-                                    },
-                                    primary: true
-                                }
-                            ]
-                        }
-                    );
-                }
-            }
-            
-            throw error;
         }
     }
 

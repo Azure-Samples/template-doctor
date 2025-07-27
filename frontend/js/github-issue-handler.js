@@ -364,6 +364,9 @@ async function processIssueCreation(github) {
             }
         }
         
+        // Create repository issues URL
+        const repoIssuesUrl = `https://github.com/${owner}/${repo}/issues`;
+        
         // Show success notification
         if (notification) {
             // Check if we're using the new or old notification API
@@ -377,6 +380,10 @@ async function processIssueCreation(github) {
                                 label: 'Open Issue',
                                 onClick: () => window.open(mainIssue.url, '_blank'),
                                 primary: true
+                            },
+                            {
+                                label: 'View All Issues',
+                                onClick: () => window.open(repoIssuesUrl, '_blank')
                             }
                         ]
                     }
@@ -390,20 +397,33 @@ async function processIssueCreation(github) {
                     // Show a new success notification
                     window.NotificationSystem.showSuccess(
                         'Issues Created Successfully', 
-                        `Main issue #${mainIssue.number} created${childIssues.length > 0 ? ` with ${childIssues.length} child issues` : ''}.`,
-                        10000,
+                        `Main issue #${mainIssue.number} created${childIssues.length > 0 ? ` with ${childIssues.length} child issues` : ''}.
+                        <br><a href="${repoIssuesUrl}" target="_blank">View all repository issues</a>`,
+                        15000,
                         {
                             actions: [
                                 {
                                     label: 'Open Issue',
                                     onClick: () => window.open(mainIssue.url, '_blank'),
                                     primary: true
+                                },
+                                {
+                                    label: 'View All Issues',
+                                    onClick: () => window.open(repoIssuesUrl, '_blank')
                                 }
                             ]
                         }
                     );
                 }
             }
+            
+            // Log a helpful message with links
+            console.log('Issues created successfully:', {
+                mainIssue: mainIssue.url,
+                issueNumber: mainIssue.number,
+                childIssues: childIssues.length,
+                repositoryIssues: repoIssuesUrl
+            });
         }
         
         // Restore button state
