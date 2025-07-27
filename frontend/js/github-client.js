@@ -129,30 +129,65 @@ class GitHubClient {
     async graphql(query, variables = {}) {
         const token = this.auth.getAccessToken();
         if (!token) {
+            if (window.Notifications) {
+                window.Notifications.error('Authentication Error', 'You need to be logged in to perform this action.');
+            }
             throw new Error('Not authenticated');
         }
 
-        const response = await fetch(this.graphQLUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `token ${token}`
-            },
-            body: JSON.stringify({
-                query,
-                variables
-            })
-        });
+        try {
+            const response = await fetch(this.graphQLUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `token ${token}`
+                },
+                body: JSON.stringify({
+                    query,
+                    variables
+                })
+            });
 
-        const result = await response.json();
-        
-        if (result.errors) {
-            const error = new Error('GraphQL Error: ' + result.errors[0].message);
-            error.errors = result.errors;
+            const result = await response.json();
+            
+            if (result.errors) {
+                const errorMessage = result.errors[0].message;
+                console.error('GraphQL Error:', result.errors);
+                
+                // Check for specific error types
+                if (errorMessage.includes('scope')) {
+                    if (window.Notifications) {
+                        window.Notifications.error(
+                            'Permission Error', 
+                            'Your GitHub token does not have the required permissions. Please log out and log back in to grant the necessary permissions.',
+                            {
+                                actions: [
+                                    {
+                                        label: 'Log Out',
+                                        onClick: () => {
+                                            if (this.auth) this.auth.logout();
+                                        },
+                                        primary: true
+                                    }
+                                ]
+                            }
+                        );
+                    }
+                }
+                
+                const error = new Error('GraphQL Error: ' + errorMessage);
+                error.errors = result.errors;
+                throw error;
+            }
+
+            return result.data;
+        } catch (error) {
+            console.error('GraphQL request failed:', error);
+            if (!error.errors && window.Notifications) {
+                window.Notifications.error('Request Failed', 'Failed to communicate with GitHub API. Please try again later.');
+            }
             throw error;
         }
-
-        return result.data;
     }
 
     /**

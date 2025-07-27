@@ -85,7 +85,7 @@ async function processIssueCreation(github) {
         if (window.Notifications) {
             window.Notifications.error('Error', 'Could not determine repository owner and name from URL. Please check the repository URL.');
         } else {
-            alert('Could not determine repository owner and name from URL. Please check the repository URL.');
+            console.error('Could not determine repository owner and name from URL.');
         }
         return;
     }
@@ -312,8 +312,10 @@ async function processIssueCreation(github) {
         
         if (notification) {
             notification.error('Error', `Failed to create GitHub issues: ${error.message}`);
+        } else if (window.Notifications) {
+            window.Notifications.error('Error', `Failed to create GitHub issues: ${error.message}`);
         } else {
-            alert(`Error creating GitHub issues: ${error.message}`);
+            console.error(`Error creating GitHub issues: ${error.message}`);
         }
         
         // Restore button state
@@ -331,7 +333,7 @@ function testAzdProvision() {
         if (window.Notifications) {
             window.Notifications.error('Error', 'No compliance data available to test AZD provision');
         } else {
-            alert('No compliance data available to test AZD provision');
+            console.error('No compliance data available to test AZD provision');
         }
         return;
     }

@@ -17,7 +17,7 @@ function debug(module, message, data) {
 const AUTH_CONFIG = {
     clientId: 'Ov23li2nstp4WdgRG6vZ', // Replace with your GitHub OAuth app client ID
     redirectUri: window.location.origin + '/callback.html',
-    scope: 'read:repo read:user issues',
+    scope: 'public_repo read:user',
     authUrl: 'https://github.com/login/oauth/authorize',
     tokenStorageKey: 'gh_access_token',
     userStorageKey: 'gh_user_info'
