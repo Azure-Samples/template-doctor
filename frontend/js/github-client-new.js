@@ -709,6 +709,96 @@ class GitHubClient {
      * @param {number} issueNumber - Issue number to assign
      * @returns {Promise<boolean>} - True if successful, false otherwise
      */
+    /**
+     * Creates an issue without attempting to assign it to the Copilot bot
+     * This is used for child issues which should not be assigned to Copilot
+     * @param {string} owner - Repository owner
+     * @param {string} repo - Repository name
+     * @param {string} title - Issue title
+     * @param {string} body - Issue body
+     * @param {Array<string>} labelNames - Labels to apply to the issue
+     * @returns {Promise<Object>} - The created issue
+     */
+    async createIssueWithoutCopilot(owner, repo, title, body, labelNames = []) {
+        console.log(`Creating GitHub issue without Copilot assignment for ${owner}/${repo}`);
+        
+        try {
+            // First check token permissions
+            const scopes = await this.checkTokenScopes();
+            console.log('Current token scopes for issue creation:', scopes);
+            
+            if (!scopes.includes('public_repo') && !scopes.includes('repo')) {
+                console.error('Missing required scopes for issue creation');
+                throw new Error('Your GitHub token does not have the "public_repo" permission required to create issues');
+            }
+            
+            // Try to get node IDs for repository
+            console.log('Getting repository ID');
+            let repoId;
+            
+            try {
+                repoId = await this.getRepoNodeId(owner, repo);
+                console.log('Repository ID:', repoId);
+            } catch (error) {
+                console.error('Error getting repository node ID:', error);
+                throw new Error(`Could not find repository: ${owner}/${repo}`);
+            }
+            
+            // Get label IDs if available
+            let labelIds = [];
+            try {
+                labelIds = await this.getLabelNodeIds(owner, repo, labelNames);
+                console.log('Label IDs:', labelIds);
+            } catch (error) {
+                console.error('Error getting label IDs:', error);
+                // Continue without labels if we can't get them
+            }
+            
+            // Get a timestamp for tracking request duration
+            const startTime = Date.now();
+            
+            // Create the issue without assignment
+            console.log('Creating issue without Copilot assignment...');
+            
+            const createMutation = `
+                mutation CreateIssue($repositoryId: ID!, $title: String!, $body: String, $labelIds: [ID!]) {
+                    createIssue(input: {
+                        repositoryId: $repositoryId,
+                        title: $title,
+                        body: $body,
+                        labelIds: $labelIds
+                    }) {
+                        issue {
+                            id
+                            number
+                            url
+                            title
+                        }
+                    }
+                }
+            `;
+            
+            const data = await this.graphql(createMutation, {
+                repositoryId: repoId,
+                title: title,
+                body: body,
+                labelIds: labelIds
+            });
+            
+            console.log('Issue created without assignment:', data);
+            
+            // Calculate how long the request took
+            const duration = Date.now() - startTime;
+            console.log(`Issue #${data.createIssue.issue.number} created in ${duration}ms`);
+            
+            // Return the created issue data
+            return data.createIssue.issue;
+        } catch (error) {
+            console.error('Error creating issue:', error);
+            throw error;
+        }
+    }
+    
     async assignIssueToCopilotBot(owner, repo, issueNumber) {
         try {
             console.log(`Attempting to assign issue #${issueNumber} to Copilot bot...`);

@@ -251,6 +251,7 @@ async function processIssueCreation(github) {
         }
         
         // Create the main issue with GraphQL to assign to copilot-swe-agent
+        // Only the main issue should be assigned to Copilot, child issues will be created without assignment
         let mainIssue;
         try {
             if (notification) notification.update('Creating main issue', 'Creating issue and assigning to Copilot Agent...');
@@ -311,8 +312,8 @@ async function processIssueCreation(github) {
                     
                     const childTitle = `${issue.message} [${issue.id}]`;
                     
-                    // Create the child issue with GraphQL
-                    const childIssue = await github.createIssueGraphQL(
+                    // Create the child issue without assigning to Copilot
+                    const childIssue = await github.createIssueWithoutCopilot(
                         owner,
                         repo,
                         childTitle,
