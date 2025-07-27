@@ -17,7 +17,7 @@ function debug(module, message, data) {
 const AUTH_CONFIG = {
     clientId: 'Ov23li2nstp4WdgRG6vZ', // Replace with your GitHub OAuth app client ID
     redirectUri: window.location.origin + '/callback.html',
-    scope: 'public_repo read:user',
+    scope: 'public_repo read:user',  // public_repo gives issue creation/assignment for public repos
     authUrl: 'https://github.com/login/oauth/authorize',
     tokenStorageKey: 'gh_access_token',
     userStorageKey: 'gh_user_info'
@@ -60,14 +60,58 @@ class GitHubAuth {
      * Start the OAuth flow by redirecting to GitHub
      */
     login() {
+        console.log('Starting login flow with scopes:', AUTH_CONFIG.scope);
+        
+        // Try to clear any existing GitHub session cookies
+        this.clearGitHubCookies();
+        
         const authUrl = new URL(AUTH_CONFIG.authUrl);
         authUrl.searchParams.append('client_id', AUTH_CONFIG.clientId);
         authUrl.searchParams.append('redirect_uri', AUTH_CONFIG.redirectUri);
         authUrl.searchParams.append('scope', AUTH_CONFIG.scope);
         authUrl.searchParams.append('state', this.generateState());
         
+        // Force consent screen to show again
+        authUrl.searchParams.append('allow_signup', 'true');
+        
+        // Add timestamp and random values to avoid caching
+        authUrl.searchParams.append('_t', Date.now());
+        authUrl.searchParams.append('_r', Math.random().toString(36).substring(7));
+        
+        // Force approval prompt to show again
+        // https://docs.github.com/en/developers/apps/building-oauth-apps/authorizing-oauth-apps#parameters
+        authUrl.searchParams.append('prompt', 'consent');
+        
+        console.log('Redirecting to GitHub OAuth URL:', authUrl.toString());
+        
         // Redirect the user to GitHub login page
         window.location.href = authUrl.toString();
+    }
+    
+    /**
+     * Attempt to clear GitHub cookies to force re-authentication
+     */
+    clearGitHubCookies() {
+        console.log('Attempting to clear GitHub cookies');
+        // Try to clear some common GitHub cookies
+        const cookiesToClear = [
+            { name: '_gh_sess', domain: '.github.com', path: '/' },
+            { name: 'user_session', domain: '.github.com', path: '/' },
+            { name: '__Host-user_session_same_site', domain: '', path: '/' },
+            { name: 'logged_in', domain: '.github.com', path: '/' },
+            { name: 'dotcom_user', domain: '.github.com', path: '/' },
+            // Add more GitHub cookies as needed
+        ];
+        
+        cookiesToClear.forEach(cookie => {
+            try {
+                const cookieStr = `${cookie.name}=; path=${cookie.path}; ${cookie.domain ? 'domain=' + cookie.domain + ';' : ''} expires=Thu, 01 Jan 1970 00:00:00 GMT; secure; samesite=none`;
+                console.log('Clearing cookie:', cookieStr);
+                document.cookie = cookieStr;
+            } catch (e) {
+                console.error('Error clearing cookie:', cookie.name, e);
+            }
+        });
     }
 
     /**
@@ -156,13 +200,43 @@ class GitHubAuth {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             
-            return response.json();
+            // First clone the response to log the raw response
+            return response.clone().text().then(rawText => {
+                debug('exchangeCodeForToken', 'Raw token exchange response:', rawText);
+                try {
+                    // Try parsing as JSON to see the raw response structure
+                    const rawJson = JSON.parse(rawText);
+                    debug('exchangeCodeForToken', 'Raw token exchange response as JSON:', rawJson);
+                    if (rawJson.scope) {
+                        debug('exchangeCodeForToken', 'Token scopes from response:', rawJson.scope);
+                    }
+                } catch (e) {
+                    debug('exchangeCodeForToken', 'Failed to parse raw response as JSON:', e);
+                }
+                
+                // Continue with the original response
+                return response.json();
+            });
         })
         .then(data => {
             debug('exchangeCodeForToken', 'Token exchange response data received', data);
             
+            // Log detailed token information
+            if (data) {
+                const tokenDetails = {
+                    hasAccessToken: !!data.access_token,
+                    tokenType: data.token_type || null,
+                    scopes: data.scope ? data.scope.split(' ') : null,
+                    hasRefreshToken: !!data.refresh_token,
+                    expiresIn: data.expires_in || null,
+                    responseKeys: Object.keys(data)
+                };
+                debug('exchangeCodeForToken', 'Detailed token information:', tokenDetails);
+            }
+            
             if (data.access_token) {
                 debug('exchangeCodeForToken', 'Successfully received access token');
+                debug('exchangeCodeForToken', 'Token scopes (if provided):', data.scope || 'Not provided in response');
                 this.setAccessToken(data.access_token);
                 this.fetchUserInfo();
                 
@@ -370,17 +444,81 @@ class GitHubAuth {
     }
 
     /**
+     * Revoke the current token if possible
+     * @returns {Promise}
+     */
+    async revokeToken() {
+        if (!this.accessToken) return Promise.resolve();
+        
+        try {
+            console.log('Revoking token and clearing GitHub session...');
+            
+            // Clear all GitHub cookies
+            this.clearGitHubCookies();
+            
+            // Note: GitHub doesn't have a formal revoke endpoint for OAuth apps
+            // The best we can do is clear local storage and cookies
+            return Promise.resolve();
+        } catch (error) {
+            console.error('Error revoking token:', error);
+            return Promise.resolve(); // Continue with logout anyway
+        }
+    }
+    
+    /**
      * Logout the user by removing tokens and user info
      */
     logout() {
-        localStorage.removeItem(AUTH_CONFIG.tokenStorageKey);
-        localStorage.removeItem(AUTH_CONFIG.userStorageKey);
-        this.accessToken = null;
-        this.userInfo = null;
-        this.updateUI();
+        console.log('Logging out user...');
         
-        // Redirect to home
-        window.location.href = '/';
+        // Try to revoke the token first
+        this.revokeToken().finally(() => {
+            console.log('Clearing all storage...');
+            
+            // Clear ALL session storage
+            sessionStorage.clear();
+            
+            // Clear specific items from local storage
+            localStorage.removeItem(AUTH_CONFIG.tokenStorageKey);
+            localStorage.removeItem(AUTH_CONFIG.userStorageKey);
+            localStorage.removeItem('oauth_state');
+            
+            // Clear all auth-related local storage items to be safe
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && (key.includes('gh_') || key.includes('github') || key.includes('oauth') || key.includes('token'))) {
+                    console.log('Removing localStorage item:', key);
+                    localStorage.removeItem(key);
+                }
+            }
+            
+            // Update state
+            this.accessToken = null;
+            this.userInfo = null;
+            this.updateUI();
+            
+            console.log('Logged out successfully, redirecting to home page');
+            
+            // Add timestamp and random parameters to avoid caching
+            const redirectUrl = new URL(window.location.origin);
+            redirectUrl.searchParams.append('_t', Date.now());
+            redirectUrl.searchParams.append('_r', Math.random().toString(36).substring(7));
+            redirectUrl.searchParams.append('logged_out', 'true');
+            redirectUrl.searchParams.append('require_permissions', 'public_repo');
+            
+            if (window.Notifications) {
+                window.Notifications.success('Logged Out Successfully', 'You have been logged out of GitHub. Please log in again with the required permissions.', 5000);
+                
+                // Give the notification a chance to show before redirecting
+                setTimeout(() => {
+                    // Redirect to home
+                    window.location.href = redirectUrl.toString();
+                }, 1000);
+            } else {
+                // Redirect to home immediately
+                window.location.href = redirectUrl.toString();
+            }
+        });
     }
 
     /**

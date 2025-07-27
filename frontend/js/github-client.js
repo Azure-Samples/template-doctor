@@ -34,7 +34,48 @@ class GitHubClient {
         }
         
         // Try to load the current user info if authenticated
-        this.loadCurrentUser();
+        this.loadCurrentUser().then(() => {
+            // After loading user, check if token has all required scopes
+            this.checkTokenScopes().then(scopes => {
+                console.log('Current token scopes:', scopes);
+                
+                // Check if we have the required scopes
+                const requiredScopes = ['public_repo'];
+                const hasRequiredScopes = requiredScopes.some(scope => 
+                    scopes.includes(scope) || 
+                    scopes.includes('repo') // Full 'repo' scope would also work
+                );
+                
+                if (!hasRequiredScopes && this.auth.isAuthenticated()) {
+                    console.warn('Token missing required scopes, showing warning');
+                    
+                    // Show a notification after a short delay
+                    setTimeout(() => {
+                        if (window.NotificationSystem) {
+                            window.NotificationSystem.showWarning(
+                                'Limited GitHub Access',
+                                'Your GitHub authorization is missing the "public_repo" permission that is required to create issues. ' +
+                                'If you encounter permission errors, please log out and log back in.',
+                                10000,
+                                {
+                                    actions: [
+                                        {
+                                            label: 'Log Out Now',
+                                            onClick: () => {
+                                                if (this.auth) this.auth.logout();
+                                            },
+                                            primary: true
+                                        }
+                                    ]
+                                }
+                            );
+                        }
+                    }, 2000);
+                }
+            }).catch(err => {
+                console.error('Error checking token scopes:', err);
+            });
+        });
     }
     
     /**
@@ -127,8 +168,15 @@ class GitHubClient {
      * @returns {Promise} - The query result
      */
     async graphql(query, variables = {}) {
+        console.log('Making GraphQL request with variables:', variables);
+        
+        // First, let's check what scopes we currently have
+        const scopes = await this.checkTokenScopes();
+        console.log('Current token scopes before GraphQL request:', scopes);
+        
         const token = this.auth.getAccessToken();
         if (!token) {
+            console.error('No token available for GraphQL request');
             if (window.Notifications) {
                 window.Notifications.error('Authentication Error', 'You need to be logged in to perform this action.');
             }
@@ -136,6 +184,9 @@ class GitHubClient {
         }
 
         try {
+            console.log('Sending GraphQL request to:', this.graphQLUrl);
+            console.log('GraphQL query:', query);
+            
             const response = await fetch(this.graphQLUrl, {
                 method: 'POST',
                 headers: {
@@ -147,25 +198,74 @@ class GitHubClient {
                     variables
                 })
             });
+            
+            console.log('GraphQL response status:', response.status);
+            // Log headers for debugging
+            const headers = {};
+            response.headers.forEach((value, key) => {
+                headers[key] = value;
+            });
+            console.log('GraphQL response headers:', headers);
 
             const result = await response.json();
+            console.log('GraphQL response:', result);
             
             if (result.errors) {
                 const errorMessage = result.errors[0].message;
-                console.error('GraphQL Error:', result.errors);
+                console.error('GraphQL Error (full):', result.errors);
+                
+                // Log each error separately with detailed information
+                result.errors.forEach((error, index) => {
+                    console.error(`GraphQL Error #${index + 1}:`, {
+                        message: error.message,
+                        type: error.type || 'Not specified',
+                        path: error.path || 'Not specified',
+                        locations: error.locations || 'Not specified',
+                        extensions: error.extensions || 'Not specified'
+                    });
+                    
+                    // Check for specific extension data that might have more info
+                    if (error.extensions) {
+                        console.error(`GraphQL Error #${index + 1} Extensions:`, error.extensions);
+                    }
+                });
                 
                 // Check for specific error types
-                if (errorMessage.includes('scope')) {
-                    if (window.Notifications) {
-                        window.Notifications.error(
+                if (errorMessage.includes('scope') || errorMessage.includes('permission')) {
+                    console.error('Permission/scope error detected in GraphQL response');
+                    
+                    // Get detailed token information
+                    const tokenInfo = { scopes: await this.checkTokenScopes() };
+                    console.log('Current token information:', tokenInfo);
+                    
+                    // Log detailed diagnostic information about the error
+                    console.log('Error diagnostic info:', {
+                        errorContainsScope: errorMessage.includes('scope'),
+                        errorContainsPermission: errorMessage.includes('permission'),
+                        errorContainsResource: errorMessage.includes('resource'),
+                        errorContainsRepository: errorMessage.includes('repository'),
+                        errorContainsAccess: errorMessage.includes('access'),
+                        publicRepoScope: tokenInfo.scopes.includes('public_repo'),
+                        repoScope: tokenInfo.scopes.includes('repo'),
+                        fullErrorText: errorMessage
+                    });
+                    
+                    if (window.NotificationSystem) {
+                        window.NotificationSystem.showError(
                             'Permission Error', 
-                            'Your GitHub token does not have the required permissions. Please log out and log back in to grant the necessary permissions.',
+                            `Your GitHub token does not have the "public_repo" permission required to create issues. Please log out and log back in to grant this permission.<br><br>
+                            <strong>Current Scopes:</strong> ${tokenInfo.scopes.join(', ') || 'None'}<br>
+                            <strong>Error:</strong> ${errorMessage}`,
+                            15000,
                             {
                                 actions: [
                                     {
-                                        label: 'Log Out',
+                                        label: 'Log Out Now',
                                         onClick: () => {
-                                            if (this.auth) this.auth.logout();
+                                            if (this.auth) {
+                                                console.log('Logging out user from permission error action');
+                                                this.auth.logout();
+                                            }
                                         },
                                         primary: true
                                     }
@@ -340,32 +440,97 @@ class GitHubClient {
      * @returns {Promise<Object>} - Created issue info
      */
     async createIssueGraphQL(owner, repo, title, body, labelNames = []) {
-        // Get node IDs
-        const [repoId, assigneeId, labelIds] = await Promise.all([
-            this.getRepoNodeId(owner, repo),
-            this.getUserNodeId('copilot-swe-agent'),
-            this.getLabelNodeIds(owner, repo, labelNames)
-        ]);
-        const mutation = `mutation CreateIssue($repositoryId: ID!, $title: String!, $body: String, $assigneeIds: [ID!], $labelIds: [ID!]) {
-            createIssue(input: {
-                repositoryId: $repositoryId,
-                title: $title,
-                body: $body,
-                assigneeIds: $assigneeIds,
-                labelIds: $labelIds
-            }) {
-                issue { id number url title }
+        console.log(`Creating GitHub issue via GraphQL for ${owner}/${repo}`);
+        
+        try {
+            // First check token permissions
+            const scopes = await this.checkTokenScopes();
+            console.log('Current token scopes for issue creation:', scopes);
+            
+            if (!scopes.includes('public_repo') && !scopes.includes('repo')) {
+                console.error('Missing required scopes for issue creation');
+                throw new Error('Your GitHub token does not have the "public_repo" permission required to create issues');
             }
-        }`;
-        const variables = {
-            repositoryId: repoId,
-            title,
-            body,
-            assigneeIds: [assigneeId],
-            labelIds
-        };
-        const data = await this.graphql(mutation, variables);
-        return data.createIssue.issue;
+            
+            // Try to get node IDs
+            console.log('Getting repository and assignee node IDs');
+            let repoId, assigneeId, labelIds;
+            
+            try {
+                repoId = await this.getRepoNodeId(owner, repo);
+                console.log('Repository ID:', repoId);
+            } catch (error) {
+                console.error('Error getting repository node ID:', error);
+                throw new Error(`Could not find repository: ${owner}/${repo}`);
+            }
+            
+            try {
+                assigneeId = await this.getUserNodeId('copilot-swe-agent');
+                console.log('Assignee ID:', assigneeId);
+            } catch (error) {
+                console.error('Error getting user node ID for copilot-swe-agent:', error);
+                assigneeId = null; // Will skip assigning if user not found
+            }
+            
+            try {
+                labelIds = await this.getLabelNodeIds(owner, repo, labelNames);
+                console.log('Label IDs:', labelIds);
+            } catch (error) {
+                console.error('Error getting label IDs:', error);
+                labelIds = []; // Will skip labels if any error
+            }
+            
+            const mutation = `mutation CreateIssue($repositoryId: ID!, $title: String!, $body: String, $assigneeIds: [ID!], $labelIds: [ID!]) {
+                createIssue(input: {
+                    repositoryId: $repositoryId,
+                    title: $title,
+                    body: $body,
+                    assigneeIds: $assigneeIds,
+                    labelIds: $labelIds
+                }) {
+                    issue { id number url title }
+                }
+            }`;
+            
+            const variables = {
+                repositoryId: repoId,
+                title,
+                body,
+                assigneeIds: assigneeId ? [assigneeId] : [],
+                labelIds
+            };
+            
+            console.log('Sending GraphQL mutation to create issue with variables:', JSON.stringify(variables));
+            const data = await this.graphql(mutation, variables);
+            console.log('Issue created successfully:', data);
+            return data.createIssue.issue;
+        } catch (error) {
+            console.error('Error creating issue via GraphQL:', error);
+            
+            // Special handling for scope errors
+            if (error.message && (error.message.includes('scope') || error.message.includes('permission'))) {
+                if (window.NotificationSystem) {
+                    window.NotificationSystem.showError(
+                        'Permission Error',
+                        `Your GitHub token doesn't have the "public_repo" permission required to create issues. Please log out and log back in with the correct permissions.`,
+                        15000,
+                        {
+                            actions: [
+                                {
+                                    label: 'Log Out Now',
+                                    onClick: () => {
+                                        if (this.auth) this.auth.logout();
+                                    },
+                                    primary: true
+                                }
+                            ]
+                        }
+                    );
+                }
+            }
+            
+            throw error;
+        }
     }
 
     /**
@@ -377,9 +542,11 @@ class GitHubClient {
      * @returns {Promise<Array>} - Array of matching issues
      */
     async findIssuesByTitle(owner, repo, title, labelName) {
-        const query = `query($owner: String!, $name: String!, $title: String!) {
+        // Remove the $title parameter since we're not using it in the query
+        // We'll filter by title client-side after getting the issues
+        const query = `query($owner: String!, $name: String!) {
             repository(owner: $owner, name: $name) {
-                issues(first: 10, states: [OPEN, CLOSED], filterBy: { since: "2022-01-01T00:00:00Z" }) {
+                issues(first: 20, states: [OPEN, CLOSED], filterBy: { since: "2022-01-01T00:00:00Z" }) {
                     nodes {
                         id number title url state labels(first: 10) { nodes { name } }
                     }
@@ -387,6 +554,10 @@ class GitHubClient {
             }
         }`;
         const data = await this.graphql(query, { owner, name: repo });
+        
+        // Log the returned issues for debugging
+        console.log(`Found ${data.repository.issues.nodes.length} issues in repository, filtering for title match`);
+        
         return data.repository.issues.nodes.filter(issue => {
             const titleMatch = issue.title === title;
             const labelMatch = !labelName || issue.labels.nodes.some(l => l.name === labelName);
@@ -400,6 +571,90 @@ class GitHubClient {
      */
     async getAuthenticatedUser() {
         return this.request('/user');
+    }
+    
+    /**
+     * Check the scopes of the current token
+     * @returns {Promise<Array<string>>} - Array of scopes
+     */
+    async checkTokenScopes() {
+        try {
+            const token = this.auth.getAccessToken();
+            if (!token) {
+                console.log('No token available to check scopes');
+                return [];
+            }
+            
+            console.log('Checking token scopes...');
+            console.log('Token first 10 chars:', token.substring(0, 10) + '...');
+            
+            const response = await fetch(`${this.baseUrl}/user`, {
+                headers: {
+                    'Authorization': `token ${token}`
+                }
+            });
+            
+            // Log detailed information about the response
+            console.log('Token check response status:', response.status, response.statusText);
+            console.log('Token check response type:', response.type);
+            console.log('Token check response URL:', response.url);
+            
+            // Log all headers for debugging
+            const headers = {};
+            response.headers.forEach((value, key) => {
+                headers[key] = value;
+            });
+            console.log('Response headers (full):', headers);
+            
+            // The scopes are in the 'X-OAuth-Scopes' header
+            const scopesHeader = response.headers.get('X-OAuth-Scopes');
+            console.log('X-OAuth-Scopes header (direct):', scopesHeader);
+            
+            // Also check other authorization headers
+            console.log('Authorization headers:', {
+                'X-OAuth-Scopes': response.headers.get('X-OAuth-Scopes'),
+                'X-Accepted-OAuth-Scopes': response.headers.get('X-Accepted-OAuth-Scopes'),
+                'X-GitHub-Request-Id': response.headers.get('X-GitHub-Request-Id')
+            });
+            
+            // Clone and log response body for more debug information
+            const clonedResponse = response.clone();
+            clonedResponse.json().then(data => {
+                console.log('User response data:', data);
+                if (data && data.login) {
+                    console.log('Authenticated as:', data.login);
+                }
+            }).catch(e => console.log('Could not parse response as JSON:', e));
+            
+            if (!scopesHeader) {
+                console.warn('No X-OAuth-Scopes header found in response');
+                return [];
+            }
+            
+            // Parse the scopes header which is a comma-separated list
+            const scopes = scopesHeader.split(',').map(scope => scope.trim());
+            console.log('Parsed scopes (array):', scopes);
+            
+            // Additional helpful debug info
+            if (scopes.includes('public_repo')) {
+                console.log('✅ Token has public_repo scope');
+            } else if (scopes.includes('repo')) {
+                console.log('✅ Token has full repo scope');
+            } else {
+                console.warn('⚠️ Token does not have public_repo or repo scope');
+                console.log('Missing public_repo scope may cause issue creation to fail');
+            }
+            
+            return scopes;
+        } catch (error) {
+            console.error('Error checking token scopes:', error);
+            console.error('Error details:', {
+                name: error.name,
+                message: error.message,
+                stack: error.stack
+            });
+            return [];
+        }
     }
     
     /**

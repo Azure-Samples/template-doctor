@@ -59,10 +59,55 @@ async function createGitHubIssue() {
 }
 
 /**
+ * Verify that the token has the required scopes
+ * @param {Object} github - GitHub client instance
+ * @returns {Promise<boolean>} - True if token has required scopes
+ */
+async function verifyRequiredScopes(github) {
+    try {
+        // Check if the token has the required scopes
+        const scopes = await github.checkTokenScopes();
+        console.log('Token scopes:', scopes);
+        
+        const requiredScopes = ['public_repo'];
+        const hasRequiredScopes = requiredScopes.some(scope => 
+            scopes.includes(scope) || 
+            scopes.includes('repo') // Full 'repo' scope would also work
+        );
+        
+        if (!hasRequiredScopes) {
+            if (window.NotificationSystem) {
+                window.NotificationSystem.showError(
+                    'Permission Error',
+                    'Your GitHub token does not have the "public_repo" permission required to create issues. Please logout and login again to grant this permission.',
+                    15000
+                );
+            } else if (window.Notifications) {
+                window.Notifications.error(
+                    'Permission Error',
+                    'Your GitHub token does not have the "public_repo" permission required to create issues. Please logout and login again to grant this permission.'
+                );
+            } else {
+                console.error('Permission Error: Your GitHub token does not have the required permissions.');
+            }
+            return false;
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('Error verifying scopes:', error);
+        return false;
+    }
+}
+
+/**
  * Process the issue creation workflow
  * @param {Object} github - GitHub client instance
  */
 async function processIssueCreation(github) {
+    // First verify we have the required scopes
+    const hasScopes = await verifyRequiredScopes(github);
+    if (!hasScopes) return;
     // Add today's date in square brackets for the issue title
     const today = new Date();
     const formattedDate = `[${today.toISOString().split('T')[0]}]`;
@@ -82,7 +127,9 @@ async function processIssueCreation(github) {
     }
     
     if (!owner || !repo) {
-        if (window.Notifications) {
+        if (window.NotificationSystem) {
+            window.NotificationSystem.showError('Error', 'Could not determine repository owner and name from URL. Please check the repository URL.', 10000);
+        } else if (window.Notifications) {
             window.Notifications.error('Error', 'Could not determine repository owner and name from URL. Please check the repository URL.');
         } else {
             console.error('Could not determine repository owner and name from URL.');
@@ -92,19 +139,24 @@ async function processIssueCreation(github) {
     
     // Show loading notification
     let notification;
-    if (window.Notifications) {
+    if (window.NotificationSystem) {
+        notification = window.NotificationSystem.showLoading('Creating GitHub Issues', 'Preparing to create issues...');
+    } else if (window.Notifications) {
         notification = window.Notifications.loading('Creating GitHub Issues', 'Preparing to create issues...');
     }
     
     // Disable the button to prevent multiple submissions
     const createIssueButton = document.getElementById('create-github-issue-btn');
+    // Define restoreButton function in the outer scope so it's accessible throughout the function
+    let restoreButton = () => {}; // Default empty function
+    
     if (createIssueButton) {
         const originalText = createIssueButton.innerHTML;
         createIssueButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating Issues...';
         createIssueButton.disabled = true;
         
-        // Restore button when done
-        const restoreButton = () => {
+        // Assign the actual implementation to the already declared restoreButton
+        restoreButton = () => {
             createIssueButton.innerHTML = originalText;
             createIssueButton.disabled = false;
         };
@@ -171,19 +223,28 @@ async function processIssueCreation(github) {
         if (existingIssues && existingIssues.length > 0) {
             const firstIssue = existingIssues[0];
             if (notification) {
-                notification.warning(
-                    'Issue Already Exists', 
-                    `A Template Doctor issue already exists: #${firstIssue.number} - ${firstIssue.title}`,
-                    {
-                        actions: [
-                            {
-                                label: 'Open Issue',
-                                onClick: () => window.open(firstIssue.url, '_blank'),
-                                primary: true
-                            }
-                        ]
-                    }
-                );
+                // Check if we're using the new or old notification API
+                if (notification.warning) {
+                    notification.warning(
+                        'Issue Already Exists', 
+                        `A Template Doctor issue already exists: #${firstIssue.number} - ${firstIssue.title}`,
+                        {
+                            actions: [
+                                {
+                                    label: 'Open Issue',
+                                    onClick: () => window.open(firstIssue.url, '_blank'),
+                                    primary: true
+                                }
+                            ]
+                        }
+                    );
+                } else {
+                    notification.update('Issue Already Exists', `A Template Doctor issue already exists: #${firstIssue.number} - ${firstIssue.title}`);
+                    setTimeout(() => {
+                        // Clean up notification after a delay
+                        if (notification.close) notification.close();
+                    }, 10000);
+                }
             }
             if (createIssueButton) restoreButton();
             return;
@@ -263,6 +324,22 @@ async function processIssueCreation(github) {
                     
                 } catch (error) {
                     console.error(`Error creating child issue for ${issue.id}:`, error);
+                    
+                    // Add a more detailed error message to notification
+                    if (notification) {
+                        notification.update('Creating child issues', 
+                            `Error creating issue ${i + 1}: ${error.message}. Continuing with other issues...`);
+                    }
+                    
+                    // If this is a permissions error, we should stop creating more issues
+                    if (error.message && (error.message.includes('scope') || error.message.includes('permission'))) {
+                        if (notification) {
+                            notification.error('Permission Error', 
+                                'Insufficient permissions to create additional issues. Please check your GitHub token.');
+                        }
+                        break; // Exit the loop
+                    }
+                    
                     // Continue with other issues
                 }
             }
@@ -289,19 +366,44 @@ async function processIssueCreation(github) {
         
         // Show success notification
         if (notification) {
-            notification.success(
-                'Issues Created Successfully', 
-                `Main issue #${mainIssue.number} created${childIssues.length > 0 ? ` with ${childIssues.length} child issues` : ''}.`,
-                {
-                    actions: [
+            // Check if we're using the new or old notification API
+            if (notification.success) {
+                notification.success(
+                    'Issues Created Successfully', 
+                    `Main issue #${mainIssue.number} created${childIssues.length > 0 ? ` with ${childIssues.length} child issues` : ''}.`,
+                    {
+                        actions: [
+                            {
+                                label: 'Open Issue',
+                                onClick: () => window.open(mainIssue.url, '_blank'),
+                                primary: true
+                            }
+                        ]
+                    }
+                );
+            } else {
+                // We're using the new NotificationSystem API
+                if (window.NotificationSystem) {
+                    // Close the loading notification first
+                    if (notification.close) notification.close();
+                    
+                    // Show a new success notification
+                    window.NotificationSystem.showSuccess(
+                        'Issues Created Successfully', 
+                        `Main issue #${mainIssue.number} created${childIssues.length > 0 ? ` with ${childIssues.length} child issues` : ''}.`,
+                        10000,
                         {
-                            label: 'Open Issue',
-                            onClick: () => window.open(mainIssue.url, '_blank'),
-                            primary: true
+                            actions: [
+                                {
+                                    label: 'Open Issue',
+                                    onClick: () => window.open(mainIssue.url, '_blank'),
+                                    primary: true
+                                }
+                            ]
                         }
-                    ]
+                    );
                 }
-            );
+            }
         }
         
         // Restore button state
@@ -311,7 +413,19 @@ async function processIssueCreation(github) {
         console.error('Error creating GitHub issues:', error);
         
         if (notification) {
-            notification.error('Error', `Failed to create GitHub issues: ${error.message}`);
+            // Check which notification API we're using
+            if (notification.error) {
+                notification.error('Error', `Failed to create GitHub issues: ${error.message}`);
+            } else {
+                // We're using the new NotificationSystem API
+                if (notification.close) notification.close();
+                
+                if (window.NotificationSystem) {
+                    window.NotificationSystem.showError('Error', `Failed to create GitHub issues: ${error.message}`, 15000);
+                }
+            }
+        } else if (window.NotificationSystem) {
+            window.NotificationSystem.showError('Error', `Failed to create GitHub issues: ${error.message}`, 15000);
         } else if (window.Notifications) {
             window.Notifications.error('Error', `Failed to create GitHub issues: ${error.message}`);
         } else {

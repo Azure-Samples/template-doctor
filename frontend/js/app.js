@@ -111,6 +111,21 @@ document.addEventListener('DOMContentLoaded', () => {
         sessionStorage.removeItem('auth_error');
     }
     
+    // Check if user was redirected after logout due to missing permissions
+    if (urlParams.has('require_permissions') && urlParams.has('logged_out')) {
+        debug('app', 'User needs to log back in with required permissions');
+        // Show notification after a slight delay to ensure the notification system is initialized
+        setTimeout(() => {
+            if (window.NotificationSystem) {
+                window.NotificationSystem.showWarning(
+                    'GitHub Permissions Required', 
+                    'Please login with GitHub to grant the "public_repo" permission needed to create issues.',
+                    10000
+                );
+            }
+        }, 500);
+    }
+    
     const auth = window.GitHubAuth;
     const github = window.GitHubClient;
     const analyzer = window.TemplateAnalyzer;
