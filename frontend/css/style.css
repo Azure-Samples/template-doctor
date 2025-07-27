@@ -303,6 +303,49 @@ main {
     cursor: help;
 }
 
+.repo-item.not-found {
+    border-left: 4px solid var(--warning-color);
+    background-color: rgba(216, 59, 1, 0.05);
+    animation: blinkingWarningBorder 2s infinite alternate;
+}
+
+.repo-item.not-found:hover {
+    background-color: rgba(216, 59, 1, 0.1);
+}
+
+@keyframes blinkingWarningBorder {
+    0% {
+        border-left: 4px solid var(--warning-color);
+        box-shadow: inset 2px 0 5px rgba(216, 59, 1, 0.2);
+    }
+    100% {
+        border-left: 4px solid #a12c01;
+        box-shadow: inset 2px 0 5px rgba(216, 59, 1, 0.5);
+    }
+}
+
+.repo-item.not-found .analyze-btn {
+    background-color: var(--warning-color);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(216, 59, 1, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 6px rgba(216, 59, 1, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(216, 59, 1, 0);
+    }
+}
+
+.action-buttons {
+    display: flex;
+    align-items: center;
+}
+
 .analyze-btn {
     padding: 6px 12px;
     background-color: var(--primary-color);

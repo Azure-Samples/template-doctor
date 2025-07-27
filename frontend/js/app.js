@@ -703,7 +703,36 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await github.searchRepositories(query, 1, 10);
             if (!res.items || res.items.length === 0) {
-                searchResults.innerHTML = '<div>No repositories found.</div>';
+                // No repositories found in GitHub search, but allow analyzing if it looks like a repo URL
+                if (query.includes('github.com/') || query.includes('/')) {
+                    // This could be a direct repository URL or owner/repo format
+                    let repoUrl = query;
+                    
+                    // If it's in owner/repo format, convert to GitHub URL
+                    if (!repoUrl.includes('github.com/') && repoUrl.includes('/')) {
+                        repoUrl = `https://github.com/${repoUrl}`;
+                    } else if (!repoUrl.startsWith('http')) {
+                        repoUrl = `https://github.com/${repoUrl}`;
+                    }
+                    
+                    searchResults.innerHTML = `
+                        <div class="repo-item not-found">
+                            <div>
+                                <div class="repo-name">${repoUrl}</div>
+                                <div class="repo-description">This repository hasn't been analyzed before</div>
+                            </div>
+                            <div class="action-buttons">
+                                <button class="analyze-btn">Analyze Repository</button>
+                            </div>
+                        </div>
+                    `;
+                    
+                    searchResults.querySelector('.analyze-btn').addEventListener('click', () => {
+                        analyzeRepo(repoUrl);
+                    });
+                } else {
+                    searchResults.innerHTML = '<div>No repositories found.</div>';
+                }
                 return;
             }
             
