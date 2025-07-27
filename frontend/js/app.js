@@ -369,7 +369,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                                     resultsContainer.innerHTML = '';
                                                     
                                                     // Try to render
-                                                    dashboard.render(data, resultsContainer);
+                                                    appDashboard.render(data, resultsContainer);
                                                     
                                                     // Scroll to the top of the analysis section
                                                     analysisSection.scrollIntoView({ behavior: 'smooth' });
@@ -411,7 +411,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                                     resultsContainer.innerHTML = '';
                                                     
                                                     // Try to render
-                                                    dashboard.render(data, resultsContainer);
+                                                    appDashboard.render(data, resultsContainer);
                                                     
                                                     // Scroll to the top of the analysis section
                                                     analysisSection.scrollIntoView({ behavior: 'smooth' });
@@ -514,7 +514,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                     }
                                     
                                     debug('app', 'Report loaded successfully via ReportLoader, rendering dashboard', result);
-                                    dashboard.render(result, resultsContainer);
+                                    appDashboard.render(result, resultsContainer);
                                     
                                     // Scroll to the top of the analysis section
                                     analysisSection.scrollIntoView({ behavior: 'smooth' });
@@ -681,7 +681,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             resultsContainer.style.display = 'block';
                             
                             debug('app', 'Report loaded successfully, rendering dashboard', result);
-                            dashboard.render(result, resultsContainer);
+                            appDashboard.render(result, resultsContainer);
                             
                             // Scroll to the top of the analysis section
                             analysisSection.scrollIntoView({ behavior: 'smooth' });
@@ -831,7 +831,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                     resultsContainer.style.display = 'block';
                                     
                                     debug('app', 'Report loaded successfully, rendering dashboard', result);
-                                    dashboard.render(result, resultsContainer);
+                                    appDashboard.render(result, resultsContainer);
                                     
                                     // Scroll to the top of the analysis section
                                     analysisSection.scrollIntoView({ behavior: 'smooth' });
