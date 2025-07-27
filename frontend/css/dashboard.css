@@ -1,0 +1,99 @@
+/* Dashboard-specific styles */
+
+/* Action header styles */
+.action-header {
+    background: white;
+    border-radius: 5px;
+    padding: 16px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.action-header .tooltip {
+    position: relative;
+}
+
+.action-header .tooltiptext {
+    visibility: hidden;
+    width: 180px;
+    background-color: #333;
+    color: #fff;
+    text-align: center;
+    border-radius: 4px;
+    padding: 5px;
+    position: absolute;
+    z-index: 1;
+    bottom: 125%;
+    left: 50%;
+    margin-left: -90px;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.action-header .tooltip:hover .tooltiptext {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Add a small arrow pointing down from the tooltip */
+.action-header .tooltiptext::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -5px;
+    border-width: 5px;
+    border-style: solid;
+    border-color: #333 transparent transparent transparent;
+}
+
+/* Debug section styles */
+.debug-section {
+    margin-bottom: 30px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 5px;
+    border: 1px solid #ddd;
+}
+
+/* Raw data toggle button styling */
+#toggle-raw-data {
+    padding: 5px 10px;
+    font-size: 0.9em;
+    background-color: #f0f0f0;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+#toggle-raw-data:hover {
+    background-color: #e0e0e0;
+}
+
+#toggle-raw-data.active {
+    background-color: #dc3545;
+    color: white;
+    border-color: #c82333;
+}
+
+/* Raw data content styling */
+#raw-data-content {
+    margin-top: 15px;
+    display: none;
+}
+
+#raw-data-content pre {
+    background: #2d2d2d;
+    color: #eee;
+    padding: 15px;
+    border-radius: 5px;
+    max-height: 400px;
+    overflow: auto;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+    font-size: 13px;
+}

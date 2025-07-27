@@ -1,6 +1,37 @@
 // Dashboard Renderer - Handles rendering of compliance reports
 // Uses IIFE pattern to avoid global namespace pollution
 
+console.log('Loading dashboard-renderer.js - initializing renderer');
+
+// Check if CSS files are loaded properly
+document.addEventListener('DOMContentLoaded', function() {
+    const allStylesheets = document.styleSheets;
+    console.log(`Found ${allStylesheets.length} stylesheets:`);
+    for (let i = 0; i < allStylesheets.length; i++) {
+        try {
+            console.log(`  - ${allStylesheets[i].href}`);
+        } catch (e) {
+            console.log(`  - Unable to access stylesheet #${i}`);
+        }
+    }
+    
+    // Check specifically for dashboard.css
+    let dashboardCssFound = false;
+    for (let i = 0; i < allStylesheets.length; i++) {
+        try {
+            if (allStylesheets[i].href && allStylesheets[i].href.includes('dashboard.css')) {
+                dashboardCssFound = true;
+                console.log('dashboard.css found and loaded!');
+                break;
+            }
+        } catch (e) {}
+    }
+    
+    if (!dashboardCssFound) {
+        console.warn('dashboard.css not found in loaded stylesheets!');
+    }
+});
+
 // Only create if not already defined
 (function() {
     // If DashboardRenderer already exists, don't redefine it
@@ -51,7 +82,36 @@
                 // Clear the container
                 container.innerHTML = '';
                 
-                // First, show the raw data toggle section for debugging
+                // First, add the action buttons at the top with explicit inline styles
+                const actionHtml = `
+                    <div id="action-section" class="action-footer action-header" style="background: white !important; border-radius: 5px !important; padding: 16px !important; margin-bottom: 20px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important; display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: center !important; width: 100% !important;">
+                        <div style="width: 100% !important; text-align: center !important; margin-bottom: 15px !important;">
+                            <h3 style="margin: 0 !important; padding: 0 !important; font-size: 1.2rem !important; color: #333 !important;">Template Doctor Actions</h3>
+                        </div>
+                        <div style="display: flex !important; flex-wrap: wrap !important; justify-content: center !important; gap: 15px !important; width: 100% !important;">
+                            <a href="#" id="fixButton" class="btn" 
+                               style="opacity: 1 !important; visibility: visible !important; padding: 12px 24px !important; background-color: #0078d4 !important; color: white !important; border: none !important; border-radius: 4px !important; font-size: 1rem !important; font-weight: 500 !important; cursor: pointer !important; display: inline-flex !important; align-items: center !important; gap: 8px !important; min-width: 180px !important; justify-content: center !important; text-decoration: none !important; pointer-events: auto !important;">
+                                <i class="fas fa-code"></i> Fix with AI Agent
+                            </a>
+                            <button id="create-github-issue-btn" class="btn"
+                                    style="opacity: 1 !important; visibility: visible !important; padding: 12px 24px !important; background-color: #2b3137 !important; color: white !important; border: none !important; border-radius: 4px !important; font-size: 1rem !important; font-weight: 500 !important; cursor: pointer !important; display: inline-flex !important; align-items: center !important; gap: 8px !important; min-width: 180px !important; justify-content: center !important; pointer-events: auto !important;">
+                                <i class="fab fa-github"></i> Create GitHub Issue
+                            </button>
+                            <button id="testProvisionButton" class="btn"
+                                    style="opacity: 1 !important; visibility: visible !important; padding: 12px 24px !important; background-color: #0078d4 !important; color: white !important; border: none !important; border-radius: 4px !important; font-size: 1rem !important; font-weight: 500 !important; cursor: pointer !important; display: inline-flex !important; align-items: center !important; gap: 8px !important; min-width: 180px !important; justify-content: center !important; pointer-events: auto !important;">
+                                <i class="fas fa-rocket"></i> Test AZD Provision
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                // Add the action section to the container
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = actionHtml;
+                const actionSection = tempDiv.firstElementChild;
+                container.appendChild(actionSection);
+                
+                // Now add the debug section after the action buttons
                 const debugSection = document.createElement('div');
                 debugSection.className = 'debug-section';
                 debugSection.style.cssText = 'margin-bottom: 30px; padding: 15px; background: #f8f9fa; border-radius: 5px; border: 1px solid #ddd;';
@@ -477,42 +537,29 @@
          * @param {HTMLElement} container - The container element to render into
          */
         this.renderActionFooter = function(data, container) {
-            const actionFooter = document.createElement('div');
-            actionFooter.className = 'action-footer';
+            console.log('renderActionFooter called');
+            this.debug('Setting up action buttons from renderActionFooter');
+            
+            // We don't need to create another action footer at the bottom
+            // since we've already added one at the top
+            
+            // Instead, we'll just set up the button handlers for the
+            // action footer we created at the top
             
             // Generate a prompt for the agent based on issues
             const agentPrompt = this.generateAgentPrompt(data);
             
-            actionFooter.innerHTML = `
-                <div class="tooltip">
-                    <a href="#" class="btn" id="fixButton">
-                        <i class="fas fa-code"></i>
-                        Fix with AI Agent
-                    </a>
-                    <span class="tooltiptext">Opens your template in VS Code with an AI agent prompt.</span>
-                </div>
-                
-                <div class="tooltip">
-                    <button id="create-github-issue-btn" class="btn" style="background-color: #2b3137;">
-                        <i class="fab fa-github"></i>
-                        Create GitHub Issue
-                    </button>
-                    <span class="tooltiptext">Creates an issue in your repository with compliance details.</span>
-                </div>
-                
-                <div class="tooltip">
-                    <button id="testProvisionButton" class="btn" style="background-color: #0078d4;">
-                        <i class="fas fa-rocket"></i>
-                        Test AZD Provision
-                    </button>
-                    <span class="tooltiptext">Tests if your template can be successfully provisioned with AZD.</span>
-                </div>
-            `;
-            
-            container.appendChild(actionFooter);
-            
-            // Add event listeners for the buttons
+            // Set up action buttons
             this.setupActionButtons(data);
+            
+            // Let's check if our action header is visible
+            const actionHeader = document.querySelector('.action-header');
+            if (actionHeader) {
+                console.log('Action header is in the DOM');
+                console.log('Action header styles:', window.getComputedStyle(actionHeader));
+            } else {
+                console.warn('Action header not found in the DOM!');
+            }
         };
         
         /**
@@ -570,41 +617,141 @@
          * @param {Object} data - The adapted result data
          */
         this.setupActionButtons = function(data) {
-            // Fix with AI Agent button
-            const fixButton = document.getElementById('fixButton');
-            if (fixButton) {
-                // Update the fix button URL with the Azure template URL format
-                const templateUrl = encodeURIComponent(data.repoUrl);
-                fixButton.href = `https://insiders.vscode.dev/azure?azdTemplateUrl=${templateUrl}`;
-            }
+            this.debug('Setting up action buttons');
             
-            // Create GitHub Issue button
-            const createIssueButton = document.getElementById('create-github-issue-btn');
-            if (createIssueButton) {
-                createIssueButton.addEventListener('click', () => {
-                    console.log("Create GitHub Issue button clicked");
-                    // The createGitHubIssue function will be defined globally
-                    if (typeof window.createGitHubIssue === 'function') {
-                        window.createGitHubIssue();
+            setTimeout(() => {
+                try {
+                    this.debug('Setting up action buttons with delay');
+                    
+                    // Fix with AI Agent button
+                    const fixButton = document.getElementById('fixButton');
+                    if (fixButton) {
+                        this.debug('Found fixButton - setting up');
+                        
+                        // Remove any existing event listeners by cloning and replacing
+                        const newFixButton = fixButton.cloneNode(true);
+                        if (fixButton.parentNode) {
+                            fixButton.parentNode.replaceChild(newFixButton, fixButton);
+                        }
+                        
+                        // Ensure the button is visible and clickable
+                        newFixButton.style.opacity = '1 !important';
+                        newFixButton.style.visibility = 'visible !important';
+                        newFixButton.style.pointerEvents = 'auto !important';
+                        newFixButton.style.cursor = 'pointer !important';
+                        newFixButton.style.display = 'inline-flex !important';
+                        
+                        // Update the fix button URL with the Azure template URL format
+                        const templateUrl = encodeURIComponent(data.repoUrl);
+                        newFixButton.href = `https://insiders.vscode.dev/azure?azdTemplateUrl=${templateUrl}`;
+                        this.debug(`Set fix button URL to: ${newFixButton.href}`);
+                        
+                        // Add a direct click handler
+                        newFixButton.addEventListener('click', function(e) {
+                            e.preventDefault();
+                            console.log("Fix button clicked");
+                            window.open(`https://insiders.vscode.dev/azure?azdTemplateUrl=${templateUrl}`, '_blank');
+                        });
                     } else {
-                        alert("GitHub issue creation is not available in this view");
+                        this.debug('fixButton not found! Will try to create one');
+                        
+                        // Try to find the action section to add a button
+                        const actionSection = document.querySelector('.action-header') || document.getElementById('action-section');
+                        if (actionSection && actionSection.querySelector('div:last-child')) {
+                            const buttonContainer = document.createElement('div');
+                            buttonContainer.innerHTML = `
+                                <a href="#" id="fixButton-dynamic" class="btn" 
+                                   style="opacity: 1 !important; visibility: visible !important; padding: 12px 24px !important; background-color: #0078d4 !important; color: white !important; border: none !important; border-radius: 4px !important; font-size: 1rem !important; font-weight: 500 !important; cursor: pointer !important; display: inline-flex !important; align-items: center !important; gap: 8px !important; min-width: 180px !important; justify-content: center !important; text-decoration: none !important; pointer-events: auto !important;">
+                                    <i class="fas fa-code"></i> Fix with AI Agent
+                                </a>
+                            `;
+                            
+                            const dynamicFixButton = buttonContainer.firstElementChild;
+                            actionSection.querySelector('div:last-child').appendChild(dynamicFixButton);
+                            
+                            // Set up the button
+                            const templateUrl = encodeURIComponent(data.repoUrl);
+                            dynamicFixButton.href = `https://insiders.vscode.dev/azure?azdTemplateUrl=${templateUrl}`;
+                            
+                            dynamicFixButton.addEventListener('click', function(e) {
+                                e.preventDefault();
+                                console.log("Dynamic fix button clicked");
+                                window.open(`https://insiders.vscode.dev/azure?azdTemplateUrl=${templateUrl}`, '_blank');
+                            });
+                            
+                            this.debug('Created dynamic fix button');
+                        }
                     }
-                });
-            }
-            
-            // Test AZD Provision button
-            const testProvisionButton = document.getElementById('testProvisionButton');
-            if (testProvisionButton) {
-                testProvisionButton.addEventListener('click', () => {
-                    console.log("Test AZD Provision button clicked");
-                    // The testAzdProvision function will be defined globally
-                    if (typeof window.testAzdProvision === 'function') {
-                        window.testAzdProvision();
-                    } else {
-                        alert("AZD provision testing is not available in this view");
+                    
+                    // Create GitHub Issue button
+                    const createIssueButton = document.getElementById('create-github-issue-btn');
+                    if (createIssueButton) {
+                        this.debug('Found createIssueButton - setting up');
+                        
+                        // Remove any existing event listeners by cloning and replacing
+                        const newCreateIssueButton = createIssueButton.cloneNode(true);
+                        if (createIssueButton.parentNode) {
+                            createIssueButton.parentNode.replaceChild(newCreateIssueButton, createIssueButton);
+                        }
+                        
+                        // Ensure the button is visible and clickable
+                        newCreateIssueButton.style.opacity = '1 !important';
+                        newCreateIssueButton.style.visibility = 'visible !important';
+                        newCreateIssueButton.style.pointerEvents = 'auto !important';
+                        newCreateIssueButton.style.cursor = 'pointer !important';
+                        newCreateIssueButton.style.display = 'inline-flex !important';
+                        
+                        // Add direct click handler
+                        newCreateIssueButton.addEventListener('click', function() {
+                            console.log("Create GitHub Issue button clicked");
+                            if (typeof window.createGitHubIssue === 'function') {
+                                window.createGitHubIssue();
+                            } else {
+                                alert("GitHub issue creation is not available in this view");
+                            }
+                        });
                     }
-                });
-            }
+                    
+                    // Test AZD Provision button
+                    const testProvisionButton = document.getElementById('testProvisionButton');
+                    if (testProvisionButton) {
+                        this.debug('Found testProvisionButton - setting up');
+                        
+                        // Remove any existing event listeners by cloning and replacing
+                        const newTestProvisionButton = testProvisionButton.cloneNode(true);
+                        if (testProvisionButton.parentNode) {
+                            testProvisionButton.parentNode.replaceChild(newTestProvisionButton, testProvisionButton);
+                        }
+                        
+                        // Ensure the button is visible and clickable
+                        newTestProvisionButton.style.opacity = '1 !important';
+                        newTestProvisionButton.style.visibility = 'visible !important';
+                        newTestProvisionButton.style.pointerEvents = 'auto !important';
+                        newTestProvisionButton.style.cursor = 'pointer !important';
+                        newTestProvisionButton.style.display = 'inline-flex !important';
+                        
+                        // Add direct click handler
+                        newTestProvisionButton.addEventListener('click', function() {
+                            console.log("Test AZD Provision button clicked");
+                            if (typeof window.testAzdProvision === 'function') {
+                                window.testAzdProvision();
+                            } else {
+                                alert("AZD provision testing is not available in this view");
+                            }
+                        });
+                    }
+                    
+                    // Log all interactive elements after setup
+                    const allButtons = document.querySelectorAll('button, a.btn');
+                    this.debug(`After setup: Found ${allButtons.length} total interactive elements`);
+                    allButtons.forEach((btn, idx) => {
+                        this.debug(`Button #${idx}: id=${btn.id}, visible=${btn.style.visibility}, clickable=${btn.style.pointerEvents}`);
+                    });
+                    
+                } catch (e) {
+                    console.error('Error setting up action buttons:', e);
+                }
+            }, 200); // Small delay to ensure DOM is ready
         };
         
         /**

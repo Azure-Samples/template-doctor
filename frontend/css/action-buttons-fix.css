@@ -1,0 +1,61 @@
+/* Styles to ensure action buttons are always visible and clickable */
+
+/* Target action buttons specifically */
+#fixButton, #create-github-issue-btn, #testProvisionButton,
+#fixButton-fallback, #create-github-issue-btn-fallback, #testProvisionButton-fallback,
+#fixButton-direct, #create-github-issue-btn-direct, #testProvisionButton-direct {
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* Target action containers */
+.action-header, .action-footer, #direct-action-buttons {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+    width: 100% !important;
+    background: white !important;
+    border-radius: 5px !important;
+    padding: 16px !important;
+    margin-bottom: 20px !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* Target the buttons container inside action headers */
+.action-header > div:last-child, 
+.action-footer > div:last-child, 
+#direct-action-buttons > div:last-child {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    gap: 15px !important;
+    width: 100% !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* Fix any tooltip issues */
+.tooltip .tooltiptext {
+    position: absolute !important;
+    z-index: 1000 !important;
+}
+
+/* Make sure buttons have proper hover effect */
+.btn:hover, a.btn:hover, button.btn:hover {
+    filter: brightness(1.1) !important;
+    text-decoration: none !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
+}
+
+/* Add a transition to improve usability */
+.btn, a.btn, button.btn {
+    transition: all 0.2s ease-in-out !important;
+}
