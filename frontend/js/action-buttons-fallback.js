@@ -136,7 +136,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (typeof window.createGitHubIssue === 'function') {
                         window.createGitHubIssue();
                     } else {
-                        alert("GitHub issue creation is not available in this view");
+                        if (window.Notifications) {
+                            window.Notifications.error('Error', 'GitHub issue creation is not available in this view');
+                        } else {
+                            alert("GitHub issue creation is not available in this view");
+                        }
                     }
                 });
             }
