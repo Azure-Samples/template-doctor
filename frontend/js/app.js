@@ -93,9 +93,33 @@ function directLoadDataFile(folderName, dataFileName, successCallback, errorCall
 
 
 
-document.addEventListener('DOMContentLoaded', () => {
+// Initialize key services
+let appAuth, appGithub, appAnalyzer, appDashboard;
+
+// Function to initialize the app with dependencies
+function initializeApp() {
     debug('app', 'Application initializing');
     
+    // Initialize core services
+    appAuth = window.GitHubAuth;
+    appGithub = window.GitHubClient;
+    appAnalyzer = window.TemplateAnalyzer;
+    appDashboard = window.DashboardRenderer;
+    
+    // Log initialization status
+    debug('app', 'Service initialization status', {
+        auth: !!appAuth,
+        github: !!appGithub,
+        analyzer: !!appAnalyzer,
+        dashboard: !!appDashboard
+    });
+    
+    if (!appAnalyzer) {
+        debug('app', 'Template analyzer not available, waiting for initialization');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
     // Check for auth errors from the callback page
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.has('auth_error')) {
@@ -126,10 +150,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 500);
     }
     
-    const auth = window.GitHubAuth;
-    const github = window.GitHubClient;
-    const analyzer = window.TemplateAnalyzer;
-    const dashboard = window.DashboardRenderer;
+    // Initialize app with currently available dependencies
+    initializeApp();
 
     // UI elements
     const searchInput = document.getElementById('repo-search');
@@ -516,12 +538,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             
             card.querySelector('.rescan-btn').addEventListener('click', () => {
-                if (analyzer) {
-                    analyzeRepo(template.repoUrl);
-                } else {
-                    debug('app', 'Analyzer not available');
-                    alert('Template analyzer is not initialized. Please reload the page and try again.');
-                }
+                // Try to analyze regardless of current state - analyzeRepo will handle initialization
+                analyzeRepo(template.repoUrl);
             });
             
             templateGrid.appendChild(card);
@@ -701,7 +719,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // If not found in scanned templates, proceed with GitHub API search
         try {
-            const res = await github.searchRepositories(query, 1, 10);
+            const res = await appGithub.searchRepositories(query, 1, 10);
             if (!res.items || res.items.length === 0) {
                 // No repositories found in GitHub search, but allow analyzing if it looks like a repo URL
                 if (query.includes('github.com/') || query.includes('/')) {
@@ -753,7 +771,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 
                 // Check if it belongs to the authenticated user
-                const isUserRepo = repo.owner.login === github.currentUser?.login;
+                const isUserRepo = repo.owner.login === appGithub.currentUser?.login;
                 
                 div.innerHTML = `
                     <div>
@@ -896,15 +914,52 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Analysis Flow ---
     async function analyzeRepo(repoUrl) {
         // First verify we have necessary modules initialized
-        if (!analyzer) {
-            debug('app', 'Template analyzer not available');
-            alert('Template analyzer is not initialized. Please reload the page and try again.');
-            return;
+        if (!appAnalyzer || !appDashboard) {
+            debug('app', 'Required services not available, attempting to reinitialize');
+            
+            // Try to reinitialize all services
+            const servicesAvailable = tryReinitializeServices();
+            
+            if (!servicesAvailable) {
+                if (window.NotificationSystem) {
+                    window.NotificationSystem.showError(
+                        'Services Not Ready',
+                        'Some required services are not available. Please wait a moment or refresh the page to try again.',
+                        5000
+                    );
+                }
+                debug('app', 'Required services still unavailable after reinitialization attempt');
+                return;
+            }
         }
         
-        if (!dashboard) {
-            debug('app', 'Dashboard renderer not available');
-            alert('Dashboard renderer is not initialized. Please reload the page and try again.');
+        // Double-check analyzer
+        if (!appAnalyzer) {
+            debug('app', 'Template analyzer still not available after reinitialization');
+            
+            if (window.NotificationSystem) {
+                window.NotificationSystem.showWarning(
+                    'Initializing Analyzer',
+                    'Template analyzer is initializing. Your request will be processed shortly.',
+                    5000
+                );
+            }
+            
+            // Wait a moment and try again
+            setTimeout(() => {
+                if (window.TemplateAnalyzer) {
+                    appAnalyzer = window.TemplateAnalyzer;
+                    analyzeRepo(repoUrl);  // Retry the analysis
+                } else {
+                    if (window.NotificationSystem) {
+                        window.NotificationSystem.showError(
+                            'Analyzer Not Available',
+                            'Could not initialize the analyzer. Please refresh the page and try again.',
+                            5000
+                        );
+                    }
+                }
+            }, 1500);
             return;
         }
         
@@ -916,21 +971,31 @@ document.addEventListener('DOMContentLoaded', () => {
         errorSection.style.display = 'none';
         
         // Set repo info
-        document.getElementById('repo-name').textContent = repoUrl.split('github.com/')[1] || repoUrl;
+        const repoName = repoUrl.split('github.com/')[1] || repoUrl;
+        document.getElementById('repo-name').textContent = repoName;
         document.getElementById('repo-url').textContent = repoUrl;
         
         // Save to recent
         updateRecentSearches(repoUrl);
         
+        // Notify user that analysis is starting
+        if (window.NotificationSystem) {
+            window.NotificationSystem.showInfo(
+                'Analysis Started',
+                `Analyzing repository: ${repoName}`,
+                3000
+            );
+        }
+        
         try {
             debug('app', `Starting analysis of repo: ${repoUrl}`);
-            const result = await analyzer.analyzeTemplate(repoUrl, 'dod');
+            const result = await appAnalyzer.analyzeTemplate(repoUrl, 'dod');
             
             loadingContainer.style.display = 'none';
             resultsContainer.style.display = 'block';
             
             debug('app', 'Analysis complete, rendering dashboard');
-            dashboard.render(result, resultsContainer);
+            appDashboard.render(result, resultsContainer);
             
         } catch (err) {
             debug('app', `Error analyzing repo: ${err.message}`, err);
@@ -1015,4 +1080,54 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     debug('app', 'Application initialized');
+});
+
+// Function to attempt to reinitialize all required services
+function tryReinitializeServices() {
+    debug('app', 'Attempting to reinitialize services');
+    
+    // Update all service references
+    appAuth = window.GitHubAuth;
+    appGithub = window.GitHubClient;
+    appAnalyzer = window.TemplateAnalyzer;
+    appDashboard = window.DashboardRenderer;
+    
+    // Check if analyzer exists now
+    if (!appAnalyzer && window.checkAnalyzerReady) {
+        debug('app', 'Calling checkAnalyzerReady to initialize analyzer');
+        window.checkAnalyzerReady();
+        appAnalyzer = window.TemplateAnalyzer;
+    }
+    
+    // Log updated status
+    debug('app', 'Services after reinitialization attempt', {
+        auth: !!appAuth,
+        github: !!appGithub,
+        analyzer: !!appAnalyzer,
+        dashboard: !!appDashboard
+    });
+    
+    // Return true if all essential services are available
+    return !!appAnalyzer && !!appGithub && !!appDashboard;
+}
+
+// Listen for the analyzer initialization event
+document.addEventListener('template-analyzer-ready', () => {
+    debug('app', 'Template analyzer ready event received');
+    
+    // Update the analyzer reference
+    appAnalyzer = window.TemplateAnalyzer;
+    
+    if (appAnalyzer) {
+        debug('app', 'Template analyzer successfully initialized');
+        if (window.NotificationSystem) {
+            window.NotificationSystem.showSuccess(
+                'Analyzer Ready',
+                'Template analyzer is now initialized and ready to use',
+                3000
+            );
+        }
+    } else {
+        debug('app', 'Template analyzer still not available after ready event');
+    }
 });
