@@ -51,9 +51,21 @@
                         debug('report-loader', `Extracted folder name from relativePath: ${folderName}`);
                     }
                     
+                    // If template has a folderPath property (added by our app.js fix), use that instead
+                    let pathPrefix = folderName;
+                    if (template.folderPath) {
+                        pathPrefix = template.folderPath;
+                        debug('report-loader', `Using provided folderPath: ${pathPrefix}`);
+                    } else if (template.scannedBy && template.scannedBy.length > 0) {
+                        // Add scanner prefix if needed
+                        const lastScanner = template.scannedBy[template.scannedBy.length - 1];
+                        pathPrefix = `${lastScanner}-${folderName}`;
+                        debug('report-loader', `Created folderPath with scanner prefix: ${pathPrefix}`);
+                    }
+                    
                     // If template has a dataPath property, it's likely the real format
                     if (template.dataPath) {
-                        dataJsPath = `${folderName}/${template.dataPath}`;
+                        dataJsPath = `${pathPrefix}/${template.dataPath}`;
                         debug('report-loader', `Found data.js path: ${dataJsPath}`);
                     }
                     
@@ -342,10 +354,33 @@
          * @returns {Promise<Object>} - Promise resolving to report data
          */
         _findMostRecentAnalysisFile: function(template) {
-            debug('report-loader', `Finding most recent analysis file for template: ${template}`);
+            debug('report-loader', `Finding most recent analysis file for template`, template);
+            
+            // Determine the folder path
+            let folderPath;
+            if (typeof template === 'object') {
+                if (template.folderPath) {
+                    folderPath = template.folderPath;
+                } else if (template.relativePath) {
+                    const folderName = template.relativePath.split('/')[0];
+                    // Check if we need to prefix the scanner
+                    if (template.scannedBy && template.scannedBy.length > 0) {
+                        const lastScanner = template.scannedBy[template.scannedBy.length - 1];
+                        folderPath = `${lastScanner}-${folderName}`;
+                    } else {
+                        folderPath = folderName;
+                    }
+                } else {
+                    folderPath = String(template);
+                }
+            } else {
+                folderPath = String(template);
+            }
+            
+            debug('report-loader', `Using folder path: ${folderPath}`);
             
             // First try to fetch the index.json to see what's available
-            return this._fetchReportFile(`/results/${template}/index.json`)
+            return this._fetchReportFile(`/results/${folderPath}/index.json`)
                 .then(indexData => {
                     // If we found an index.json with timestamp info, use the most recent one
                     if (indexData && Array.isArray(indexData.timestamps) && indexData.timestamps.length > 0) {
@@ -385,18 +420,38 @@
                 return Promise.reject(new Error('No more timestamps to try'));
             }
             
-            // Make sure we're working with a valid template name string
-            const templateName = typeof template === 'string' ? template : 'unknown';
-            const timestamp = timestamps[0];
-            const path = `/results/${templateName}/${timestamp}-analysis.json`;
+            // Determine the folder path
+            let folderPath;
+            if (typeof template === 'object') {
+                if (template.folderPath) {
+                    folderPath = template.folderPath;
+                } else if (template.relativePath) {
+                    const folderName = template.relativePath.split('/')[0];
+                    // Check if we need to prefix the scanner
+                    if (template.scannedBy && template.scannedBy.length > 0) {
+                        const lastScanner = template.scannedBy[template.scannedBy.length - 1];
+                        folderPath = `${lastScanner}-${folderName}`;
+                    } else {
+                        folderPath = folderName;
+                    }
+                } else {
+                    folderPath = String(template);
+                }
+            } else {
+                folderPath = String(template);
+            }
             
-            debug('report-loader', `Trying timestamp ${timestamp} for template ${templateName}`);
+            debug('report-loader', `Using folder path for timestamps: ${folderPath}`);
+            const timestamp = timestamps[0];
+            const path = `/results/${folderPath}/${timestamp}-analysis.json`;
+            
+            debug('report-loader', `Trying timestamp ${timestamp} for template at path ${path}`);
             
             return this._fetchReportFile(path)
                 .catch(error => {
                     // Try the next timestamp
                     debug('report-loader', `Timestamp ${timestamp} failed, trying next`);
-                    return this._tryTimestamps(templateName, timestamps.slice(1));
+                    return this._tryTimestamps(template, timestamps.slice(1));
                 });
         }
     };

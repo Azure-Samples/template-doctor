@@ -1,0 +1,29 @@
+name: 'Template Doctor Analysis Submission'
+description: 'Submits template analysis results to the repository'
+author: 'Template Doctor Team'
+inputs:
+  repo-url:
+    description: 'URL of the GitHub repository being analyzed'
+    required: true
+  rule-set:
+    description: 'Ruleset used for the analysis (dod, partner, custom)'
+    required: true
+    default: 'dod'
+  username:
+    description: 'GitHub username of the person who ran the analysis'
+    required: true
+  timestamp:
+    description: 'Timestamp when the analysis was completed'
+    required: true
+  analysis-data:
+    description: 'JSON string containing the analysis results'
+    required: true
+outputs:
+  template-data:
+    description: 'Template data object that was created/updated'
+runs:
+  using: 'node16'
+  main: 'action.js'
+branding:
+  icon: 'clipboard'
+  color: 'blue'

@@ -1,0 +1,75 @@
+name: Submit Template Analysis
+
+on:
+  repository_dispatch:
+    types: [template-analysis-completed]
+
+# Required permissions for the workflow
+permissions:
+  contents: write  # Needed to write to repository files
+  pull-requests: write  # Needed to create pull requests
+
+jobs:
+  submit-analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Debug payload
+        run: |
+          echo "Received repository dispatch event"
+          echo "Repository URL: ${{ github.event.client_payload.repoUrl }}"
+          echo "Rule Set: ${{ github.event.client_payload.ruleSet }}"
+          echo "Username: ${{ github.event.client_payload.username }}"
+          echo "Timestamp: ${{ github.event.client_payload.timestamp }}"
+          
+      - name: Process analysis result
+        id: process
+        uses: ./
+        with:
+          repo-url: ${{ github.event.client_payload.repoUrl }}
+          rule-set: ${{ github.event.client_payload.ruleSet }}
+          username: ${{ github.event.client_payload.username }}
+          timestamp: ${{ github.event.client_payload.timestamp }}
+          analysis-data: ${{ toJSON(github.event.client_payload.analysisData) }}
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "Update template analysis for ${{ github.event.client_payload.repoUrl }}"
+          title: "Add template analysis for ${{ github.event.client_payload.repoUrl }}"
+          body: |
+            This PR adds a new template analysis result:
+            
+            - Repository: ${{ github.event.client_payload.repoUrl }}
+            - Ruleset: ${{ github.event.client_payload.ruleSet }}
+            - Scanned by: ${{ github.event.client_payload.username }}
+            - Date: ${{ github.event.client_payload.timestamp }}
+            
+            Compliance: ${{ github.event.client_payload.compliance.percentage }}% 
+            (${{ github.event.client_payload.compliance.passed }} passed, ${{ github.event.client_payload.compliance.issues }} issues)
+          branch: template-analysis-${{ github.run_id }}
+          delete-branch: true
+          base: main
+
+      - name: PR Creation Status
+        if: steps.process.outcome == 'success'
+        run: |
+          echo "Pull request creation complete"
+          echo "See the Pull requests tab for the new PR"
+          
+      - name: PR Creation Error
+        if: steps.process.outcome != 'success'
+        run: |
+          echo "⚠️ Error creating pull request!"
+          echo "Check action logs for details"

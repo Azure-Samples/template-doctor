@@ -171,7 +171,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchInput = document.getElementById('repo-search');
     const searchButton = document.getElementById('search-button');
     const searchResults = document.getElementById('search-results');
-    const recentList = document.getElementById('recent-list');
+    let recentList; // Will be initialized in createRecentSearchesSection
     const analysisSection = document.getElementById('analysis-section');
     const resultsContainer = document.getElementById('results-container');
     const loadingContainer = document.getElementById('loading-container');
@@ -210,9 +210,20 @@ document.addEventListener('DOMContentLoaded', () => {
             scannedTemplatesSection.id = 'scanned-templates-section';
             scannedTemplatesSection.className = 'scanned-templates-section';
             
+            // Create collapsible header
             scannedTemplatesSection.innerHTML = `
-                <h2>Previously Scanned Templates</h2>
-                <div id="template-grid" class="template-grid"></div>
+                <div class="section-header collapsible">
+                    <h2>Previously Scanned Templates</h2>
+                    <button class="toggle-btn"><i class="fas fa-chevron-down"></i></button>
+                </div>
+                <div class="section-content">
+                    <div id="template-grid" class="template-grid"></div>
+                    <div class="pagination">
+                        <button class="prev-page" disabled>&laquo; Previous</button>
+                        <div class="page-numbers"></div>
+                        <button class="next-page">Next &raquo;</button>
+                    </div>
+                </div>
             `;
             
             // Insert after the search section
@@ -224,24 +235,66 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             templateGrid = document.getElementById('template-grid');
+            
+            // Set up collapsible functionality
+            const toggleBtn = scannedTemplatesSection.querySelector('.toggle-btn');
+            const sectionContent = scannedTemplatesSection.querySelector('.section-content');
+            
+            toggleBtn.addEventListener('click', () => {
+                const isCollapsed = sectionContent.style.display === 'none';
+                sectionContent.style.display = isCollapsed ? 'block' : 'none';
+                toggleBtn.innerHTML = isCollapsed ? 
+                    '<i class="fas fa-chevron-down"></i>' : 
+                    '<i class="fas fa-chevron-right"></i>';
+                
+                // Store preference in localStorage
+                localStorage.setItem('td_templates_collapsed', isCollapsed ? 'false' : 'true');
+            });
+            
+            // Apply stored collapse state
+            const isCollapsed = localStorage.getItem('td_templates_collapsed') === 'true';
+            if (isCollapsed) {
+                sectionContent.style.display = 'none';
+                toggleBtn.innerHTML = '<i class="fas fa-chevron-right"></i>';
+            }
         } else {
             scannedTemplatesSection = document.getElementById('scanned-templates-section');
             templateGrid = document.getElementById('template-grid');
         }
     }
 
-    function renderScannedTemplates() {
+    // Add these variables for pagination
+    let currentPage = 1;
+    const templatesPerPage = 6;
+    
+    function renderScannedTemplates(page = 1) {
         createScannedTemplatesSection();
         
         if (!templateGrid) return;
         
         if (scannedTemplates.length === 0) {
             templateGrid.innerHTML = '<div class="no-templates">No scanned templates found.</div>';
+            // Hide pagination
+            const pagination = scannedTemplatesSection.querySelector('.pagination');
+            if (pagination) pagination.style.display = 'none';
             return;
         }
 
+        // Update current page
+        currentPage = page;
+        
+        // Calculate pagination
+        const totalTemplates = scannedTemplates.length;
+        const totalPages = Math.ceil(totalTemplates / templatesPerPage);
+        const startIndex = (currentPage - 1) * templatesPerPage;
+        const endIndex = Math.min(startIndex + templatesPerPage, totalTemplates);
+        
+        // Get templates for current page
+        const currentTemplates = scannedTemplates.slice(startIndex, endIndex);
+        
+        // Render templates
         templateGrid.innerHTML = '';
-        scannedTemplates.forEach(template => {
+        currentTemplates.forEach(template => {
             const repoName = template.repoUrl.split('github.com/')[1] || template.repoUrl;
             const templateId = `template-${template.relativePath.split('/')[0]}`.replace(/[^a-zA-Z0-9-]/g, '-');
             
@@ -255,6 +308,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 gistUrl = template.customConfig.gistUrl;
             }
             
+            // Get the last scanner from the scannedBy array
+            const lastScanner = template.scannedBy && template.scannedBy.length > 0 ? 
+                template.scannedBy[template.scannedBy.length - 1] : 'Unknown';
+            
             const card = document.createElement('div');
             card.className = 'template-card';
             card.id = templateId;
@@ -264,7 +321,7 @@ document.addEventListener('DOMContentLoaded', () => {
             card.innerHTML = `
                 <div class="card-header">
                     <h3 data-tooltip="${repoName}" class="has-permanent-tooltip">${repoName}</h3>
-                    <span class="scan-date">${new Date(template.timestamp).toLocaleDateString()}</span>
+                    <span class="scan-date">Last scanned by <strong>${lastScanner}</strong> on ${new Date(template.timestamp).toLocaleDateString()}</span>
                 </div>
                 <div class="card-body">
                     ${ruleSet === 'custom' && gistUrl ? 
@@ -280,7 +337,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     <div class="stats">
                         <div class="stat-item issues">
                             <i class="fas fa-exclamation-triangle"></i>
-                            <span>${template.compliance.issues} issues</span>
+                            ${(() => {
+                                // Get the template name from relativePath (first part before the slash)
+                                const templateName = template.relativePath ? template.relativePath.split('/')[0] : null;
+                                // Get the latest scanner (last in the scannedBy array)
+                                const latestScanner = template.scannedBy && template.scannedBy.length > 0 ? 
+                                    template.scannedBy[template.scannedBy.length - 1] : null;
+                                
+                                if (templateName && latestScanner) {
+                                    return `<a href="https://github.com/${latestScanner}/${templateName}/issues" target="_blank" 
+                                        class="issues-link" title="View issues for ${templateName} by ${latestScanner}">
+                                        ${template.compliance.issues} issues <i class="fas fa-external-link-alt fa-xs"></i>
+                                    </a>`;
+                                } else {
+                                    return `<span>${template.compliance.issues} issues</span>`;
+                                }
+                            })()}
                         </div>
                         <div class="stat-item passed">
                             <i class="fas fa-check-circle"></i>
@@ -312,7 +384,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('repo-url').textContent = template.repoUrl;
                 
                 // Extract the folder name from the template path
-                const folderName = template.relativePath ? template.relativePath.split('/')[0] : null;
+                let folderName = template.relativePath ? template.relativePath.split('/')[0] : null;
                 
                 if (!folderName) {
                     debug('app', 'Error: No folder name could be extracted from template');
@@ -322,10 +394,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
                 
-                console.log(`HANDLER: Loading report for ${folderName}`);
+                // Determine if we need to prefix the folder with the scanner name
+                const lastScanner = template.scannedBy && template.scannedBy.length > 0 ? 
+                    template.scannedBy[template.scannedBy.length - 1] : null;
+                
+                // Create the folder path with scanner prefix if needed
+                const folderPath = lastScanner ? `${lastScanner}-${folderName}` : folderName;
+                
+                console.log(`HANDLER: Loading report for ${folderName} from path ${folderPath}`);
                 
                 // First, try to load latest.json to find the current data file
-                const latestJsonPath = `/results/${folderName}/latest.json`;
+                const latestJsonPath = `/results/${folderPath}/latest.json`;
                 console.log(`HANDLER: Fetching latest.json from: ${latestJsonPath}`);
                 
                 // Clear any existing reportData
@@ -345,7 +424,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             console.log(`HANDLER: Found dataPath in latest.json: ${latestData.dataPath}`);
                             
                             // DISPLAY RAW DATA APPROACH: Use a direct fetch to get the data
-                            const dataUrl = `/results/${folderName}/${latestData.dataPath}`;
+                            const dataUrl = `/results/${folderPath}/${latestData.dataPath}`;
                             console.log(`Loading data from: ${dataUrl}`);
                             
                             // First display a message to show we're trying
@@ -353,9 +432,17 @@ document.addEventListener('DOMContentLoaded', () => {
                             resultsContainer.style.display = 'block';
                             resultsContainer.innerHTML = `
                                 <div style="padding: 20px; background: #f8f9fa; border-radius: 5px; margin-bottom: 20px;">
-                                    <h3>Loading Data (Debug Mode)</h3>
-                                    <p>Attempting to load data from: <code>${dataUrl}</code></p>
-                                    <div id="raw-data-container">Loading...</div>
+                                    <h3>Template Report</h3>
+                                    <div style="display: flex; justify-content: center; margin: 20px 0;">
+                                        <button id="show-full-report-btn" style="padding: 10px 20px; background: #0078d4; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px;">
+                                            Show full report
+                                        </button>
+                                    </div>
+                                    <div class="raw-data-section" style="margin-top: 30px; border-top: 1px solid #ddd; padding-top: 20px;">
+                                        <h4>Raw Data</h4>
+                                        <p>Data source: <code>${dataUrl}</code></p>
+                                        <div id="raw-data-container">Loading...</div>
+                                    </div>
                                 </div>
                             `;
                             
@@ -368,94 +455,55 @@ document.addEventListener('DOMContentLoaded', () => {
                                 console.log("Script loaded! Window.reportData:", window.reportData);
                                 
                                 const rawDataContainer = document.getElementById('raw-data-container');
+                                const showFullReportBtn = document.getElementById('show-full-report-btn');
                                 
                                 // Check if data is available
                                 if (window.reportData) {
                                     // Display raw JSON
                                     rawDataContainer.innerHTML = `
-                                        <h4>Data loaded successfully!</h4>
-                                        <p>Here's the raw data:</p>
                                         <pre style="background: #333; color: #fff; padding: 10px; border-radius: 5px; max-height: 400px; overflow: auto;">${JSON.stringify(window.reportData, null, 2)}</pre>
-                                        <div style="display: flex; gap: 10px; margin-top: 15px;">
-                                            <button id="render-dashboard-btn" style="padding: 8px 15px; background: #0078d4; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                                                Try to render dashboard with this data
-                                            </button>
-                                            <button id="fixed-render-btn" style="padding: 8px 15px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                                                Render with fixed data format
-                                            </button>
-                                        </div>
                                     `;
                                     
-                                    // Add click handler for the render buttons
-                                    setTimeout(() => {
-                                        // Standard render button
-                                        const renderBtn = document.getElementById('render-dashboard-btn');
-                                        if (renderBtn) {
-                                            renderBtn.addEventListener('click', function() {
-                                                try {
-                                                    // Make a copy of the data
-                                                    const data = JSON.parse(JSON.stringify(window.reportData));
-                                                    
-                                                    // Clear the container
-                                                    resultsContainer.innerHTML = '';
-                                                    
-                                                    // Try to render
-                                                    appDashboard.render(data, resultsContainer);
-                                                    
-                                                    // Scroll to the top of the analysis section
-                                                    analysisSection.scrollIntoView({ behavior: 'smooth' });
-                                                } catch (error) {
-                                                    resultsContainer.innerHTML = `<div style="padding: 20px; background: #f8d7da; color: #721c24; border-radius: 5px;">
-                                                        <h3>Render Error</h3>
-                                                        <p>Error rendering dashboard: ${error.message}</p>
-                                                        <pre>${error.stack}</pre>
-                                                    </div>`;
+                                    // Add click handler for the show full report button
+                                    if (showFullReportBtn) {
+                                        showFullReportBtn.addEventListener('click', function() {
+                                            try {
+                                                // Get the data and ensure it's properly structured
+                                                let data = JSON.parse(JSON.stringify(window.reportData));
+                                                
+                                                // Ensure compliance structure exists
+                                                if (!data.compliance) {
+                                                    data.compliance = {};
                                                 }
-                                            });
-                                        }
-                                        
-                                        // Fixed format button - this ensures the data is properly structured
-                                        const fixedBtn = document.getElementById('fixed-render-btn');
-                                        if (fixedBtn) {
-                                            fixedBtn.addEventListener('click', function() {
-                                                try {
-                                                    // Get the data and ensure it's properly structured
-                                                    let data = JSON.parse(JSON.stringify(window.reportData));
-                                                    
-                                                    // Ensure compliance structure exists
-                                                    if (!data.compliance) {
-                                                        data.compliance = {};
-                                                    }
-                                                    
-                                                    // Ensure compliance issues array exists
-                                                    if (!Array.isArray(data.compliance.issues)) {
-                                                        // If issues don't exist, create an empty array
-                                                        data.compliance.issues = [];
-                                                    }
-                                                    
-                                                    // Ensure there's a repoUrl
-                                                    if (!data.repoUrl) {
-                                                        data.repoUrl = window.location.href;
-                                                    }
-                                                    
-                                                    // Clear the container
-                                                    resultsContainer.innerHTML = '';
-                                                    
-                                                    // Try to render
-                                                    appDashboard.render(data, resultsContainer);
-                                                    
-                                                    // Scroll to the top of the analysis section
-                                                    analysisSection.scrollIntoView({ behavior: 'smooth' });
-                                                } catch (error) {
-                                                    resultsContainer.innerHTML = `<div style="padding: 20px; background: #f8d7da; color: #721c24; border-radius: 5px;">
-                                                        <h3>Render Error</h3>
-                                                        <p>Error rendering dashboard with fixed data: ${error.message}</p>
-                                                        <pre>${error.stack}</pre>
-                                                    </div>`;
+                                                
+                                                // Ensure compliance issues array exists
+                                                if (!Array.isArray(data.compliance.issues)) {
+                                                    // If issues don't exist, create an empty array
+                                                    data.compliance.issues = [];
                                                 }
-                                            });
-                                        }
-                                    }, 100);
+                                                
+                                                // Ensure there's a repoUrl
+                                                if (!data.repoUrl) {
+                                                    data.repoUrl = window.location.href;
+                                                }
+                                                
+                                                // Clear the container
+                                                resultsContainer.innerHTML = '';
+                                                
+                                                // Try to render
+                                                appDashboard.render(data, resultsContainer);
+                                                
+                                                // Scroll to the top of the analysis section
+                                                analysisSection.scrollIntoView({ behavior: 'smooth' });
+                                            } catch (error) {
+                                                resultsContainer.innerHTML = `<div style="padding: 20px; background: #f8d7da; color: #721c24; border-radius: 5px;">
+                                                    <h3>Render Error</h3>
+                                                    <p>Error rendering dashboard: ${error.message}</p>
+                                                    <pre>${error.stack}</pre>
+                                                </div>`;
+                                            }
+                                        });
+                                    }
                                 } else {
                                     rawDataContainer.innerHTML = `
                                         <div style="padding: 15px; background: #f8d7da; color: #721c24; border-radius: 5px;">
@@ -463,6 +511,13 @@ document.addEventListener('DOMContentLoaded', () => {
                                             <p>The script loaded but window.reportData is not defined!</p>
                                         </div>
                                     `;
+                                    
+                                    // Disable the show full report button
+                                    if (showFullReportBtn) {
+                                        showFullReportBtn.disabled = true;
+                                        showFullReportBtn.style.backgroundColor = '#cccccc';
+                                        showFullReportBtn.style.cursor = 'not-allowed';
+                                    }
                                 }
                             };
                             
@@ -521,8 +576,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Try to load report with ReportLoader instead
                         if (window.ReportLoader) {
                             console.log(`HANDLER: Falling back to ReportLoader`);
-                            // Add folderName to template object for better context
-                            const templateWithFolder = { ...template, folderName: folderName };
+                            // Add folderName and folderPath to template object for better context
+                            const templateWithFolder = { ...template, folderName: folderName, folderPath: folderPath };
                             console.log(`HANDLER: Template object for ReportLoader:`, templateWithFolder);
                             
                             window.ReportLoader.loadReportData(
@@ -575,6 +630,53 @@ document.addEventListener('DOMContentLoaded', () => {
             
             templateGrid.appendChild(card);
         });
+        
+        // Update pagination controls
+        const pagination = scannedTemplatesSection.querySelector('.pagination');
+        const pageNumbers = pagination.querySelector('.page-numbers');
+        const prevBtn = pagination.querySelector('.prev-page');
+        const nextBtn = pagination.querySelector('.next-page');
+        
+        // Show/hide pagination based on number of templates
+        pagination.style.display = totalTemplates > templatesPerPage ? 'flex' : 'none';
+        
+        // Generate page numbers
+        pageNumbers.innerHTML = '';
+        
+        // Only show up to 5 page numbers
+        const maxPageButtons = 5;
+        let startPage = Math.max(1, currentPage - Math.floor(maxPageButtons / 2));
+        let endPage = Math.min(totalPages, startPage + maxPageButtons - 1);
+        
+        // Adjust start page if we're near the end
+        if (endPage - startPage + 1 < maxPageButtons && startPage > 1) {
+            startPage = Math.max(1, endPage - maxPageButtons + 1);
+        }
+        
+        // Add page numbers
+        for (let i = startPage; i <= endPage; i++) {
+            const pageBtn = document.createElement('button');
+            pageBtn.textContent = i;
+            pageBtn.classList.add('page-btn');
+            if (i === currentPage) {
+                pageBtn.classList.add('active');
+            }
+            pageBtn.addEventListener('click', () => renderScannedTemplates(i));
+            pageNumbers.appendChild(pageBtn);
+        }
+        
+        // Update prev/next buttons
+        prevBtn.disabled = currentPage === 1;
+        nextBtn.disabled = currentPage === totalPages;
+        
+        // Add event listeners to prev/next buttons
+        prevBtn.onclick = () => {
+            if (currentPage > 1) renderScannedTemplates(currentPage - 1);
+        };
+        
+        nextBtn.onclick = () => {
+            if (currentPage < totalPages) renderScannedTemplates(currentPage + 1);
+        };
 
         // Make section visible
         if (scannedTemplatesSection) {
@@ -592,7 +694,56 @@ document.addEventListener('DOMContentLoaded', () => {
         renderRecentSearches();
     }
 
+    function createRecentSearchesSection() {
+        const recentSearchesContainer = document.getElementById('recent-searches');
+        if (!recentSearchesContainer) return;
+        
+        // If the section has already been configured with collapsible functionality, return
+        if (recentSearchesContainer.querySelector('.section-header')) return;
+        
+        // Store the original content
+        const originalContent = recentSearchesContainer.innerHTML;
+        
+        // Replace with new structure that includes collapsible header
+        recentSearchesContainer.innerHTML = `
+            <div class="section-header collapsible">
+                <h3>Recent Searches</h3>
+                <button class="toggle-btn"><i class="fas fa-chevron-down"></i></button>
+            </div>
+            <div class="section-content">
+                <ul id="recent-list"></ul>
+            </div>
+        `;
+        
+        // Set up collapsible functionality
+        const toggleBtn = recentSearchesContainer.querySelector('.toggle-btn');
+        const sectionContent = recentSearchesContainer.querySelector('.section-content');
+        
+        toggleBtn.addEventListener('click', () => {
+            const isCollapsed = sectionContent.style.display === 'none';
+            sectionContent.style.display = isCollapsed ? 'block' : 'none';
+            toggleBtn.innerHTML = isCollapsed ? 
+                '<i class="fas fa-chevron-down"></i>' : 
+                '<i class="fas fa-chevron-right"></i>';
+            
+            // Store preference in localStorage
+            localStorage.setItem('td_recent_searches_collapsed', isCollapsed ? 'false' : 'true');
+        });
+        
+        // Apply stored collapse state
+        const isCollapsed = localStorage.getItem('td_recent_searches_collapsed') === 'true';
+        if (isCollapsed) {
+            sectionContent.style.display = 'none';
+            toggleBtn.innerHTML = '<i class="fas fa-chevron-right"></i>';
+        }
+        
+        // Update the reference to the recent list
+        recentList = document.getElementById('recent-list');
+    }
+
     function renderRecentSearches() {
+        createRecentSearchesSection();
+        
         recentList.innerHTML = '';
         if (recentSearches.length === 0) {
             recentList.innerHTML = '<li>No recent searches.</li>';
@@ -1073,6 +1224,73 @@ document.addEventListener('DOMContentLoaded', () => {
             debug('app', 'Analysis complete, rendering dashboard');
             appDashboard.render(result, resultsContainer);
             
+            // Submit analysis results to GitHub for PR creation
+            if (window.submitAnalysisToGitHub && window.GitHubClient?.auth?.isAuthenticated()) {
+                try {
+                    // Get current username
+                    const username = window.GitHubClient.auth.getUsername();
+                    
+                    if (username) {
+                        debug('app', `Submitting analysis to GitHub with username: ${username}`);
+                        
+                        const submitResult = await window.submitAnalysisToGitHub(result, username);
+                        
+                        if (submitResult.success) {
+                            debug('app', 'Analysis submitted successfully to GitHub');
+                            if (window.NotificationSystem) {
+                                window.NotificationSystem.showSuccess(
+                                    'Analysis Submitted',
+                                    'Your analysis has been submitted for integration into the repository',
+                                    5000
+                                );
+                            }
+                        } else {
+                            debug('app', `Error submitting analysis: ${submitResult.error}`);
+                            if (window.NotificationSystem) {
+                                const errorMessage = submitResult.details ? 
+                                    `${submitResult.error} ${submitResult.details}` : 
+                                    submitResult.error;
+                                
+                                const helpLink = document.createElement('div');
+                                helpLink.style.marginTop = '10px';
+                                helpLink.innerHTML = `
+                                    <a href="/docs/GITHUB_ACTION_SETUP.md" target="_blank" style="color: #0078d4; text-decoration: underline;">
+                                        View GitHub Action setup guide
+                                    </a>
+                                `;
+                                
+                                window.NotificationSystem.showWarning(
+                                    'Submission Issue',
+                                    `Analysis completed but could not be submitted: ${errorMessage}`,
+                                    10000,
+                                    helpLink
+                                );
+                            }
+                        }
+                    }
+                } catch (submitErr) {
+                    debug('app', `Error in GitHub submission: ${submitErr.message}`, submitErr);
+                    
+                    // Show an error notification with help link
+                    if (window.NotificationSystem) {
+                        const helpLink = document.createElement('div');
+                        helpLink.style.marginTop = '10px';
+                        helpLink.innerHTML = `
+                            <a href="/docs/GITHUB_ACTION_SETUP.md" target="_blank" style="color: #0078d4; text-decoration: underline;">
+                                View GitHub Action setup guide
+                            </a>
+                        `;
+                        
+                        window.NotificationSystem.showWarning(
+                            'Submission Error',
+                            `Failed to submit analysis: ${submitErr.message}`,
+                            10000,
+                            helpLink
+                        );
+                    }
+                }
+            }
+            
         } catch (err) {
             debug('app', `Error analyzing repo: ${err.message}`, err);
             loadingContainer.style.display = 'none';
@@ -1156,6 +1374,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // --- Initial Render ---
+    createRecentSearchesSection();
     renderRecentSearches();
     
     // Try loading scanned templates

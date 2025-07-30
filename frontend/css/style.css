@@ -365,6 +365,35 @@ main {
     margin-top: 32px;
 }
 
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.section-header h2,
+.section-header h3 {
+    margin: 0;
+    color: var(--text-secondary);
+}
+
+.section-header.collapsible {
+    cursor: pointer;
+}
+
+.section-header .toggle-btn {
+    background: none;
+    border: none;
+    font-size: 1rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.section-content {
+    transition: all 0.3s ease;
+}
+
 .recent-searches h3 {
     font-size: 1rem;
     margin-bottom: 12px;
@@ -398,6 +427,56 @@ main {
 
 .recent-searches li a:hover {
     text-decoration: underline;
+}
+
+/* Pagination Styles */
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 20px;
+    gap: 10px;
+}
+
+.pagination button {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.pagination button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
+.pagination button:hover:not(:disabled) {
+    background-color: var(--primary-dark);
+}
+
+.page-numbers {
+    display: flex;
+    gap: 5px;
+}
+
+.page-numbers button {
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    background-color: #f0f0f0;
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+
+.page-numbers button.active {
+    background-color: var(--primary-color);
+    color: white;
 }
 
 /* Analysis Section */
