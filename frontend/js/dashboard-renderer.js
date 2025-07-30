@@ -263,13 +263,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     percentageCompliant: percentageCompliant,
                     totalChecks: totalChecks,
                     passedChecks: compliant.length,
-                    issuesCount: issues.length
+                    issuesCount: issues.length,
+                    ruleSet: result.ruleSet || 'dod'
                 }
             });
             
             // Create the adapted result data object
-            return {
+            const adaptedData = {
                 repoUrl: result.repoUrl || window.location.href,
+                ruleSet: result.ruleSet || 'dod',
                 compliance: {
                     issues: issues,
                     compliant: compliant,
@@ -278,6 +280,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 totalIssues: issues.length,
                 totalPassed: compliant.length
             };
+            
+            // Include custom configuration if available
+            if (result.customConfig) {
+                adaptedData.customConfig = result.customConfig;
+            }
+            
+            return adaptedData;
         };
         
         /**
@@ -291,12 +300,33 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const compliancePercentage = data.compliance.compliant.find(item => item.category === 'meta')?.details?.percentageCompliant || 0;
             
+            // Get ruleset information
+            const ruleSet = data.ruleSet || data.compliance.compliant.find(item => item.category === 'meta')?.details?.ruleSet || 'dod';
+            const ruleSetDisplay = ruleSet === 'dod' ? 'DoD' : (ruleSet === 'partner' ? 'Partner' : 'Custom');
+            
+            // Check for Gist URL in custom configuration
+            const gistUrl = data.customConfig?.gistUrl;
+            
             overviewSection.innerHTML = `
                 <h2>Compliance Overview</h2>
-                <p class="overview-text">
-                    This dashboard provides an overview for your Azure template compliance status with the 'Azure Developer CLI Template Framework' <a href="https://github.com/Azure-Samples/azd-template-artifacts/blob/main/docs/development-guidelines/definition-of-done.md" title="Definition of Done">Definition of Done</a>. Browse the list below to
-                    fix specific issues or use the AI agent to automatically fix all compliance issues in VS Code.
-                </p>
+                <div class="overview-header">
+                    <p class="overview-text">
+                        This dashboard provides an overview for your Azure template compliance status with the 'Azure Developer CLI Template Framework' <a href="https://github.com/Azure-Samples/azd-template-artifacts/blob/main/docs/development-guidelines/definition-of-done.md" title="Definition of Done">Definition of Done</a>. Browse the list below to
+                        fix specific issues or use the AI agent to automatically fix all compliance issues in VS Code.
+                    </p>
+                    <div class="ruleset-info">
+                        <span class="ruleset-label">Configuration:</span>
+                        ${ruleSet === 'custom' && gistUrl ? 
+                            `<a href="${gistUrl}" target="_blank" class="ruleset-value ${ruleSet}-badge" title="View custom ruleset on GitHub">
+                                ${ruleSetDisplay} <i class="fas fa-external-link-alt fa-xs"></i>
+                             </a>` : 
+                            `<span class="ruleset-value ${ruleSet}-badge">${ruleSetDisplay}</span>`
+                        }
+                        <button id="change-ruleset-btn" class="btn btn-small" title="Change configuration">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                </div>
                 <p>For more information about compliance and collections, go here <a href="https://github.com/Azure-Samples/azd-template-artifacts">Azure Developer CLI Template Framework Docs</a></p>
                 <div class="compliance-gauge">
                     <div class="gauge-fill" id="complianceGauge" style="width: ${compliancePercentage}%; background-position: ${compliancePercentage}% 0;"></div>
@@ -335,6 +365,22 @@ document.addEventListener('DOMContentLoaded', function() {
             `;
             
             container.appendChild(overviewSection);
+            
+            // Add event listener for change ruleset button
+            setTimeout(() => {
+                const changeRulesetBtn = document.getElementById('change-ruleset-btn');
+                if (changeRulesetBtn) {
+                    changeRulesetBtn.addEventListener('click', () => {
+                        // Get the current repo URL
+                        const repoUrl = data.repoUrl;
+                        if (repoUrl && typeof window.analyzeRepo === 'function') {
+                            window.analyzeRepo(repoUrl, 'show-modal');
+                        } else {
+                            console.error('Unable to get repository URL or analyzeRepo function');
+                        }
+                    });
+                }
+            }, 100);
         };
         
         /**

@@ -18,65 +18,83 @@ class TemplateAnalyzer {
      */
     async loadRuleSetConfigs() {
         try {
-            // In a real implementation, these would be loaded from actual JSON files
-            // For now, we'll define them inline with a subset of rules for demonstration
-            this.ruleSetConfigs.dod = {
-                requiredFiles: [
-                    "README.md",
-                    "azure.yaml",
-                    "LICENSE"
-                ],
-                requiredFolders: [
-                    "infra",
-                    ".github"
-                ],
-                requiredWorkflowFiles: [
-                    { pattern: /\.github\/workflows\/azure-dev\.yml/i, message: "Missing required GitHub workflow: azure-dev.yml" }
-                ],
-                readmeRequirements: {
-                    requiredHeadings: [
-                        "Prerequisites",
-                        "Getting Started"
-                    ],
-                    architectureDiagram: {
-                        heading: "Architecture",
-                        requiresImage: true
-                    }
-                },
-                bicepChecks: {
-                    requiredResources: [
-                        "Microsoft.Resources/resourceGroups",
-                        "Microsoft.KeyVault/vaults"
-                    ]
-                },
-                azureYamlRules: {
-                    mustDefineServices: true
-                }
-            };
+            // Load DoD (default) config
+            const dodResponse = await fetch('/configs/dod-config.json');
+            if (!dodResponse.ok) {
+                throw new Error(`Failed to load DoD config: ${dodResponse.status}`);
+            }
+            this.ruleSetConfigs.dod = await dodResponse.json();
             
-            // Load simplified partner rules
-            this.ruleSetConfigs.partner = {
-                ...this.ruleSetConfigs.dod,
-                requiredFiles: [
-                    "README.md",
-                    "azure.yaml"
-                ]
-            };
+            // Convert pattern strings to RegExp objects for workflow files
+            if (this.ruleSetConfigs.dod.requiredWorkflowFiles) {
+                this.ruleSetConfigs.dod.requiredWorkflowFiles = 
+                    this.ruleSetConfigs.dod.requiredWorkflowFiles.map(item => ({
+                        pattern: new RegExp(item.pattern, 'i'),
+                        message: item.message
+                    }));
+            }
             
-            // Load simplified custom rules
-            this.ruleSetConfigs.custom = {
-                requiredFiles: [
-                    "README.md",
-                    "azure.yaml"
-                ],
-                requiredFolders: [
-                    "infra"
-                ]
-            };
+            // Load Partner config
+            const partnerResponse = await fetch('/configs/partner-config.json');
+            if (!partnerResponse.ok) {
+                throw new Error(`Failed to load Partner config: ${partnerResponse.status}`);
+            }
+            this.ruleSetConfigs.partner = await partnerResponse.json();
+            
+            // Convert pattern strings to RegExp objects for workflow files
+            if (this.ruleSetConfigs.partner.requiredWorkflowFiles) {
+                this.ruleSetConfigs.partner.requiredWorkflowFiles = 
+                    this.ruleSetConfigs.partner.requiredWorkflowFiles.map(item => ({
+                        pattern: new RegExp(item.pattern, 'i'),
+                        message: item.message
+                    }));
+            }
+            
+            // Load Custom config - this will be overridden if the user provides a custom config
+            const customResponse = await fetch('/configs/custom-config.json');
+            if (!customResponse.ok) {
+                throw new Error(`Failed to load Custom config: ${customResponse.status}`);
+            }
+            this.ruleSetConfigs.custom = await customResponse.json();
+            
+            // Convert pattern strings to RegExp objects for workflow files (if any)
+            if (this.ruleSetConfigs.custom.requiredWorkflowFiles) {
+                this.ruleSetConfigs.custom.requiredWorkflowFiles = 
+                    this.ruleSetConfigs.custom.requiredWorkflowFiles.map(item => ({
+                        pattern: new RegExp(item.pattern, 'i'),
+                        message: item.message
+                    }));
+            }
             
             console.log("Rule set configurations loaded");
         } catch (error) {
             console.error("Failed to load rule set configurations:", error);
+            
+            // Fallback to hardcoded configs if loading fails
+            this.ruleSetConfigs.dod = {
+                requiredFiles: ["README.md", "azure.yaml", "LICENSE"],
+                requiredFolders: ["infra", ".github"],
+                requiredWorkflowFiles: [
+                    { pattern: /\.github\/workflows\/azure-dev\.yml/i, message: "Missing required GitHub workflow: azure-dev.yml" }
+                ],
+                readmeRequirements: {
+                    requiredHeadings: ["Prerequisites", "Getting Started"],
+                    architectureDiagram: {
+                        heading: "Architecture",
+                        requiresImage: true
+                    }
+                }
+            };
+            
+            this.ruleSetConfigs.partner = {
+                ...this.ruleSetConfigs.dod,
+                requiredFiles: ["README.md", "azure.yaml"]
+            };
+            
+            this.ruleSetConfigs.custom = {
+                requiredFiles: ["README.md", "azure.yaml"],
+                requiredFolders: ["infra"]
+            };
         }
     }
     
@@ -231,6 +249,19 @@ class TemplateAnalyzer {
         // Get the appropriate configuration based on the rule set
         const config = this.getConfig(ruleSet);
         const repoInfo = this.extractRepoInfo(repoUrl);
+        
+        // Store custom config details if using custom ruleset
+        let customConfig = null;
+        if (ruleSet === 'custom') {
+            try {
+                const savedConfig = localStorage.getItem('td_custom_ruleset');
+                if (savedConfig) {
+                    customConfig = JSON.parse(savedConfig);
+                }
+            } catch (e) {
+                console.error('Error loading custom configuration:', e);
+            }
+        }
         
         // UI feedback - this is usually handled by the caller
         console.log(`Analyzing repository ${repoInfo.fullName} with rule set: ${ruleSet}`);
@@ -479,6 +510,13 @@ class TemplateAnalyzer {
                     summary: `${summary} - Compliance: ${percentageCompliant}%`
                 }
             };
+            
+            // Add custom configuration details if applicable
+            if (ruleSet === 'custom' && customConfig) {
+                result.customConfig = {
+                    gistUrl: customConfig.gistUrl || null
+                };
+            }
             
             return result;
         } catch (error) {

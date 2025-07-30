@@ -119,6 +119,20 @@ function initializeApp() {
     }
 }
 
+// Define a local reference to the internal analyzeRepo function that will be defined later
+let internalAnalyzeRepo;
+
+// Export analyzeRepo to window object so it can be used by other components
+window.analyzeRepo = async function(repoUrl, ruleSet = 'dod') {
+    // Call the internal analyzeRepo function with the same parameters
+    if (typeof internalAnalyzeRepo === 'function') {
+        return internalAnalyzeRepo(repoUrl, ruleSet);
+    } else {
+        console.error('Internal analyzeRepo function not available yet');
+        return null;
+    }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     // Check for auth errors from the callback page
     const urlParams = new URLSearchParams(window.location.search);
@@ -231,17 +245,34 @@ document.addEventListener('DOMContentLoaded', () => {
             const repoName = template.repoUrl.split('github.com/')[1] || template.repoUrl;
             const templateId = `template-${template.relativePath.split('/')[0]}`.replace(/[^a-zA-Z0-9-]/g, '-');
             
+            // Get ruleset information from template, default to "DoD" if not available
+            const ruleSet = template.ruleSet || 'dod';
+            const ruleSetDisplay = ruleSet === 'dod' ? 'DoD' : (ruleSet === 'partner' ? 'Partner' : 'Custom');
+            
+            // Check for gistUrl in custom rulesets
+            let gistUrl = '';
+            if (ruleSet === 'custom' && template.customConfig && template.customConfig.gistUrl) {
+                gistUrl = template.customConfig.gistUrl;
+            }
+            
             const card = document.createElement('div');
             card.className = 'template-card';
             card.id = templateId;
             card.dataset.repoUrl = template.repoUrl;
             card.dataset.dashboardPath = template.relativePath;
+            card.dataset.ruleSet = ruleSet;
             card.innerHTML = `
                 <div class="card-header">
                     <h3 data-tooltip="${repoName}" class="has-permanent-tooltip">${repoName}</h3>
                     <span class="scan-date">${new Date(template.timestamp).toLocaleDateString()}</span>
                 </div>
                 <div class="card-body">
+                    ${ruleSet === 'custom' && gistUrl ? 
+                        `<a href="${gistUrl}" target="_blank" class="ruleset-badge ${ruleSet}-badge" title="View custom ruleset on GitHub">
+                            ${ruleSetDisplay} <i class="fas fa-external-link-alt fa-xs"></i>
+                         </a>` : 
+                        `<div class="ruleset-badge ${ruleSet}-badge">${ruleSetDisplay}</div>`
+                    }
                     <div class="compliance-bar">
                         <div class="compliance-fill" style="width: ${template.compliance.percentage}%"></div>
                         <span class="compliance-value">${template.compliance.percentage}%</span>
@@ -538,8 +569,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             
             card.querySelector('.rescan-btn').addEventListener('click', () => {
-                // Try to analyze regardless of current state - analyzeRepo will handle initialization
-                analyzeRepo(template.repoUrl);
+                // Show ruleset selection modal
+                internalAnalyzeRepo(template.repoUrl, 'show-modal');
             });
             
             templateGrid.appendChild(card);
@@ -572,7 +603,7 @@ document.addEventListener('DOMContentLoaded', () => {
             li.innerHTML = `<a href="#">${url}</a>`;
             li.querySelector('a').addEventListener('click', e => {
                 e.preventDefault();
-                analyzeRepo(url);
+                internalAnalyzeRepo(url, 'show-modal');
             });
             recentList.appendChild(li);
         });
@@ -705,7 +736,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             
             div.querySelector('.rescan-btn').addEventListener('click', () => {
-                analyzeRepo(matchedTemplate.repoUrl);
+                internalAnalyzeRepo(matchedTemplate.repoUrl);
             });
             
             searchResults.appendChild(div);
@@ -746,7 +777,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     `;
                     
                     searchResults.querySelector('.analyze-btn').addEventListener('click', () => {
-                        analyzeRepo(repoUrl);
+                        internalAnalyzeRepo(repoUrl, 'show-modal');
                     });
                 } else {
                     searchResults.innerHTML = '<div>No repositories found.</div>';
@@ -791,12 +822,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 div.querySelector('.analyze-btn').addEventListener('click', () => {
                     if (isUserRepo || isPreviouslyScanned) {
-                        analyzeRepo(repo.html_url);
+                        internalAnalyzeRepo(repo.html_url, 'show-modal');
                     } else {
                         // Would need to implement fork functionality
                         if (confirm(`This will fork ${repo.full_name} to your account before scanning. Continue?`)) {
                             // For now, just analyze without forking
-                            analyzeRepo(repo.html_url);
+                            internalAnalyzeRepo(repo.html_url, 'show-modal');
                         }
                     }
                 });
@@ -912,7 +943,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Analysis Flow ---
-    async function analyzeRepo(repoUrl) {
+    // Define the internal analyzeRepo function and store a reference to it
+    internalAnalyzeRepo = async function(repoUrl, ruleSet = 'dod') {
         // First verify we have necessary modules initialized
         if (!appAnalyzer || !appDashboard) {
             debug('app', 'Required services not available, attempting to reinitialize');
@@ -949,7 +981,7 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => {
                 if (window.TemplateAnalyzer) {
                     appAnalyzer = window.TemplateAnalyzer;
-                    analyzeRepo(repoUrl);  // Retry the analysis
+                    internalAnalyzeRepo(repoUrl, ruleSet);  // Retry the analysis
                 } else {
                     if (window.NotificationSystem) {
                         window.NotificationSystem.showError(
@@ -961,6 +993,49 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }, 1500);
             return;
+        }
+
+        // Show ruleset configuration modal
+        if (ruleSet === 'show-modal') {
+            debug('app', 'Showing ruleset configuration modal');
+            showRuleSetModal(repoUrl);
+            return;
+        }
+
+        // Check for custom ruleset configuration in local storage
+        if (ruleSet === 'custom') {
+            const customConfig = localStorage.getItem('td_custom_ruleset');
+            if (customConfig) {
+                try {
+                    const parsedConfig = JSON.parse(customConfig);
+                    // Set the custom config in the analyzer
+                    if (appAnalyzer.ruleSetConfigs) {
+                        appAnalyzer.ruleSetConfigs.custom = parsedConfig;
+                    }
+                } catch (e) {
+                    debug('app', 'Failed to parse custom ruleset config', e);
+                    if (window.NotificationSystem) {
+                        window.NotificationSystem.showError(
+                            'Custom Configuration Error',
+                            'Failed to load custom configuration. Using default DoD ruleset instead.',
+                            5000
+                        );
+                    }
+                    // Fall back to DoD ruleset
+                    ruleSet = 'dod';
+                }
+            } else {
+                debug('app', 'No custom ruleset configuration found, using default DoD');
+                if (window.NotificationSystem) {
+                    window.NotificationSystem.showWarning(
+                        'No Custom Configuration',
+                        'No custom configuration found. Using default DoD ruleset instead.',
+                        5000
+                    );
+                }
+                // Fall back to DoD ruleset
+                ruleSet = 'dod';
+            }
         }
         
         // UI state
@@ -980,16 +1055,17 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Notify user that analysis is starting
         if (window.NotificationSystem) {
+            const ruleSetDisplayName = ruleSet === 'dod' ? 'DoD' : (ruleSet === 'partner' ? 'Partner' : 'Custom');
             window.NotificationSystem.showInfo(
                 'Analysis Started',
-                `Analyzing repository: ${repoName}`,
+                `Analyzing repository: ${repoName} with ${ruleSetDisplayName} ruleset`,
                 3000
             );
         }
         
         try {
-            debug('app', `Starting analysis of repo: ${repoUrl}`);
-            const result = await appAnalyzer.analyzeTemplate(repoUrl, 'dod');
+            debug('app', `Starting analysis of repo: ${repoUrl} with ruleset: ${ruleSet}`);
+            const result = await appAnalyzer.analyzeTemplate(repoUrl, ruleSet);
             
             loadingContainer.style.display = 'none';
             resultsContainer.style.display = 'block';
@@ -1002,6 +1078,18 @@ document.addEventListener('DOMContentLoaded', () => {
             loadingContainer.style.display = 'none';
             errorSection.style.display = 'block';
             errorMessage.textContent = err.message || 'An unknown error occurred during analysis';
+        }
+    }
+
+    // Function to show ruleset configuration modal
+    function showRuleSetModal(repoUrl) {
+        // Use the showRulesetModal function from ruleset-modal.js
+        if (window.showRulesetModal) {
+            window.showRulesetModal(repoUrl);
+        } else {
+            console.error("showRulesetModal function not found. Is ruleset-modal.js loaded?");
+            // Fallback to direct analysis if modal doesn't work
+            internalAnalyzeRepo(repoUrl, 'dod');
         }
     }
 

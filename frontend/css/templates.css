@@ -23,6 +23,93 @@
     margin-top: 16px;
 }
 
+/* Ruleset Badges */
+.ruleset-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-bottom: 10px;
+}
+
+.dod-badge {
+    background-color: #0078d4;
+    color: white;
+}
+
+.partner-badge {
+    background-color: #107c10;
+    color: white;
+}
+
+.custom-badge {
+    background-color: #5c2d91;
+    color: white;
+}
+
+/* Ruleset Info in Overview */
+.overview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    margin-bottom: 15px;
+}
+
+.overview-text {
+    flex: 1;
+    margin-right: 20px;
+    min-width: 300px;
+}
+
+.ruleset-info {
+    display: flex;
+    align-items: center;
+    padding: 5px 10px;
+    background-color: #f9f9f9;
+    border-radius: 5px;
+    border: 1px solid #e0e0e0;
+}
+
+.ruleset-label {
+    margin-right: 8px;
+    font-weight: 500;
+    color: #555;
+}
+
+.ruleset-value {
+    margin-right: 8px;
+}
+
+.ruleset-value.custom-badge {
+    text-decoration: none;
+}
+
+.ruleset-value i {
+    margin-left: 4px;
+    font-size: 0.7rem;
+}
+
+.ruleset-badge i {
+    margin-left: 4px;
+    font-size: 0.7rem;
+}
+
+.btn-small {
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    background-color: transparent;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    cursor: pointer;
+    color: #555;
+}
+
+.btn-small:hover {
+    background-color: #f0f0f0;
+}
+
 .template-card {
     background-color: var(--card-background);
     border-radius: 8px;
