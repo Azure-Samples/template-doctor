@@ -765,6 +765,39 @@ class GitHubClient {
             return false;
         }
     }
+            
+
+                    
+
+            return data.createIssue.issue;
+        } catch (error) {
+            console.error('Error creating issue via GraphQL:', error);
+            
+            // Special handling for scope errors
+            if (error.message && (error.message.includes('scope') || error.message.includes('permission'))) {
+                if (window.NotificationSystem) {
+                    window.NotificationSystem.showError(
+                        'Permission Error',
+                        `Your GitHub token doesn't have the "public_repo" permission required to create issues. Please log out and log back in with the correct permissions.`,
+                        15000,
+                        {
+                            actions: [
+                                {
+                                    label: 'Log Out Now',
+                                    onClick: () => {
+                                        if (this.auth) this.auth.logout();
+                                    },
+                                    primary: true
+                                }
+                            ]
+                        }
+                    );
+                }
+            }
+            
+            throw error;
+        }
+    }
 
     /**
      * Check if a user is a collaborator on a repository
