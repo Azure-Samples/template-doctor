@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fork Workflow Test</title>
+    
+    <!-- External dependencies -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    
+    <!-- App styles -->
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/notifications.css">
+    
+    <!-- Core functionality -->
+    <script src="js/auth.js"></script>
+    <script src="js/github-client.js"></script>
+    <script src="js/notifications.js"></script>
+    
+    <!-- Test script -->
+    <script src="js/test-fork-workflow.js"></script>
+    
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+            color: #333;
+        }
+        
+        h1 {
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        
+        .content {
+            background-color: #f5f5f5;
+            border-radius: 5px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        
+        button {
+            background-color: #0078d4;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background-color: #106ebe;
+        }
+        
+        .auth-info {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #e8f5ff;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Fork Workflow Test Page</h1>
+    
+    <div class="content">
+        <p>This page tests the GitHub repository forking functionality:</p>
+        <ul>
+            <li>Checks if the user has forked a repository</li>
+            <li>Creates a fork if needed</li>
+            <li>Checks if a fork is up to date with its parent</li>
+            <li>Updates a fork if needed</li>
+        </ul>
+        
+        <div class="auth-controls">
+            <button id="login-button">Sign in with GitHub</button>
+            <button id="logout-button">Sign out</button>
+        </div>
+        
+        <div class="auth-info">
+            <div id="auth-status">Not signed in</div>
+            <div id="user-info"></div>
+        </div>
+    </div>
+    
+    <script>
+        // Initialize auth status display
+        document.addEventListener('DOMContentLoaded', function() {
+            // References to DOM elements
+            const loginButton = document.getElementById('login-button');
+            const logoutButton = document.getElementById('logout-button');
+            const authStatus = document.getElementById('auth-status');
+            const userInfo = document.getElementById('user-info');
+            
+            // Update auth status display
+            function updateAuthStatus() {
+                if (window.GitHubClient && window.GitHubClient.auth.isAuthenticated()) {
+                    authStatus.textContent = 'Signed in';
+                    authStatus.style.color = 'green';
+                    
+                    const username = window.GitHubClient.auth.getUsername();
+                    if (username) {
+                        userInfo.textContent = `Username: ${username}`;
+                    } else {
+                        userInfo.textContent = 'Username not available';
+                    }
+                } else {
+                    authStatus.textContent = 'Not signed in';
+                    authStatus.style.color = 'red';
+                    userInfo.textContent = '';
+                }
+            }
+            
+            // Set up event listeners
+            loginButton.addEventListener('click', () => {
+                if (window.GitHubAuth) {
+                    window.GitHubAuth.login();
+                } else {
+                    console.error('GitHub Auth not available');
+                }
+            });
+            
+            logoutButton.addEventListener('click', () => {
+                if (window.GitHubAuth) {
+                    window.GitHubAuth.logout();
+                    updateAuthStatus();
+                } else {
+                    console.error('GitHub Auth not available');
+                }
+            });
+            
+            // Check auth status initially
+            updateAuthStatus();
+            
+            // Listen for auth changes
+            document.addEventListener('github-auth-changed', updateAuthStatus);
+        });
+    </script>
+</body>
+</html>

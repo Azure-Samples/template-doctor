@@ -754,7 +754,10 @@ document.addEventListener('DOMContentLoaded', () => {
             li.innerHTML = `<a href="#">${url}</a>`;
             li.querySelector('a').addEventListener('click', e => {
                 e.preventDefault();
-                internalAnalyzeRepo(url, 'show-modal');
+                // Set the search input value
+                searchInput.value = url;
+                // Trigger search which will find and scroll to the template if it exists
+                searchRepos();
             });
             recentList.appendChild(li);
         });
@@ -767,40 +770,68 @@ document.addEventListener('DOMContentLoaded', () => {
         // Clean up search term to handle various formats
         searchTerm = searchTerm.toLowerCase().trim();
         
-        // Handle full URLs
-        if (searchTerm.includes('github.com/')) {
-            searchTerm = searchTerm.split('github.com/')[1];
+        // Get only the repo name part, focusing on the last segment
+        let repoNameToSearch = searchTerm;
+        
+        // Handle full URLs with protocol
+        if (searchTerm.includes('/')) {
+            // Get the last part of the URL or path which is the repo name
+            const parts = searchTerm.split('/');
+            repoNameToSearch = parts[parts.length - 1].replace('.git', '');
         }
         
-        // Remove trailing slashes, .git extension
-        searchTerm = searchTerm.replace(/\/$|\.git$/g, '');
+        debug('app', `Searching for template with repo name: ${repoNameToSearch} (from: ${searchTerm})`);
         
-        debug('app', `Searching for template with normalized term: ${searchTerm}`);
-        
-        // First try exact match
+        // Search through templates, focusing on the repo name
         let match = scannedTemplates.find(template => {
-            const repoName = template.repoUrl.split('github.com/')[1] || '';
-            const normalizedRepoName = repoName.toLowerCase().replace(/\/$|\.git$/g, '');
+            const repoUrl = template.repoUrl.toLowerCase();
             
-            return normalizedRepoName === searchTerm || 
-                   normalizedRepoName.replace('/', '-') === searchTerm;
+            // Extract just the repo name (last part of the URL)
+            const parts = repoUrl.split('/');
+            const templateRepoName = parts[parts.length - 1].replace('.git', '');
+            
+            // Try exact match on repo name
+            return templateRepoName === repoNameToSearch;
         });
         
-        // If no exact match, try partial match
+        // If no exact repo name match, try matching against the full repository identifier (owner/repo)
+        if (!match && searchTerm.includes('/')) {
+            match = scannedTemplates.find(template => {
+                const repoUrl = template.repoUrl.toLowerCase();
+                
+                // Extract owner/repo part if this is a GitHub URL
+                let ownerRepo = '';
+                if (repoUrl.includes('github.com/')) {
+                    ownerRepo = repoUrl.split('github.com/')[1] || '';
+                    ownerRepo = ownerRepo.replace(/\/$|\.git$/g, '');
+                }
+                
+                // Try matching against the owner/repo part
+                if (searchTerm.includes('github.com/')) {
+                    const searchOwnerRepo = searchTerm.split('github.com/')[1].replace(/\/$|\.git$/g, '');
+                    return ownerRepo === searchOwnerRepo;
+                } else {
+                    // If search term might be just owner/repo format
+                    return ownerRepo === searchTerm.replace(/\/$|\.git$/g, '');
+                }
+            });
+        }
+        
+        // Last resort: try partial matching on the repo name
         if (!match) {
             match = scannedTemplates.find(template => {
-                const repoName = template.repoUrl.split('github.com/')[1] || '';
-                const normalizedRepoName = repoName.toLowerCase().replace(/\/$|\.git$/g, '');
+                const repoUrl = template.repoUrl.toLowerCase();
+                const parts = repoUrl.split('/');
+                const templateRepoName = parts[parts.length - 1].replace('.git', '');
                 
-                return normalizedRepoName.includes(searchTerm) || 
-                       normalizedRepoName.replace('/', '-').includes(searchTerm);
+                return templateRepoName.includes(repoNameToSearch);
             });
         }
         
         if (match) {
             debug('app', `Found matching template:`, match);
         } else {
-            debug('app', `No matching template found for: ${searchTerm}`);
+            debug('app', `No matching template found for repo: ${repoNameToSearch}`);
         }
         
         return match;
@@ -1057,22 +1088,55 @@ document.addEventListener('DOMContentLoaded', () => {
     function scrollAndHighlightTemplate(templateId) {
         const templateElement = document.getElementById(templateId);
         if (templateElement) {
-            // Make sure the template section is visible
+            // Make sure the template section is visible and expanded
             if (scannedTemplatesSection) {
                 scannedTemplatesSection.style.display = 'block';
+                
+                // Make sure section content is visible (not collapsed)
+                const sectionContent = scannedTemplatesSection.querySelector('.section-content');
+                if (sectionContent && sectionContent.style.display === 'none') {
+                    // Expand the section
+                    sectionContent.style.display = 'block';
+                    
+                    // Update toggle button
+                    const toggleBtn = scannedTemplatesSection.querySelector('.toggle-btn');
+                    if (toggleBtn) {
+                        toggleBtn.innerHTML = '<i class="fas fa-chevron-down"></i>';
+                    }
+                    
+                    // Update localStorage to reflect expanded state
+                    localStorage.setItem('td_templates_collapsed', 'false');
+                }
+            }
+            
+            // Find which page the template is on and switch to that page
+            const allTemplateCards = document.querySelectorAll('.template-card');
+            const templateIndex = Array.from(allTemplateCards).findIndex(card => card.id === templateId);
+            
+            if (templateIndex !== -1) {
+                const targetPage = Math.floor(templateIndex / templatesPerPage) + 1;
+                if (targetPage !== currentPage) {
+                    renderScannedTemplates(targetPage);
+                }
             }
             
             // Scroll to the element with smooth behavior
             setTimeout(() => {
-                templateElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // First scroll the section into view
+                scannedTemplatesSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 
-                // Add highlight class for blinking border
-                templateElement.classList.add('highlight-template');
-                
-                // Remove highlight after animation completes
+                // Then after a short delay, scroll to the specific template
                 setTimeout(() => {
-                    templateElement.classList.remove('highlight-template');
-                }, 4000);
+                    templateElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    
+                    // Add highlight class for blinking border
+                    templateElement.classList.add('highlight-template');
+                    
+                    // Remove highlight after animation completes
+                    setTimeout(() => {
+                        templateElement.classList.remove('highlight-template');
+                    }, 4000);
+                }, 600);
             }, 300); // Small delay to ensure DOM is ready
         }
     }
