@@ -1,0 +1,14 @@
+{
+  "name": "template-doctor-frontend",
+  "version": "0.0.1",
+  "description": "Frontend for Template Doctor",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:debug": "playwright test --debug",
+    "start": "python3 -m http.server 8080"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0"
+  }
+}

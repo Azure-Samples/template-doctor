@@ -2,14 +2,16 @@
     "name": "template-doctor",
     "version": "0.0.1",
     "description": "An Azure Developer CLI template analysis and healing agent",
-    "type": "module",
     "main": "bin/cli.js",
     "bin": {
         "template-doctor": "dist/cli.js"
     },
     "scripts": {
         "build": "tsc",
-        "start": "node --experimental-json-modules dist/cli.js"
+        "start": "node --experimental-json-modules dist/cli.js",
+        "test": "playwright test",
+        "test:ui": "playwright test --ui",
+        "test:debug": "playwright test --debug"
     },
     "keywords": [
         "azd",
@@ -19,6 +21,7 @@
     "author": "",
     "license": "MIT",
     "devDependencies": {
+        "@playwright/test": "^1.54.1",
         "@types/node": "^24.0.14",
         "typescript": "^5.8.3"
     },
