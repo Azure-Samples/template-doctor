@@ -1,71 +1,52 @@
-# Template Doctor Frontend
+# Frontend - Template Doctor
 
-This is the frontend part of the Template Doctor application, designed to analyze Azure Developer CLI (AZD) templates for compliance with the official Definition of Done.
+This folder contains the frontend application for Template Doctor.
 
-## Configuration Rulesets
+## Prerequisites
+- Node.js and npm
+- Python 3
+- Azure Functions Core Tools (for running the API)
 
-The application uses three types of rulesets:
+## Setup Instructions
 
-1. **DoD (Default)** - The full Definition of Done ruleset with all requirements
-2. **Partner** - A simplified ruleset for partner templates
-3. **Custom** - User-defined ruleset that can be uploaded via JSON or loaded from a GitHub Gist
+### 1. Install Dependencies
+First, install the required npm packages for both the API and the frontend:
 
-### Custom Configuration
-
-Users can define their own custom ruleset by:
-- Pasting a JSON configuration
-- Loading configuration from a GitHub Gist URL
-
-Custom ruleset configurations are stored in the browser's localStorage.
-
-## Previously Scanned Templates Feature
-
-This feature enhances the Template Doctor by showing previously scanned templates.
-
-### How It Works
-
-1. **Template Data Loading:**
-   - The web app loads template scan results from `results/index-data.js`
-   - Templates are displayed in a grid below the search section
-
-2. **Integration with Search:**
-   - When searching for repositories, previously scanned templates are highlighted
-   - Users can view the existing report or rescan the template
-
-3. **Smooth Scroll & Highlight:**
-   - Clicking "View Report" on a search result will scroll to and highlight the corresponding template card
-
-## Folder Structure
-
-- `css/` - Contains all CSS styles for the application
-- `js/` - Contains JavaScript files
-- `configs/` - Contains JSON configuration files for different rulesets
-  - `dod-config.json` - Default Definition of Done ruleset
-  - `partner-config.json` - Partner ruleset
-  - `custom-config.json` - Base template for custom rulesets
-- `assets/` - Contains images and other static assets
-- `results/` - Contains previously scanned template results
-
-## Development Notes
-
-- The data is loaded asynchronously via the `templates-data-loader.js` script
-- Templates are rendered in a responsive grid layout
-- Ruleset configurations are loaded from the `configs/` directory
-
-## CSS Styles
-
-- Template cards use a consistent design language matching the rest of the UI
-- Highlighting effect uses CSS animations for a subtle pulse effect
-- Responsive design adapts to different screen sizes
-
-## Deployment
-
-This directory is designed to be deployed as a standalone static website. All necessary configurations are included within the directory.
-
-Before deploying to GitHub Pages, run:
-
-```bash
-./scripts/copy-results-data.sh
+```
+cd ../api
+npm install
+cd ../frontend
+npm install
 ```
 
-This will copy the necessary template data to the frontend folder.
+### 2. Start the API (Azure Function)
+The backend API is located in the `../api` folder and must be running for the frontend to function properly. Start it with:
+
+```
+cd ../api
+func start
+```
+
+This will start the Azure Function locally (usually on port 7071).
+
+### 3. Start the Frontend
+The frontend is a static site that can be served locally using Python:
+
+```
+cd ../frontend
+python3 -m http.server 8080
+```
+
+This will serve the frontend at [http://localhost:8080](http://localhost:8080).
+
+## Local Testing
+- Ensure both the API and the frontend are running as described above.
+- Open your browser and navigate to [http://localhost:8080](http://localhost:8080) to use the app.
+
+## Notes
+- The frontend expects the API to be running at its default local address (http://localhost:7071).
+- If you change the API port, update the frontend configuration accordingly.
+
+---
+
+For any issues, please refer to the main project README or open an issue in the repository.
