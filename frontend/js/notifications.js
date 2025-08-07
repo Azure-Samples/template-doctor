@@ -10,8 +10,7 @@ class NotificationSystem {
         
         this.initContainer();
         
-        // Allow global access
-        window.Notifications = this;
+    // No global assignment here; handled in DOMContentLoaded
     }
     
     /**
@@ -441,6 +440,8 @@ class NotificationSystem {
 
 // Initialize the notification system when the DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-    window.Notifications = new NotificationSystem();
-    console.log('Notification system initialized');
+    if (!window.Notifications) {
+        window.Notifications = new NotificationSystem();
+        console.log('Notification system initialized');
+    }
 });
