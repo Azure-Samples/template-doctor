@@ -4,6 +4,8 @@
  */
 (function(window) {
     'use strict';
+    // Configurable results directory
+    const RESULTS_DIR = (typeof window.RESULTS_DIR === 'string' && window.RESULTS_DIR) ? window.RESULTS_DIR : 'results';
     
     // Helper function to check if debug function exists
     function debug(source, message, data) {
@@ -152,11 +154,11 @@
         _loadDataJsFile: function(dataJsPath) {
             return new Promise((resolve, reject) => {
                 debug('report-loader', `Loading data.js file: ${dataJsPath}`);
-                console.log(`[ReportLoader] Attempting to load: /results/${dataJsPath}`);
+                console.log(`[ReportLoader] Attempting to load: /${RESULTS_DIR}/${dataJsPath}`);
                 
                 // Create a script element to load the data.js file
                 const script = document.createElement('script');
-                script.src = `/results/${dataJsPath}`;
+                script.src = `/${RESULTS_DIR}/${dataJsPath}`;
                 script.id = `data-js-${new Date().getTime()}`;  // Add unique ID for debugging
                 script.async = true;
                 
@@ -185,7 +187,7 @@
                 
                 // Error handler
                 script.onerror = function(error) {
-                    console.error(`[ReportLoader] Failed to load script: /results/${dataJsPath}`, error);
+                    console.error(`[ReportLoader] Failed to load script: /${RESULTS_DIR}/${dataJsPath}`, error);
                     reject(new Error(`Failed to load data.js file: ${dataJsPath}`));
                 };
                 
@@ -199,19 +201,15 @@
                         debug('report-loader', 'Found window.reportData after timeout', window.reportData);
                         console.log(`[ReportLoader] Found reportData after timeout with keys:`, Object.keys(window.reportData));
                         const data = window.reportData;
-                        
                         // Store the current data
                         const reportData = { ...data };
-                        
                         // Clean up
                         window.reportData = null;
-                        
                         resolve(reportData);
                     } else {
                         console.error(`[ReportLoader] Timed out waiting for reportData. Script may have failed to execute properly.`);
-                        
                         // Let's try to fetch the file directly as text to see if it's valid
-                        fetch(`/results/${dataJsPath}`)
+                        fetch(`/${RESULTS_DIR}/${dataJsPath}`)
                             .then(response => {
                                 if (!response.ok) {
                                     throw new Error(`HTTP status ${response.status}`);
@@ -245,7 +243,7 @@
                 // Strategy 0: If we have a specific path, try that first
                 if (templatePath) {
                     debug('report-loader', `Trying specific path: ${templatePath}`);
-                    this._fetchReportFile(`/results/${templatePath}`)
+                    this._fetchReportFile(`/${RESULTS_DIR}/${templatePath}`)
                         .then(data => {
                             if (isValidObject(data)) {
                                 debug('report-loader', 'Successfully loaded data from specific path');
@@ -273,7 +271,7 @@
                     debug('report-loader', `Trying standard strategies for template: ${template}`);
                     
                     // Strategy 1: Try latest.json in the folder
-                    this._fetchReportFile(`/results/${template}/latest.json`)
+                    this._fetchReportFile(`/${RESULTS_DIR}/${template}/latest.json`)
                         .then(data => {
                             if (isValidObject(data)) {
                                 debug('report-loader', 'Successfully loaded data from latest.json');
@@ -380,7 +378,7 @@
             debug('report-loader', `Using folder path: ${folderPath}`);
             
             // First try to fetch the index.json to see what's available
-            return this._fetchReportFile(`/results/${folderPath}/index.json`)
+            return this._fetchReportFile(`/${RESULTS_DIR}/${folderPath}/index.json`)
                 .then(indexData => {
                     // If we found an index.json with timestamp info, use the most recent one
                     if (indexData && Array.isArray(indexData.timestamps) && indexData.timestamps.length > 0) {
@@ -443,7 +441,7 @@
             
             debug('report-loader', `Using folder path for timestamps: ${folderPath}`);
             const timestamp = timestamps[0];
-            const path = `/results/${folderPath}/${timestamp}-analysis.json`;
+            const path = `/${RESULTS_DIR}/${folderPath}/${timestamp}-analysis.json`;
             
             debug('report-loader', `Trying timestamp ${timestamp} for template at path ${path}`);
             
