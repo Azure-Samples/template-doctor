@@ -1,130 +1,72 @@
 # Template Doctor
 
-An Azure Developer CLI template analysis and healing agent. This tool analyzes GitHub repositories that contain Azure Developer CLI (azd) templates to ensure they follow best practices and meet compliance requirements.
+This is the root repository for Template Doctor, a tool for analyzing, validating, and ensuring compliance of templates with organizational standards.
 
-## Features
+> **Important Note**: The implementation in the `src/backend` folder is not to be used and is just a remnant of a previous version. Please use the Azure Functions in the `api/` folder for backend services.
 
-- Checks for required files and folders
-- Validates workflow files
-- Ensures proper documentation is present
-- Checks README.md for required sections and content
-- Analyzes Bicep files for required resources
-- Verifies azure.yaml configuration
-- Generates comprehensive compliance reports
-- Provides visual dashboard for compliance status
+## Project Structure
 
-## Installation
+- `api/` - Azure Functions backend providing authentication and API services
+- `frontend/` - Web-based frontend for the Template Doctor application
+- `src/` - Source code and utilities for template analysis
+- `docs/` - Documentation for GitHub Action and App setup
+- `results/` - Storage for analysis results and reports
 
-```bash
-# Clone the repository
-git clone https://github.com/your-username/template-doctor.git
-cd template-doctor
+## Prerequisites
+- Node.js and npm
+- Python 3
+- Azure Functions Core Tools (for running the API)
 
-# Install dependencies
+## Setup Instructions
+
+### 1. Install Dependencies
+First, install the required npm packages for both the API and the frontend:
+
+```
+cd ../api
 npm install
-
-# Build the project
-npm run build
-
-# Link the CLI for global usage (optional)
-npm link
+cd ../frontend
+npm install
 ```
 
-## Usage
+### 2. Start the API (Azure Function)
+The backend API is located in the `../api` folder and must be running for the frontend to function properly. Start it with:
 
-```bash
-# Analyze a GitHub repository
-template-doctor analyze --repo=https://github.com/username/repo
-
-# Analyze and serve the dashboard on localhost
-template-doctor analyze --repo=https://github.com/username/repo --serve
-
-# Analyze and automatically open the dashboard in a browser
-template-doctor analyze --repo=https://github.com/username/repo --open-dashboard
-
-# Specify a custom port for the dashboard server
-template-doctor analyze --repo=https://github.com/username/repo --serve --port=8080
-
-# Create a GitHub issue with analysis results
-template-doctor create-issue --repo=https://github.com/username/repo
-
-# Start an AZD provision test
-template-doctor provision --repo=https://github.com/username/repo --env=dev
-
-# Check the status of an AZD provision job
-template-doctor status --job-id=12345
+```
+cd ../api
+func start
 ```
 
-## Output
+This will start the Azure Function locally (usually on port 7071).
 
-The tool generates two files in the `results` directory:
+### 3. Start the Frontend
+The frontend is a static site that can be served locally using Python:
 
-1. A JSON report with detailed analysis results
-2. An HTML dashboard visualizing the compliance status
-
-## Dashboard
-
-The dashboard provides a modern visualization of the compliance status:
-
-- **Compliance Overview**: Shows overall compliance percentage
-- **Issues**: Lists all compliance issues with details on how to fix
-- **Passed Checks**: Shows all checks that passed with additional details
-- **Quick Fix**: Button to open the repository in vscode.dev for quick fixes
-
-## Development
-
-```bash
-# Run the tool in development mode
-npm run build && npm start -- --repo=https://github.com/username/repo
-
-# Adding new compliance rules
-# Modify src/config/dod-rules.ts to add new rules
+```
+cd ../frontend
+python3 -m http.server 8080
 ```
 
-## MCP Server Integration
+This will serve the frontend at [http://localhost:8080](http://localhost:8080).
 
-Template Doctor can integrate with the awesome-azd-template-testing MCP server to:
+## Local Testing
+- Ensure both the API and the frontend are running as described above.
+- Open your browser and navigate to [http://localhost:8080](http://localhost:8080) to use the app.
 
-1. Create GitHub issues with template analysis results
-2. Run AZD provisioning tests on templates
-3. Get status and logs from provisioning jobs
+## Notes
+- The frontend expects the API to be running at its default local address (http://localhost:7071).
+- If you change the API port, update the frontend configuration accordingly.
+- Remember that the `src/backend` implementation should not be used - it's only kept for historical reference.
 
-### Configuration
+## Documentation
 
-Set the following environment variables in your `.env` file:
+For detailed information on specific components:
 
-```bash
-MCP_SERVER_URL=https://awesome-azd-template-testing.azurewebsites.net
-MCP_API_KEY=your_api_key_here
-```
+- [GitHub Action Setup](docs/GITHUB_ACTION_SETUP.md)
+- [GitHub Action](docs/GITHUB_ACTION.md)
+- [GitHub App](docs/GITHUB_APP.md)
+- [GitHub Pages Implementation](docs/github-pages-implementation.md)
 
-### Usage Examples
+---
 
-```bash
-# Create a GitHub issue with analysis results
-template-doctor create-issue --repo=https://github.com/username/repo
-
-# Start an AZD provision test
-template-doctor provision --repo=https://github.com/username/repo --env=dev
-
-# Check the status of an AZD provision job
-template-doctor status --job-id=12345
-
-# Test the dashboard with MCP integration
-npm run test-dashboard
-```
-
-### Testing the Dashboard
-
-To test the dashboard with MCP integration buttons:
-
-1. Make sure your `.env` file contains the `MCP_API_KEY` value
-2. Run `npm run build` to build the project
-3. Run `npm run test-dashboard` to open a test dashboard with sample data
-4. Test the "Create GitHub Issue" and "Test AZD Provision" buttons
-
-The test dashboard uses sample data to show how the MCP integration works.
-
-## License
-
-MIT
+For any issues, please open an issue in the repository.
