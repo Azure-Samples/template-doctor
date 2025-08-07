@@ -256,12 +256,15 @@ async function processIssueCreation(github) {
         try {
             if (notification) notification.update('Creating main issue', 'Creating issue and assigning to Copilot Agent...');
             
+            // Configurable GitHub labels
+            const GITHUB_LABELS = (typeof window.GITHUB_LABELS !== 'undefined' && Array.isArray(window.GITHUB_LABELS)) ? window.GITHUB_LABELS : ['template-doctor', 'template-doctor-full-scan'];
+
             mainIssue = await github.createIssueGraphQL(
                 owner, 
                 repo, 
                 issueTitle, 
                 issueBody,
-                ['template-doctor', 'template-doctor-full-scan']
+                GITHUB_LABELS
             );
             
             console.log('Main issue created:', mainIssue);
