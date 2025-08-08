@@ -3,10 +3,12 @@
   "version": "1.0.0",
   "description": "API functions for Template Doctor",
   "scripts": {
-    "start": "func start"
+    "start": "func start",
+    "test": "echo \"No tests yet\""
   },
   "dependencies": {
-    "node-fetch": "^2.6.7"
+    "node-fetch": "^2.6.7",
+    "@azure/functions": "^3.5.0"
   },
   "engines": {
     "node": ">=16"

@@ -21,7 +21,6 @@ module.exports = async function (context, req) {
     if (req.method === 'OPTIONS') {
         context.log('Handling CORS preflight request');
         context.res.status = 204;
-        context.done();
         return;
     }
     
@@ -29,9 +28,10 @@ module.exports = async function (context, req) {
     context.log(`Authorization code received: ${code ? 'yes' : 'no'}`);
     
     if (!code) {
-        context.res.status = 400;
-        context.res.body = { error: 'Missing code' };
-        context.done();
+        context.res = {
+            status: 400,
+            body: { error: 'Missing code' }
+        };
         return;
     }
 
@@ -40,9 +40,10 @@ module.exports = async function (context, req) {
     const client_secret = process.env.GITHUB_CLIENT_SECRET;
 
     if (!client_id || !client_secret) {
-        context.res.status = 500;
-        context.res.body = { error: 'Missing GitHub OAuth credentials in environment variables' };
-        context.done();
+        context.res = {
+            status: 500,
+            body: { error: 'Missing GitHub OAuth credentials in environment variables' }
+        };
         return;
     }
 
@@ -68,13 +69,15 @@ module.exports = async function (context, req) {
             return;
         }
         context.log('Token exchange successful, received access_token');
-        context.res.status = 200;
-        context.res.body = { access_token: data.access_token };
-        context.done();
+        context.res = {
+            status: 200,
+            body: { access_token: data.access_token }
+        };
     } catch (err) {
         context.log.error('Error during token exchange:', err);
-        context.res.status = 500;
-        context.res.body = { error: err.message };
-        context.done();
+        context.res = {
+            status: 500,
+            body: { error: err.message }
+        };
     }
 };

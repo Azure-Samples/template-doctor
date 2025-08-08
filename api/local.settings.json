@@ -5,5 +5,10 @@
     "FUNCTIONS_WORKER_RUNTIME": "node",
     "GITHUB_CLIENT_ID": "Ov23li2nstp4WdgRG6vZ",
     "GITHUB_CLIENT_SECRET": "af4282913ea6ceda1eae45f3f38f9dd637005d7e"
+  },
+  "Host": {
+    "LocalHttpPort": 7071,
+    "CORS": "*",
+    "CORSCredentials": false
   }
 }
