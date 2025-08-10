@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Template Doctor - {{REPO_NAME}} Analysis</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #0078d4;
+            --primary-light: #60a5fa;
+            --primary-dark: #005a9e;
+            --success-color: #107c10;
+            --success-light: #dff6dd;
+            --warning-color: #d83b01;
+            --warning-light: #fed9cc;
+            --background-color: #f5f5f5;
+            --card-background: #ffffff;
+            --text-color: #323130;
+            --text-secondary: #605e5c;
+            --border-color: #edebe9;
+            --shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--background-color);
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Header Styles */
+        header {
+            background-color: var(--card-background);
+            box-shadow: var(--shadow);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            padding: 16px 0;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo img {
+            height: 36px;
+            width: auto;
+        }
+
+        .logo h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        /* Main Content Styles */
+        main {
+            padding: 32px 0;
+        }
+
+        .overview {
+            background-color: var(--card-background);
+            border-radius: 8px;
+            padding: 24px;
+            box-shadow: var(--shadow);
+            margin-bottom: 24px;
+        }
+
+        .overview h2 {
+            font-size: 1.25rem;
+            margin-bottom: 16px;
+            color: var(--primary-color);
+        }
+
+        .overview-text {
+            margin-bottom: 24px;
+        }
+
+        .compliance-summary {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .gauge-container {
+            width: 60%;
+        }
+
+        .gauge {
+            width: 100%;
+            height: 16px;
+            background-color: #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 8px 0;
+        }
+
+        .gauge-fill {
+            height: 100%;
+            border-radius: 8px;
+        }
+
+        .high {
+            background-color: var(--success-color);
+        }
+
+        .medium {
+            background-color: #f0ad4e;
+        }
+
+        .low {
+            background-color: var(--warning-color);
+        }
+
+        .stats-container {
+            display: flex;
+            gap: 24px;
+        }
+
+        .stat-card {
+            background-color: var(--card-background);
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            padding: 16px;
+            flex: 1;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .issues-list {
+            background-color: var(--card-background);
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            margin-top: 24px;
+        }
+
+        .issues-header {
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .issues-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .issue-item {
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .issue-item:last-child {
+            border-bottom: none;
+        }
+
+        .issue-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .issue-id {
+            font-family: monospace;
+            background-color: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+
+        .issue-severity {
+            font-size: 0.85rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        .severity-error {
+            background-color: #fde7e9;
+            color: #d13438;
+        }
+
+        .severity-warning {
+            background-color: #fff4ce;
+            color: #797775;
+        }
+
+        .severity-info {
+            background-color: #e5f0ff;
+            color: #0078d4;
+        }
+
+        .issue-message {
+            font-size: 0.95rem;
+        }
+
+        .issue-details {
+            font-family: monospace;
+            background-color: #f5f5f5;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            margin-top: 8px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .tabs {
+            display: flex;
+            margin: 0 0 -1px 0;
+            background-color: var(--card-background);
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 500;
+        }
+
+        .tab.active {
+            border: 1px solid var(--border-color);
+            border-bottom: 1px solid white;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+            color: var(--primary-color);
+        }
+
+        .tab-content {
+            display: none;
+            padding: 20px;
+            background-color: var(--card-background);
+            border: 1px solid var(--border-color);
+            border-top: none;
+            border-bottom-left-radius: 8px;
+            border-bottom-right-radius: 8px;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .history-date {
+            font-size: 0.9rem;
+        }
+
+        .history-compliance {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .compliance-badge {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .badge-high {
+            background-color: var(--success-light);
+            color: var(--success-color);
+        }
+
+        .badge-medium {
+            background-color: #fff4ce;
+            color: #797775;
+        }
+
+        .badge-low {
+            background-color: var(--warning-light);
+            color: var(--warning-color);
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 8px 16px;
+            background-color: var(--primary-color);
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-top: 12px;
+            text-align: center;
+            transition: background-color 0.2s, transform 0.2s;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        /* Footer Styles */
+        .site-footer {
+            background-color: var(--primary-dark);
+            color: white;
+            padding: 16px 0;
+            text-align: center;
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+            z-index: 100;
+        }
+
+        .footer-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .copyright {
+            font-size: 0.9rem;
+        }
+
+        /* Add padding to ensure content isn't hidden behind fixed footer */
+        body {
+            padding-bottom: 60px;
+        }
+
+        @media (max-width: 768px) {
+            .compliance-summary {
+                flex-direction: column;
+            }
+            
+            .gauge-container {
+                width: 100%;
+                margin-bottom: 16px;
+            }
+            
+            .stats-container {
+                flex-direction: column;
+                gap: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container header-content">
+            <div class="logo">
+                <img src="../assets/images/logo.svg" alt="Template Doctor Logo">
+                <h1>Template Doctor</h1>
+            </div>
+            <a href="../template-index.html" class="btn">
+                <i class="fas fa-arrow-left"></i> Back to Templates
+            </a>
+        </div>
+    </header>
+
+    <main class="container">
+        <section class="overview">
+            <h2>Template Analysis Report</h2>
+            <p class="overview-text">
+                <strong>Repository:</strong> <a href="{{REPO_URL}}" target="_blank">{{REPO_URL}}</a><br>
+                <strong>Rule Set:</strong> {{RULE_SET}}<br>
+                <strong>Analyzed on:</strong> {{TIMESTAMP}}
+            </p>
+            
+            <div class="compliance-summary">
+                <div class="gauge-container">
+                    <h3>Compliance Score: {{COMPLIANCE_PERCENTAGE}}%</h3>
+                    <div class="gauge">
+                        <div class="gauge-fill GAUGE_CLASS" style="width: COMPLIANCE_PERCENTAGE%;"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="stats-container">
+                <div class="stat-card">
+                    <div class="stat-value" style="color: var(--warning-color);">{{ISSUES_COUNT}}</div>
+                    <div class="stat-label">Issues Found</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" style="color: var(--success-color);">{{PASSED_COUNT}}</div>
+                    <div class="stat-label">Checks Passed</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{TOTAL_CHECKS}}</div>
+                    <div class="stat-label">Total Checks</div>
+                </div>
+            </div>
+        </section>
+        
+        <div class="issues-list">
+            <div class="tabs">
+                <div class="tab active" onclick="openTab(event, 'issues-tab')">Issues</div>
+                <div class="tab" onclick="openTab(event, 'passed-tab')">Passed Checks</div>
+                <div class="tab" onclick="openTab(event, 'history-tab')">History</div>
+            </div>
+            
+            <div id="issues-tab" class="tab-content active">
+                <div class="issues-header">
+                    <div class="issues-title">Issues Found ({{ISSUES_COUNT}})</div>
+                </div>
+                <div id="issues-container">
+                    <!-- Issues will be populated here via JavaScript -->
+                    <div class="issue-item">
+                        <div class="issue-header">
+                            <div class="issue-id">placeholder-issue</div>
+                            <div class="issue-severity severity-error">Error</div>
+                        </div>
+                        <div class="issue-message">
+                            See full report data for details on issues.
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="passed-tab" class="tab-content">
+                <div class="issues-header">
+                    <div class="issues-title">Passed Checks ({{PASSED_COUNT}})</div>
+                </div>
+                <div id="passed-container">
+                    <!-- Passed checks will be populated here via JavaScript -->
+                    <div class="issue-item">
+                        <div class="issue-message">
+                            See full report data for details on passed checks.
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="history-tab" class="tab-content">
+                <div class="issues-header">
+                    <div class="issues-title">Analysis History</div>
+                </div>
+                <div id="history-container">
+                    <!-- History will be populated here via JavaScript -->
+                    <div class="history-item">
+                        <div class="history-date">{{TIMESTAMP}}</div>
+                        <div class="history-compliance">
+                            <div class="compliance-badge {{BADGE_CLASS}}">
+                                {{COMPLIANCE_PERCENTAGE}}%
+                            </div>
+                            <div>{{ISSUES_COUNT}} issues / {{PASSED_COUNT}} passed</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Function to switch tabs
+        function openTab(evt, tabName) {
+            var i, tabcontent, tablinks;
+            tabcontent = document.getElementsByClassName("tab-content");
+            for (i = 0; i < tabcontent.length; i++) {
+                tabcontent[i].className = tabcontent[i].className.replace(" active", "");
+            }
+            tablinks = document.getElementsByClassName("tab");
+            for (i = 0; i < tablinks.length; i++) {
+                tablinks[i].className = tablinks[i].className.replace(" active", "");
+            }
+            document.getElementById(tabName).className += " active";
+            evt.currentTarget.className += " active";
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize report data rendering
+            function initReport() {
+                if (typeof window.reportData === 'undefined') {
+                    setTimeout(initReport, 100);
+                    return;
+                }
+                
+                renderIssues();
+                renderPassedChecks();
+                renderHistory();
+            }
+            
+            function renderIssues() {
+                // Render issues
+                const issuesContainer = document.getElementById('issues-container');
+                issuesContainer.innerHTML = '';
+                
+                if (window.reportData.compliance.issues && Array.isArray(window.reportData.compliance.issues)) {
+                    if (window.reportData.compliance.issues.length === 0) {
+                        issuesContainer.innerHTML = '<div class="issue-item">No issues found. Great job!</div>';
+                    } else {
+                        window.reportData.compliance.issues.forEach(function(issue) {
+                            let severityClass = 'severity-info';
+                            if (issue.severity === 'error') {
+                                severityClass = 'severity-error';
+                            } else if (issue.severity === 'warning') {
+                                severityClass = 'severity-warning';
+                            }
+                            
+                            const div = document.createElement('div');
+                            div.className = 'issue-item';
+                            
+                            let html = '<div class="issue-header">' +
+                                       '<div class="issue-id">' + issue.id + '</div>' +
+                                       '<div class="issue-severity ' + severityClass + '">' + 
+                                       (issue.severity.charAt(0).toUpperCase() + issue.severity.slice(1)) + 
+                                       '</div></div>' +
+                                       '<div class="issue-message">' + issue.message + '</div>';
+                            
+                            if (issue.error) {
+                                html += '<div class="issue-details">' + issue.error + '</div>';
+                            }
+                            
+                            div.innerHTML = html;
+                            issuesContainer.appendChild(div);
+                        });
+                    }
+                } else {
+                    issuesContainer.innerHTML = '<div class="issue-item">Detailed issue information not available.</div>';
+                }
+            }
+            
+            function renderPassedChecks() {
+                // Render passed checks
+                const passedContainer = document.getElementById('passed-container');
+                passedContainer.innerHTML = '';
+                
+                if (window.reportData.compliance.compliant && Array.isArray(window.reportData.compliance.compliant)) {
+                    if (window.reportData.compliance.compliant.length === 0) {
+                        passedContainer.innerHTML = '<div class="issue-item">No checks have passed yet.</div>';
+                    } else {
+                        window.reportData.compliance.compliant.forEach(function(check) {
+                            const div = document.createElement('div');
+                            div.className = 'issue-item';
+                            
+                            const html = '<div class="issue-header">' +
+                                         '<div class="issue-id">' + check.id + '</div>' +
+                                         '<div class="issue-severity severity-info">' + check.category + '</div>' +
+                                         '</div>' +
+                                         '<div class="issue-message">' + check.message + '</div>';
+                            
+                            div.innerHTML = html;
+                            passedContainer.appendChild(div);
+                        });
+                    }
+                } else {
+                    passedContainer.innerHTML = '<div class="issue-item">Detailed compliance information not available.</div>';
+                }
+            }
+            
+            function renderHistory() {
+                // Render history
+                const historyContainer = document.getElementById('history-container');
+                historyContainer.innerHTML = '';
+                
+                if (window.reportData.history && Array.isArray(window.reportData.history)) {
+                    if (window.reportData.history.length === 0) {
+                        historyContainer.innerHTML = '<div class="history-item">No previous analysis records found.</div>';
+                    } else {
+                        window.reportData.history.forEach(function(entry) {
+                            const date = new Date(entry.timestamp);
+                            const formattedDate = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+                            
+                            let badgeClass = 'badge-low';
+                            if (entry.percentage >= 80) {
+                                badgeClass = 'badge-high';
+                            } else if (entry.percentage >= 50) {
+                                badgeClass = 'badge-medium';
+                            }
+                            
+                            const div = document.createElement('div');
+                            div.className = 'history-item';
+                            
+                            const html = '<div class="history-date">' + formattedDate + '</div>' +
+                                         '<div class="history-compliance">' +
+                                         '<div class="compliance-badge ' + badgeClass + '">' + 
+                                         entry.percentage + '%</div>' +
+                                         '<div>' + entry.issues + ' issues / ' + entry.passed + ' passed</div>' +
+                                         '</div>';
+                            
+                            div.innerHTML = html;
+                            historyContainer.appendChild(div);
+                        });
+                    }
+                } else {
+                    historyContainer.innerHTML = '<div class="history-item">No history information available.</div>';
+                }
+            }
+            
+            initReport();
+        });
+    </script>
+    
+    <footer class="site-footer">
+        <div class="container footer-content">
+            <div class="copyright">©2025 - DevDiv Microsoft</div>
+        </div>
+    </footer>
+<script src="{{DATA_FILE_NAME}}"></script></body>
+</html>
