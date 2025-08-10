@@ -400,6 +400,24 @@ class NotificationSystem {
     }
     
     /**
+     * Show a simplified confirmation dialog
+     * @param {string} title - Dialog title
+     * @param {string} message - Dialog message
+     * @param {string} confirmLabel - Confirm button label
+     * @param {string} cancelLabel - Cancel button label
+     * @param {Function} callback - Callback function(confirmed)
+     * @returns {string} - Notification ID
+     */
+    showConfirmation(title, message, confirmLabel = 'Confirm', cancelLabel = 'Cancel', callback = () => {}) {
+        return this.confirm(title, message, {
+            confirmLabel,
+            cancelLabel,
+            onConfirm: () => callback(true),
+            onCancel: () => callback(false)
+        });
+    }
+    
+    /**
      * Get the icon for a notification type
      * @param {string} type - Notification type
      * @returns {string} - Icon HTML
