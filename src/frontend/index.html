@@ -67,13 +67,63 @@
         </section>
 
         <section id="search-section" class="search-section" style="display: none;">
-            <div class="search-container">
+            <!-- Scan Mode Toggle -->
+            <div class="scan-mode-toggle">
+                <span>Scan Mode:</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="scan-mode-toggle">
+                    <span class="toggle-slider"></span>
+                </label>
+                <div class="toggle-label">
+                    <span id="single-mode-label" class="active">Single</span>
+                    <span id="batch-mode-label">Batch</span>
+                </div>
+            </div>
+
+            <!-- Single Mode Search -->
+            <div id="single-scan-container" class="search-container">
                 <input type="text" id="repo-search" placeholder="Search for a GitHub repository (e.g., Azure-Samples/azd-templates)" class="search-input">
                 <button id="search-button" class="search-button">
                     <i class="fas fa-search"></i>
                 </button>
             </div>
+
+            <!-- Batch Mode URLs Input -->
+            <div id="batch-urls-container" class="batch-urls-container">
+                <label for="batch-urls" class="batch-urls-label">Enter repository URLs (one per line or comma-separated):</label>
+                <textarea id="batch-urls" class="batch-urls-textarea" placeholder="https://github.com/Azure-Samples/azd-templates&#10;https://github.com/Azure-Samples/todo-nodejs-mongo-aca&#10;https://github.com/Azure-Samples/todo-csharp-cosmos-sql"></textarea>
+                <div class="batch-urls-helper">Enter GitHub repository URLs for batch scanning. Any repositories that are not already forked will be automatically forked to your account.</div>
+                <div style="margin-top: 16px; display: flex; justify-content: flex-end;">
+                    <button id="batch-scan-button" class="search-button" style="border-radius: 4px; padding: 8px 16px;">
+                        <i class="fas fa-play"></i> Start Batch Scan
+                    </button>
+                </div>
+            </div>
+
+            <!-- Results Container -->
             <div id="search-results" class="search-results"></div>
+
+            <!-- Batch Results Container -->
+            <div id="batch-results" class="batch-results">
+                <div class="batch-results-header">
+                    <h3>Batch Scan Results</h3>
+                    <div class="batch-progress">
+                        <div class="progress-bar-container">
+                            <div class="progress-bar" id="batch-progress-bar"></div>
+                        </div>
+                        <span class="progress-text" id="batch-progress-text">0/0 Completed</span>
+                    </div>
+                </div>
+                <div id="batch-items" class="batch-items">
+                    <!-- Batch items will be populated by JavaScript -->
+                </div>
+                <div style="margin-top: 20px; text-align: center; display: none;" id="batch-cancel-container">
+                    <button id="batch-cancel-btn" class="batch-cancel-btn">
+                        <i class="fas fa-stop"></i> Cancel Remaining Scans
+                    </button>
+                </div>
+            </div>
+
             <div id="recent-searches" class="recent-searches">
                 <!-- Will be populated by createRecentSearchesSection() -->
             </div>

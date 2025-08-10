@@ -365,14 +365,339 @@ document.addEventListener('DOMContentLoaded', () => {
     const errorMessage = document.getElementById('error-message');
     const errorBackButton = document.getElementById('error-back-button');
     
+    // Batch scan UI elements
+    const scanModeToggle = document.getElementById('scan-mode-toggle');
+    const singleModeLabel = document.getElementById('single-mode-label');
+    const batchModeLabel = document.getElementById('batch-mode-label');
+    const singleScanContainer = document.getElementById('single-scan-container');
+    const batchUrlsContainer = document.getElementById('batch-urls-container');
+    const batchUrlsTextarea = document.getElementById('batch-urls');
+    const batchScanButton = document.getElementById('batch-scan-button');
+    const batchResults = document.getElementById('batch-results');
+    const batchItems = document.getElementById('batch-items');
+    const batchProgressBar = document.getElementById('batch-progress-bar');
+    const batchProgressText = document.getElementById('batch-progress-text');
+    const batchCancelContainer = document.getElementById('batch-cancel-container');
+    const batchCancelBtn = document.getElementById('batch-cancel-btn');
+    
     // Create elements for scanned templates section
     const searchSection = document.getElementById('search-section');
     let scannedTemplatesSection;
     let templateGrid;
+    
+    // Batch scan state
+    let batchUrls = [];
+    let batchScanActive = false;
+    let batchProcessedCount = 0;
+    let batchCancelled = false;
 
     // State
     let recentSearches = JSON.parse(localStorage.getItem('td_recent_searches') || '[]');
     let scannedTemplates = [];
+    
+    // --- Batch Scanning Functionality ---
+    // Function to toggle between single and batch modes
+    function toggleScanMode(isBatchMode) {
+        if (isBatchMode) {
+            singleModeLabel.classList.remove('active');
+            batchModeLabel.classList.add('active');
+            singleScanContainer.style.display = 'none';
+            batchUrlsContainer.classList.add('active');
+            searchResults.style.display = 'none';
+            if (batchScanActive) {
+                batchResults.classList.add('active');
+            }
+        } else {
+            singleModeLabel.classList.add('active');
+            batchModeLabel.classList.remove('active');
+            singleScanContainer.style.display = 'flex';
+            batchUrlsContainer.classList.remove('active');
+            searchResults.style.display = 'block';
+            batchResults.classList.remove('active');
+        }
+    }
+    
+    // Function to parse URLs from textarea
+    function parseUrlsFromTextarea() {
+        const text = batchUrlsTextarea.value.trim();
+        if (!text) return [];
+        
+        // Split by newlines and commas
+        let urls = text.split(/[\n,]+/).map(url => url.trim()).filter(url => url);
+        
+        // Validate and normalize URLs
+        urls = urls.map(url => {
+            // If URL doesn't start with http/https, assume it's a GitHub repo reference
+            if (!url.startsWith('http')) {
+                // Check if it's in the format owner/repo
+                if (url.includes('/')) {
+                    return `https://github.com/${url}`;
+                } else {
+                    // Invalid format
+                    return null;
+                }
+            }
+            return url;
+        }).filter(url => url !== null);
+        
+        return urls;
+    }
+    
+    // Function to initialize batch scan
+    async function startBatchScan() {
+        const urls = parseUrlsFromTextarea();
+        if (urls.length === 0) {
+            if (window.NotificationSystem) {
+                window.NotificationSystem.showWarning(
+                    'No URLs Found',
+                    'Please enter at least one valid GitHub repository URL.',
+                    5000
+                );
+            }
+            return;
+        }
+        
+        // Reset batch scan state
+        batchUrls = urls;
+        batchScanActive = true;
+        batchProcessedCount = 0;
+        batchCancelled = false;
+        
+        // Clear previous batch items
+        batchItems.innerHTML = '';
+        
+        // Initialize UI
+        batchProgressBar.style.width = '0%';
+        batchProgressText.textContent = `0/${urls.length} Completed`;
+        batchResults.classList.add('active');
+        batchCancelContainer.style.display = 'block';
+        
+        // Create placeholder items for each URL
+        urls.forEach((url, index) => {
+            const item = document.createElement('div');
+            item.className = 'batch-item pending';
+            item.id = `batch-item-${index}`;
+            
+            // Extract repo name from URL for display
+            let repoName = url;
+            if (url.includes('github.com/')) {
+                repoName = url.split('github.com/')[1];
+            }
+            
+            item.innerHTML = `
+                <div class="batch-item-header">
+                    <div class="batch-item-title">${repoName}</div>
+                    <div class="batch-item-status">Pending</div>
+                </div>
+                <div class="batch-item-message">Waiting to be processed...</div>
+                <div class="batch-item-actions">
+                    <button class="view-btn" disabled>View Report</button>
+                    <button class="retry-btn" disabled>Retry</button>
+                </div>
+            `;
+            
+            batchItems.appendChild(item);
+        });
+        
+        // Process each URL sequentially
+        for (let i = 0; i < urls.length; i++) {
+            // Check if the batch was cancelled
+            if (batchCancelled) {
+                debug('app', 'Batch scan cancelled, stopping further processing');
+                break;
+            }
+            
+            const url = urls[i];
+            const itemElement = document.getElementById(`batch-item-${i}`);
+            
+            // Update UI to show processing
+            itemElement.className = 'batch-item processing';
+            itemElement.querySelector('.batch-item-status').textContent = 'Processing';
+            itemElement.querySelector('.batch-item-message').textContent = 'Checking repository status...';
+            
+            try {
+                debug('app', `Processing batch item ${i+1}/${urls.length}: ${url}`);
+                
+                // First check if the repository needs to be forked
+                let processedUrl = url;
+                try {
+                    processedUrl = await checkAndUpdateRepoUrl(url);
+                    
+                    if (processedUrl !== url) {
+                        itemElement.querySelector('.batch-item-message').textContent = 'Using fork of the repository...';
+                    } else {
+                        itemElement.querySelector('.batch-item-message').textContent = 'Analyzing repository...';
+                    }
+                } catch (forkError) {
+                    debug('app', `Error during fork check: ${forkError.message}`, forkError);
+                    itemElement.querySelector('.batch-item-message').textContent = 'Proceeding with original repository...';
+                }
+                
+                // Process with the obtained URL (original or forked)
+                const result = await appAnalyzer.analyzeTemplate(processedUrl, 'dod');
+                
+                // Update item UI to show success
+                itemElement.className = 'batch-item success';
+                itemElement.querySelector('.batch-item-status').textContent = 'Completed';
+                itemElement.querySelector('.batch-item-message').textContent = 
+                    `Analysis complete: ${result.compliance.issues.length} issues, ${result.compliance.compliant.length} passed`;
+                
+                // Update buttons
+                const viewBtn = itemElement.querySelector('.view-btn');
+                viewBtn.disabled = false;
+                
+                // Add click handler for view button
+                viewBtn.addEventListener('click', () => {
+                    // Display the results for this specific repository
+                    displayBatchItemResults(result);
+                });
+                
+                // Submit analysis results to GitHub for PR creation
+                if (window.submitAnalysisToGitHub && window.GitHubClient?.auth?.isAuthenticated()) {
+                    try {
+                        // Get current username
+                        const username = window.GitHubClient.auth.getUsername();
+                        
+                        if (username) {
+                            debug('app', `Submitting batch item analysis to GitHub with username: ${username}`);
+                            
+                            itemElement.querySelector('.batch-item-message').textContent = 'Creating PR with results...';
+                            
+                            const submitResult = await window.submitAnalysisToGitHub(result, username);
+                            
+                            if (submitResult.success) {
+                                debug('app', 'Batch item analysis submitted successfully to GitHub');
+                                itemElement.querySelector('.batch-item-message').textContent = 
+                                    `Analysis complete: ${result.compliance.issues.length} issues, ${result.compliance.compliant.length} passed. PR created.`;
+                            } else {
+                                debug('app', `Error submitting batch item analysis: ${submitResult.error}`);
+                                itemElement.querySelector('.batch-item-message').textContent = 
+                                    `Analysis complete: ${result.compliance.issues.length} issues, ${result.compliance.compliant.length} passed. PR creation failed.`;
+                            }
+                        }
+                    } catch (submitErr) {
+                        debug('app', `Error in GitHub submission for batch item: ${submitErr.message}`, submitErr);
+                        itemElement.querySelector('.batch-item-message').textContent = 
+                            `Analysis complete but PR creation failed: ${submitErr.message}`;
+                    }
+                }
+                
+            } catch (error) {
+                debug('app', `Error processing batch item ${i+1}: ${error.message}`, error);
+                
+                // Update item UI to show error
+                itemElement.className = 'batch-item error';
+                itemElement.querySelector('.batch-item-status').textContent = 'Error';
+                itemElement.querySelector('.batch-item-message').textContent = 
+                    error.message || 'An unknown error occurred';
+                
+                // Enable retry button
+                const retryBtn = itemElement.querySelector('.retry-btn');
+                retryBtn.disabled = false;
+                
+                // Add click handler for retry button
+                retryBtn.addEventListener('click', async () => {
+                    // Reset this item and retry
+                    itemElement.className = 'batch-item processing';
+                    itemElement.querySelector('.batch-item-status').textContent = 'Processing';
+                    itemElement.querySelector('.batch-item-message').textContent = 'Retrying...';
+                    retryBtn.disabled = true;
+                    
+                    try {
+                        // Retry the forking check and analysis
+                        let processedUrl = url;
+                        try {
+                            processedUrl = await checkAndUpdateRepoUrl(url);
+                        } catch (forkError) {
+                            debug('app', `Error during retry fork check: ${forkError.message}`, forkError);
+                        }
+                        
+                        const retryResult = await appAnalyzer.analyzeTemplate(processedUrl, 'dod');
+                        
+                        // Update item UI to show success
+                        itemElement.className = 'batch-item success';
+                        itemElement.querySelector('.batch-item-status').textContent = 'Completed';
+                        itemElement.querySelector('.batch-item-message').textContent = 
+                            `Analysis complete: ${retryResult.compliance.issues.length} issues, ${retryResult.compliance.compliant.length} passed`;
+                        
+                        // Enable view button
+                        const viewBtn = itemElement.querySelector('.view-btn');
+                        viewBtn.disabled = false;
+                        
+                        // Add click handler for view button
+                        viewBtn.addEventListener('click', () => {
+                            displayBatchItemResults(retryResult);
+                        });
+                        
+                    } catch (retryError) {
+                        debug('app', `Error during retry of batch item: ${retryError.message}`, retryError);
+                        
+                        // Update item UI to show error
+                        itemElement.className = 'batch-item error';
+                        itemElement.querySelector('.batch-item-status').textContent = 'Error';
+                        itemElement.querySelector('.batch-item-message').textContent = 
+                            retryError.message || 'An unknown error occurred during retry';
+                        
+                        // Re-enable retry button
+                        retryBtn.disabled = false;
+                    }
+                });
+            }
+            
+            // Update progress
+            batchProcessedCount++;
+            const progressPercentage = (batchProcessedCount / urls.length) * 100;
+            batchProgressBar.style.width = `${progressPercentage}%`;
+            batchProgressText.textContent = `${batchProcessedCount}/${urls.length} Completed`;
+        }
+        
+        // All items processed, update UI
+        if (batchCancelled) {
+            const cancelledItems = batchUrls.length - batchProcessedCount;
+            if (window.NotificationSystem) {
+                window.NotificationSystem.showInfo(
+                    'Batch Scan Cancelled',
+                    `Batch scan cancelled. ${batchProcessedCount} repositories processed, ${cancelledItems} cancelled.`,
+                    5000
+                );
+            }
+        } else {
+            if (window.NotificationSystem) {
+                window.NotificationSystem.showSuccess(
+                    'Batch Scan Complete',
+                    `Completed scanning ${batchUrls.length} repositories.`,
+                    5000
+                );
+            }
+        }
+        
+        // Hide cancel button when all done
+        batchCancelContainer.style.display = 'none';
+    }
+    
+    // Function to display results for a specific batch item
+    function displayBatchItemResults(result) {
+        // Show loading state
+        document.getElementById('search-section').style.display = 'none';
+        if (scannedTemplatesSection) scannedTemplatesSection.style.display = 'none';
+        analysisSection.style.display = 'block';
+        resultsContainer.style.display = 'none';
+        loadingContainer.style.display = 'none';
+        errorSection.style.display = 'none';
+        
+        // Set repo info
+        const repoName = result.repoUrl.split('github.com/')[1] || result.repoUrl;
+        document.getElementById('repo-name').textContent = repoName;
+        document.getElementById('repo-url').textContent = result.repoUrl;
+        
+        // Render the dashboard
+        resultsContainer.style.display = 'block';
+        debug('app', 'Rendering batch item analysis results', result);
+        appDashboard.render(result, resultsContainer);
+        
+        // Scroll to the top of the analysis section
+        analysisSection.scrollIntoView({ behavior: 'smooth' });
+    }
     
     // --- Scanned Templates Functionality ---
     function loadScannedTemplates() {
@@ -1760,6 +2085,34 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
+    
+    // Batch scan event listeners
+    if (scanModeToggle) {
+        scanModeToggle.addEventListener('change', function() {
+            toggleScanMode(this.checked);
+        });
+    }
+    
+    if (batchScanButton) {
+        batchScanButton.addEventListener('click', startBatchScan);
+    }
+    
+    if (batchCancelBtn) {
+        batchCancelBtn.addEventListener('click', function() {
+            if (batchScanActive) {
+                batchCancelled = true;
+                if (window.NotificationSystem) {
+                    window.NotificationSystem.showInfo(
+                        'Cancelling Batch Scan',
+                        'Batch scan is being cancelled. Current scan will complete before stopping.',
+                        5000
+                    );
+                }
+                this.disabled = true;
+                this.textContent = 'Cancelling...';
+            }
+        });
+    }
 
     // --- Auth Error Handling ---
     function showAuthError(errorMessage) {
