@@ -581,7 +581,8 @@ class GitHubAuth {
    * @returns {string|null}
    */
   getUsername() {
-    return this.userInfo && (this.userInfo.login || this.userInfo.name) ? (this.userInfo.login || this.userInfo.name) : null;
+    const username = this.userInfo?.login || this.userInfo?.name;
+    return username || null;
   }
 
   /**
