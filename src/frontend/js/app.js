@@ -162,7 +162,23 @@ async function checkAndUpdateRepoUrl(repoUrl) {
                         );
                     });
                 } else {
-                    shouldCreateFork = confirm(`You don't have a fork of ${owner}/${repo}. Would you like to create one now?`);
+                    // Fallback to native confirm if notification system is not available
+                    if (window.NotificationSystem) {
+                        await new Promise(resolve => {
+                            window.NotificationSystem.showConfirmation(
+                                'Create Fork',
+                                `You don't have a fork of ${owner}/${repo}. Would you like to create one now?`,
+                                'Create Fork',
+                                'Use Original',
+                                (confirmed) => {
+                                    shouldCreateFork = confirmed;
+                                    resolve();
+                                }
+                            );
+                        });
+                    } else {
+                        shouldCreateFork = confirm(`You don't have a fork of ${owner}/${repo}. Would you like to create one now?`);
+                    }
                 }
                 
                 if (shouldCreateFork) {
@@ -319,6 +335,15 @@ window.analyzeRepo = async function(repoUrl, ruleSet = 'dod') {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Initialize IndexedDB for batch scan progress
+    try {
+        initBatchScanDB()
+            .then(() => debug('app', 'IndexedDB initialized successfully'))
+            .catch(error => debug('app', 'Error initializing IndexedDB', error));
+    } catch (error) {
+        debug('app', 'Error initializing IndexedDB', error);
+    }
+    
     // Check for auth errors from the callback page
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.has('auth_error')) {
@@ -365,14 +390,682 @@ document.addEventListener('DOMContentLoaded', () => {
     const errorMessage = document.getElementById('error-message');
     const errorBackButton = document.getElementById('error-back-button');
     
+    // Batch scan UI elements
+    const scanModeToggle = document.getElementById('scan-mode-toggle');
+    const singleModeLabel = document.getElementById('single-mode-label');
+    const batchModeLabel = document.getElementById('batch-mode-label');
+    const singleScanContainer = document.getElementById('single-scan-container');
+    const batchUrlsContainer = document.getElementById('batch-urls-container');
+    const batchUrlsTextarea = document.getElementById('batch-urls');
+    const batchScanButton = document.getElementById('batch-scan-button');
+    const batchResults = document.getElementById('batch-results');
+    const batchItems = document.getElementById('batch-items');
+    const batchProgressBar = document.getElementById('batch-progress-bar');
+    const batchProgressText = document.getElementById('batch-progress-text');
+    const batchCancelContainer = document.getElementById('batch-cancel-container');
+    const batchCancelBtn = document.getElementById('batch-cancel-btn');
+    
     // Create elements for scanned templates section
     const searchSection = document.getElementById('search-section');
     let scannedTemplatesSection;
     let templateGrid;
+    
+    // Batch scan state
+    let batchUrls = [];
+    let batchScanActive = false;
+    let batchProcessedCount = 0;
+    let batchCancelled = false;
+    let batchScanDB = null; // IndexedDB reference
+    
+    // Initialize IndexedDB for batch scan progress
+    function initBatchScanDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open('BatchScanDB', 1);
+            
+            request.onerror = (event) => {
+                debug('app', 'Error opening IndexedDB', event);
+                reject(new Error('Failed to open IndexedDB'));
+            };
+            
+            request.onsuccess = (event) => {
+                debug('app', 'IndexedDB opened successfully');
+                batchScanDB = event.target.result;
+                resolve(batchScanDB);
+            };
+            
+            request.onupgradeneeded = (event) => {
+                debug('app', 'Creating IndexedDB store');
+                const db = event.target.result;
+                
+                // Create object store for batch scan progress
+                if (!db.objectStoreNames.contains('batchProgress')) {
+                    const store = db.createObjectStore('batchProgress', { keyPath: 'id' });
+                    store.createIndex('url', 'url', { unique: true });
+                    store.createIndex('status', 'status', { unique: false });
+                }
+            };
+        });
+    }
+    
+    // Save batch scan progress to IndexedDB
+    function saveBatchProgress(id, url, status, result = null) {
+        return new Promise((resolve, reject) => {
+            if (!batchScanDB) {
+                debug('app', 'IndexedDB not initialized');
+                reject(new Error('IndexedDB not initialized'));
+                return;
+            }
+            
+            try {
+                const transaction = batchScanDB.transaction(['batchProgress'], 'readwrite');
+                const store = transaction.objectStore('batchProgress');
+                
+                const progress = {
+                    id,
+                    url,
+                    status,
+                    timestamp: new Date().toISOString()
+                };
+                
+                // Only store essential result data if provided
+                if (result) {
+                    progress.result = {
+                        repoUrl: result.repoUrl,
+                        ruleSet: result.ruleSet,
+                        timestamp: result.timestamp,
+                        compliance: result.compliance
+                    };
+                }
+                
+                const request = store.put(progress);
+                
+                request.onsuccess = () => {
+                    debug('app', `Saved batch progress for ${url} with status ${status}`);
+                    resolve();
+                };
+                
+                request.onerror = (event) => {
+                    debug('app', `Error saving batch progress: ${event.target.error}`);
+                    reject(event.target.error);
+                };
+            } catch (error) {
+                debug('app', `Error in saveBatchProgress: ${error.message}`, error);
+                reject(error);
+            }
+        });
+    }
+    
+    // Load batch scan progress from IndexedDB
+    function loadBatchProgress() {
+        return new Promise((resolve, reject) => {
+            if (!batchScanDB) {
+                debug('app', 'IndexedDB not initialized');
+                reject(new Error('IndexedDB not initialized'));
+                return;
+            }
+            
+            try {
+                const transaction = batchScanDB.transaction(['batchProgress'], 'readonly');
+                const store = transaction.objectStore('batchProgress');
+                const request = store.getAll();
+                
+                request.onsuccess = () => {
+                    debug('app', `Loaded ${request.result.length} batch progress items`);
+                    resolve(request.result);
+                };
+                
+                request.onerror = (event) => {
+                    debug('app', `Error loading batch progress: ${event.target.error}`);
+                    reject(event.target.error);
+                };
+            } catch (error) {
+                debug('app', `Error in loadBatchProgress: ${error.message}`, error);
+                reject(error);
+            }
+        });
+    }
+    
+    // Clear batch scan progress from IndexedDB
+    function clearBatchProgress() {
+        return new Promise((resolve, reject) => {
+            if (!batchScanDB) {
+                debug('app', 'IndexedDB not initialized');
+                reject(new Error('IndexedDB not initialized'));
+                return;
+            }
+            
+            try {
+                const transaction = batchScanDB.transaction(['batchProgress'], 'readwrite');
+                const store = transaction.objectStore('batchProgress');
+                const request = store.clear();
+                
+                request.onsuccess = () => {
+                    debug('app', 'Cleared batch progress');
+                    resolve();
+                };
+                
+                request.onerror = (event) => {
+                    debug('app', `Error clearing batch progress: ${event.target.error}`);
+                    reject(event.target.error);
+                };
+            } catch (error) {
+                debug('app', `Error in clearBatchProgress: ${error.message}`, error);
+                reject(error);
+            }
+        });
+    }
 
     // State
     let recentSearches = JSON.parse(localStorage.getItem('td_recent_searches') || '[]');
     let scannedTemplates = [];
+    
+    // --- Batch Scanning Functionality ---
+    // Function to toggle between single and batch modes
+    function toggleScanMode(isBatchMode) {
+        if (isBatchMode) {
+            singleModeLabel.classList.remove('active');
+            batchModeLabel.classList.add('active');
+            singleScanContainer.style.display = 'none';
+            batchUrlsContainer.classList.add('active');
+            searchResults.style.display = 'none';
+            if (batchScanActive) {
+                batchResults.classList.add('active');
+            }
+        } else {
+            singleModeLabel.classList.add('active');
+            batchModeLabel.classList.remove('active');
+            singleScanContainer.style.display = 'flex';
+            batchUrlsContainer.classList.remove('active');
+            searchResults.style.display = 'block';
+            batchResults.classList.remove('active');
+        }
+    }
+    
+    // Function to parse URLs from textarea
+    function parseUrlsFromTextarea() {
+        const text = batchUrlsTextarea.value.trim();
+        if (!text) return [];
+        
+        // Split by newlines and commas
+        let urls = text.split(/[\n,]+/).map(url => url.trim()).filter(url => url);
+        
+        // Validate and normalize URLs
+        urls = urls.map(url => {
+            // If URL doesn't start with http/https, assume it's a GitHub repo reference
+            if (!url.startsWith('http')) {
+                // Check if it's in the format owner/repo
+                if (url.includes('/')) {
+                    return `https://github.com/${url}`;
+                } else {
+                    // Invalid format
+                    return null;
+                }
+            }
+            return url;
+        }).filter(url => url !== null);
+        
+        return urls;
+    }
+    
+    // Function to initialize batch scan
+    async function startBatchScan() {
+        const urls = parseUrlsFromTextarea();
+        if (urls.length === 0) {
+            if (window.NotificationSystem) {
+                window.NotificationSystem.showWarning(
+                    'No URLs Found',
+                    'Please enter at least one valid GitHub repository URL.',
+                    5000
+                );
+            }
+            return;
+        }
+        
+        try {
+            // Initialize IndexedDB if not already initialized
+            if (!batchScanDB) {
+                await initBatchScanDB();
+            }
+            
+            // Check for existing progress
+            const existingProgress = await loadBatchProgress();
+            let resumeMode = false;
+            
+            if (existingProgress && existingProgress.length > 0) {
+                // Compare with current URLs to see if we're resuming
+                const existingUrls = existingProgress.map(item => item.url);
+                const matchingUrls = urls.filter(url => existingUrls.includes(url));
+                
+                if (matchingUrls.length > 0 && matchingUrls.length < urls.length) {
+                    // Ask user if they want to resume or start fresh using the notification system
+                    if (window.NotificationSystem) {
+                        await new Promise(resolve => {
+                            window.NotificationSystem.showConfirmation(
+                                'Resume Batch Scan',
+                                `Found ${matchingUrls.length} previously scanned repositories. Would you like to resume and skip successful scans?`,
+                                'Resume', // Primary action
+                                'Start Fresh', // Secondary action
+                                (confirmed) => {
+                                    if (confirmed) {
+                                        resumeMode = true;
+                                        debug('app', 'Resuming batch scan with existing progress');
+                                    } else {
+                                        // User chose to start fresh
+                                        clearBatchProgress()
+                                            .then(() => debug('app', 'Starting fresh batch scan, cleared existing progress'))
+                                            .catch(err => debug('app', `Error clearing batch progress: ${err.message}`, err));
+                                    }
+                                    resolve();
+                                }
+                            );
+                        });
+                    } else {
+                        // Fallback to confirm dialog if notification system is not available
+                        const confirmResume = confirm(
+                            `Found ${matchingUrls.length} previously scanned repositories. Would you like to resume and skip successful scans?`
+                        );
+                        
+                        if (confirmResume) {
+                            resumeMode = true;
+                            debug('app', 'Resuming batch scan with existing progress');
+                        } else {
+                            // Clear existing progress
+                            await clearBatchProgress();
+                            debug('app', 'Starting fresh batch scan, cleared existing progress');
+                        }
+                    }
+                } else if (matchingUrls.length === urls.length) {
+                    // All URLs match existing progress
+                    if (window.NotificationSystem) {
+                        await new Promise(resolve => {
+                            window.NotificationSystem.showConfirmation(
+                                'Resume Batch Scan',
+                                `You've already scanned these repositories. Would you like to resume and skip successful scans?`,
+                                'Resume', // Primary action
+                                'Start Fresh', // Secondary action
+                                (confirmed) => {
+                                    if (confirmed) {
+                                        resumeMode = true;
+                                        debug('app', 'Resuming batch scan with existing progress');
+                                    } else {
+                                        // User chose to start fresh
+                                        clearBatchProgress()
+                                            .then(() => debug('app', 'Starting fresh batch scan, cleared existing progress'))
+                                            .catch(err => debug('app', `Error clearing batch progress: ${err.message}`, err));
+                                    }
+                                    resolve();
+                                }
+                            );
+                        });
+                    } else {
+                        // Fallback to confirm dialog if notification system is not available
+                        const confirmResume = confirm(
+                            `You've already scanned these repositories. Would you like to resume and skip successful scans?`
+                        );
+                        
+                        if (confirmResume) {
+                            resumeMode = true;
+                            debug('app', 'Resuming batch scan with existing progress');
+                        } else {
+                            // Clear existing progress
+                            await clearBatchProgress();
+                            debug('app', 'Starting fresh batch scan, cleared existing progress');
+                        }
+                    }
+                } else {
+                    // No matching URLs, clear existing progress
+                    await clearBatchProgress();
+                    debug('app', 'Starting fresh batch scan with new URLs');
+                }
+            }
+            
+            // Reset batch scan state
+            batchUrls = urls;
+            batchScanActive = true;
+            batchProcessedCount = 0;
+            batchCancelled = false;
+            
+            // Clear previous batch items
+            batchItems.innerHTML = '';
+            
+            // Initialize UI
+            batchProgressBar.style.width = '0%';
+            batchProgressText.textContent = `0/${urls.length} Completed`;
+            batchResults.classList.add('active');
+            batchCancelContainer.style.display = 'block';
+        
+            // Create placeholder items for each URL
+            urls.forEach((url, index) => {
+                const item = document.createElement('div');
+                
+                // Check if we have existing progress for this URL in resume mode
+                let initialClass = 'batch-item pending';
+                let initialStatus = 'Pending';
+                let initialMessage = 'Waiting to be processed...';
+                let viewBtnDisabled = true;
+                let retryBtnDisabled = true;
+                
+                if (resumeMode) {
+                    const existingItem = existingProgress.find(p => p.url === url);
+                    if (existingItem && existingItem.status === 'success') {
+                        initialClass = 'batch-item success';
+                        initialStatus = 'Completed';
+                        initialMessage = existingItem.result ? 
+                            `Analysis complete: ${existingItem.result.compliance.issues.length} issues, ${existingItem.result.compliance.compliant.length} passed` :
+                            'Analysis complete';
+                        viewBtnDisabled = false;
+                        batchProcessedCount++; // Count previously successful items
+                    }
+                }
+                
+                item.className = initialClass;
+                item.id = `batch-item-${index}`;
+                
+                // Extract repo name from URL for display
+                let repoName = url;
+                if (url.includes('github.com/')) {
+                    repoName = url.split('github.com/')[1];
+                }
+                
+                item.innerHTML = `
+                    <div class="batch-item-header">
+                        <div class="batch-item-title">${repoName}</div>
+                        <div class="batch-item-status">${initialStatus}</div>
+                    </div>
+                    <div class="batch-item-message">${initialMessage}</div>
+                    <div class="batch-item-actions">
+                        <button class="view-btn" ${viewBtnDisabled ? 'disabled' : ''}>View Report</button>
+                        <button class="retry-btn" ${retryBtnDisabled ? 'disabled' : ''}>Retry</button>
+                    </div>
+                `;
+                
+                batchItems.appendChild(item);
+                
+                // If this item is already successful and we're in resume mode, 
+                // set up the view button click handler with stored result
+                if (resumeMode && !viewBtnDisabled) {
+                    const existingItem = existingProgress.find(p => p.url === url);
+                    if (existingItem && existingItem.result) {
+                        const viewBtn = item.querySelector('.view-btn');
+                        viewBtn.addEventListener('click', () => {
+                            displayBatchItemResults(existingItem.result);
+                        });
+                    }
+                }
+            });
+            
+            // Update initial progress
+            if (resumeMode && batchProcessedCount > 0) {
+                const progressPercentage = (batchProcessedCount / urls.length) * 100;
+                batchProgressBar.style.width = `${progressPercentage}%`;
+                batchProgressText.textContent = `${batchProcessedCount}/${urls.length} Completed`;
+            }
+            
+            // Process each URL sequentially
+            for (let i = 0; i < urls.length; i++) {
+                // Check if the batch was cancelled
+                if (batchCancelled) {
+                    debug('app', 'Batch scan cancelled, stopping further processing');
+                    break;
+                }
+                
+                const url = urls[i];
+                const itemElement = document.getElementById(`batch-item-${i}`);
+                
+                // Skip already successful items in resume mode
+                if (resumeMode) {
+                    const existingItem = existingProgress.find(p => p.url === url);
+                    if (existingItem && existingItem.status === 'success') {
+                        debug('app', `Skipping already successful item ${i+1}/${urls.length}: ${url}`);
+                        continue;
+                    }
+                }
+                
+                // Update UI to show processing
+                itemElement.className = 'batch-item processing';
+                itemElement.querySelector('.batch-item-status').textContent = 'Processing';
+                itemElement.querySelector('.batch-item-message').textContent = 'Checking repository status...';
+                
+                try {
+                    debug('app', `Processing batch item ${i+1}/${urls.length}: ${url}`);
+                    
+                    // First check if the repository needs to be forked
+                    let processedUrl = url;
+                    try {
+                        processedUrl = await checkAndUpdateRepoUrl(url);
+                        
+                        if (processedUrl !== url) {
+                            itemElement.querySelector('.batch-item-message').textContent = 'Using fork of the repository...';
+                        } else {
+                            itemElement.querySelector('.batch-item-message').textContent = 'Analyzing repository...';
+                        }
+                    } catch (forkError) {
+                        debug('app', `Error during fork check: ${forkError.message}`, forkError);
+                        itemElement.querySelector('.batch-item-message').textContent = 'Proceeding with original repository...';
+                    }
+                    
+                    // Process with the obtained URL (original or forked)
+                    const result = await appAnalyzer.analyzeTemplate(processedUrl, 'dod');
+                    
+                    // Update item UI to show success
+                    itemElement.className = 'batch-item success';
+                    itemElement.querySelector('.batch-item-status').textContent = 'Completed';
+                    itemElement.querySelector('.batch-item-message').textContent = 
+                        `Analysis complete: ${result.compliance.issues.length} issues, ${result.compliance.compliant.length} passed`;
+                    
+                    // Update buttons
+                    const viewBtn = itemElement.querySelector('.view-btn');
+                    viewBtn.disabled = false;
+                    
+                    // Add click handler for view button
+                    viewBtn.addEventListener('click', () => {
+                        // Display the results for this specific repository
+                        displayBatchItemResults(result);
+                    });
+                    
+                    // Save successful result to IndexedDB
+                    try {
+                        await saveBatchProgress(`repo-${i}`, url, 'success', result);
+                        debug('app', `Saved successful result for ${url} to IndexedDB`);
+                    } catch (dbError) {
+                        debug('app', `Error saving to IndexedDB: ${dbError.message}`, dbError);
+                    }                // Submit analysis results to GitHub for PR creation
+                if (window.submitAnalysisToGitHub && window.GitHubClient?.auth?.isAuthenticated()) {
+                    try {
+                        // Get current username
+                        const username = window.GitHubClient.auth.getUsername();
+                        
+                        if (username) {
+                            debug('app', `Submitting batch item analysis to GitHub with username: ${username}`);
+                            
+                            itemElement.querySelector('.batch-item-message').textContent = 'Creating PR with results...';
+                            
+                            const submitResult = await window.submitAnalysisToGitHub(result, username);
+                            
+                            if (submitResult.success) {
+                                debug('app', 'Batch item analysis submitted successfully to GitHub');
+                                itemElement.querySelector('.batch-item-message').textContent = 
+                                    `Analysis complete: ${result.compliance.issues.length} issues, ${result.compliance.compliant.length} passed. PR created.`;
+                            } else {
+                                debug('app', `Error submitting batch item analysis: ${submitResult.error}`);
+                                itemElement.querySelector('.batch-item-message').textContent = 
+                                    `Analysis complete: ${result.compliance.issues.length} issues, ${result.compliance.compliant.length} passed. PR creation failed.`;
+                            }
+                        }
+                    } catch (submitErr) {
+                        debug('app', `Error in GitHub submission for batch item: ${submitErr.message}`, submitErr);
+                        itemElement.querySelector('.batch-item-message').textContent = 
+                            `Analysis complete but PR creation failed: ${submitErr.message}`;
+                    }
+                }
+                
+            } catch (error) {
+                debug('app', `Error processing batch item ${i+1}: ${error.message}`, error);
+                
+                // Update item UI to show error
+                itemElement.className = 'batch-item error';
+                itemElement.querySelector('.batch-item-status').textContent = 'Error';
+                itemElement.querySelector('.batch-item-message').textContent = 
+                    error.message || 'An unknown error occurred';
+                
+                // Save error state to IndexedDB
+                try {
+                    await saveBatchProgress(`repo-${i}`, url, 'error');
+                    debug('app', `Saved error state for ${url} to IndexedDB`);
+                } catch (dbError) {
+                    debug('app', `Error saving error state to IndexedDB: ${dbError.message}`, dbError);
+                }
+                
+                // Enable retry button
+                const retryBtn = itemElement.querySelector('.retry-btn');
+                retryBtn.disabled = false;
+                
+                // Add click handler for retry button
+                retryBtn.addEventListener('click', async () => {
+                    // Reset this item and retry
+                    itemElement.className = 'batch-item processing';
+                    itemElement.querySelector('.batch-item-status').textContent = 'Processing';
+                    itemElement.querySelector('.batch-item-message').textContent = 'Retrying...';
+                    retryBtn.disabled = true;
+                    
+                    try {
+                        // Retry the forking check and analysis
+                        let processedUrl = url;
+                        try {
+                            processedUrl = await checkAndUpdateRepoUrl(url);
+                        } catch (forkError) {
+                            debug('app', `Error during retry fork check: ${forkError.message}`, forkError);
+                        }
+                        
+                        const retryResult = await appAnalyzer.analyzeTemplate(processedUrl, 'dod');
+                        
+                        // Update item UI to show success
+                        itemElement.className = 'batch-item success';
+                        itemElement.querySelector('.batch-item-status').textContent = 'Completed';
+                        itemElement.querySelector('.batch-item-message').textContent = 
+                            `Analysis complete: ${retryResult.compliance.issues.length} issues, ${retryResult.compliance.compliant.length} passed`;
+                        
+                        // Enable view button
+                        const viewBtn = itemElement.querySelector('.view-btn');
+                        viewBtn.disabled = false;
+                        
+                        // Add click handler for view button
+                        viewBtn.addEventListener('click', () => {
+                            displayBatchItemResults(retryResult);
+                        });
+                        
+                        // Save successful retry result to IndexedDB
+                        try {
+                            await saveBatchProgress(`repo-${i}`, url, 'success', retryResult);
+                            debug('app', `Saved successful retry result for ${url} to IndexedDB`);
+                        } catch (dbError) {
+                            debug('app', `Error saving retry result to IndexedDB: ${dbError.message}`, dbError);
+                        }
+                        
+                    } catch (retryError) {
+                        debug('app', `Error during retry of batch item: ${retryError.message}`, retryError);
+                        
+                        // Update item UI to show error
+                        itemElement.className = 'batch-item error';
+                        itemElement.querySelector('.batch-item-status').textContent = 'Error';
+                        itemElement.querySelector('.batch-item-message').textContent = 
+                            retryError.message || 'An unknown error occurred during retry';
+                        
+                        // Re-enable retry button
+                        retryBtn.disabled = false;
+                        
+                        // Save retry error state to IndexedDB
+                        try {
+                            await saveBatchProgress(`repo-${i}`, url, 'error');
+                            debug('app', `Saved retry error state for ${url} to IndexedDB`);
+                        } catch (dbError) {
+                            debug('app', `Error saving retry error state to IndexedDB: ${dbError.message}`, dbError);
+                        }
+                    }
+                });
+            }
+            
+            // Update progress
+            batchProcessedCount++;
+            const progressPercentage = (batchProcessedCount / urls.length) * 100;
+            batchProgressBar.style.width = `${progressPercentage}%`;
+            batchProgressText.textContent = `${batchProcessedCount}/${urls.length} Completed`;
+        }
+        
+        // All items processed, update UI
+        if (batchCancelled) {
+            const cancelledItems = batchUrls.length - batchProcessedCount;
+            if (window.NotificationSystem) {
+                window.NotificationSystem.showInfo(
+                    'Batch Scan Cancelled',
+                    `Batch scan cancelled. ${batchProcessedCount} repositories processed, ${cancelledItems} cancelled.`,
+                    5000
+                );
+            }
+        } else {
+            if (window.NotificationSystem) {
+                window.NotificationSystem.showSuccess(
+                    'Batch Scan Complete',
+                    `Completed scanning ${batchUrls.length} repositories.`,
+                    5000
+                );
+            }
+        }
+        
+        // Hide cancel button when all done
+        batchCancelContainer.style.display = 'none';
+        
+        } catch (error) {
+            debug('app', `Error in batch scan: ${error.message}`, error);
+            if (window.NotificationSystem) {
+                window.NotificationSystem.showError(
+                    'Batch Scan Error',
+                    `An error occurred during batch scan: ${error.message}`,
+                    5000
+                );
+            }
+        }
+    }
+    
+    // Function to display results for a specific batch item
+    function displayBatchItemResults(result) {
+        // Show loading state
+        document.getElementById('search-section').style.display = 'none';
+        if (scannedTemplatesSection) scannedTemplatesSection.style.display = 'none';
+        analysisSection.style.display = 'block';
+        resultsContainer.style.display = 'none';
+        loadingContainer.style.display = 'none';
+        errorSection.style.display = 'none';
+        
+        // Set repo info
+        const repoName = result.repoUrl.split('github.com/')[1] || result.repoUrl;
+        document.getElementById('repo-name').textContent = repoName;
+        document.getElementById('repo-url').textContent = result.repoUrl;
+        
+        // Change the back button text to "Back to Results" for batch items
+        const backButton = document.getElementById('back-button');
+        if (backButton) {
+            backButton.innerHTML = '<i class="fas fa-arrow-left"></i> Back to Results';
+            
+            // Store the original event listener
+            const originalListener = backButton.onclick;
+            
+            // Set a new event listener that will first restore the button text and then call the original listener
+            backButton.onclick = function() {
+                backButton.innerHTML = '<i class="fas fa-arrow-left"></i> Back to Search';
+                backButton.onclick = originalListener; // Restore original event listener
+                originalListener.call(this); // Call the original listener
+            };
+        }
+        
+        // Render the dashboard
+        resultsContainer.style.display = 'block';
+        debug('app', 'Rendering batch item analysis results', result);
+        appDashboard.render(result, resultsContainer);
+        
+        // Scroll to the top of the analysis section
+        analysisSection.scrollIntoView({ behavior: 'smooth' });
+    }
     
     // --- Scanned Templates Functionality ---
     function loadScannedTemplates() {
@@ -1760,6 +2453,47 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
+    
+    // Batch scan event listeners
+    if (scanModeToggle) {
+        scanModeToggle.addEventListener('change', function() {
+            toggleScanMode(this.checked);
+        });
+    }
+    
+    if (batchScanButton) {
+        batchScanButton.addEventListener('click', startBatchScan);
+    }
+    
+    if (batchCancelBtn) {
+        batchCancelBtn.addEventListener('click', function() {
+            if (batchScanActive) {
+                batchCancelled = true;
+                
+                // Record batch cancellation in IndexedDB
+                if (batchScanDB) {
+                    // Save a cancellation marker in IndexedDB
+                    saveBatchProgress('batch-status', 'cancel', 'cancelled', { 
+                        timestamp: new Date().toISOString(),
+                        processedCount: batchProcessedCount,
+                        totalCount: batchUrls.length
+                    }).catch(error => {
+                        debug('app', `Error saving batch cancellation to IndexedDB: ${error.message}`, error);
+                    });
+                }
+                
+                if (window.NotificationSystem) {
+                    window.NotificationSystem.showInfo(
+                        'Cancelling Batch Scan',
+                        'Batch scan is being cancelled. Current scan will complete before stopping.',
+                        5000
+                    );
+                }
+                this.disabled = true;
+                this.textContent = 'Cancelling...';
+            }
+        });
+    }
 
     // --- Auth Error Handling ---
     function showAuthError(errorMessage) {

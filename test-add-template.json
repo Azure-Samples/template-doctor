@@ -1,8 +1,8 @@
 {
   "timestamp": 1628170800000,
-  "dashboardPath": "/results/microsoft-template-example/index.html",
-  "dataPath": "/results/microsoft-template-example/data.json",
-  "repoUrl": "https://github.com/microsoft/template-example",
+  "dashboardPath": "/results/azure-samples-template-testing-add/index.html",
+  "dataPath": "/results/azure-samples-template-testing-add/data.json",
+  "repoUrl": "https://github.com/azure-samples/template-testing-add",
   "ruleSet": "default",
   "compliance": {
     "percentage": 85,
@@ -10,5 +10,5 @@
     "passed": 17
   },
   "scannedBy": ["Template Doctor"],
-  "relativePath": "microsoft-template-example"
+  "relativePath": "azure-samples-template-testing-add"
 }
