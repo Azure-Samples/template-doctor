@@ -9,8 +9,8 @@ class NotificationSystem {
         this.notificationCount = 0;
         
         this.initContainer();
-        
-    // No global assignment here; handled in DOMContentLoaded
+
+    // Note: global attachment is handled on DOMContentLoaded to avoid early access issues.
     }
     
     /**
@@ -303,6 +303,28 @@ class NotificationSystem {
             duration
         });
     }
+
+    // --- Back-compat wrappers (older code calls showX/Confirmation on window.NotificationSystem) ---
+    showInfo(title, message, duration) {
+        return this.info(title, message, duration);
+    }
+    showSuccess(title, message, duration) {
+        return this.success(title, message, duration);
+    }
+    showWarning(title, message, duration) {
+        return this.warning(title, message, duration);
+    }
+    showError(title, message, duration) {
+        return this.error(title, message, duration);
+    }
+    showConfirmation(title, message, confirmLabel = 'Confirm', cancelLabel = 'Cancel', callback) {
+        return this.confirm(title, message, {
+            confirmLabel,
+            cancelLabel,
+            onConfirm: () => callback && callback(true),
+            onCancel: () => callback && callback(false)
+        });
+    }
     
     /**
      * Show a loading notification
@@ -400,24 +422,6 @@ class NotificationSystem {
     }
     
     /**
-     * Show a simplified confirmation dialog
-     * @param {string} title - Dialog title
-     * @param {string} message - Dialog message
-     * @param {string} confirmLabel - Confirm button label
-     * @param {string} cancelLabel - Cancel button label
-     * @param {Function} callback - Callback function(confirmed)
-     * @returns {string} - Notification ID
-     */
-    showConfirmation(title, message, confirmLabel = 'Confirm', cancelLabel = 'Cancel', callback = () => {}) {
-        return this.confirm(title, message, {
-            confirmLabel,
-            cancelLabel,
-            onConfirm: () => callback(true),
-            onCancel: () => callback(false)
-        });
-    }
-    
-    /**
      * Get the icon for a notification type
      * @param {string} type - Notification type
      * @returns {string} - Icon HTML
@@ -458,8 +462,13 @@ class NotificationSystem {
 
 // Initialize the notification system when the DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
+    // Ensure a single instance and expose both modern and legacy globals
     if (!window.Notifications) {
         window.Notifications = new NotificationSystem();
         console.log('Notification system initialized');
+    }
+    // Legacy alias used by parts of the app
+    if (!window.NotificationSystem) {
+        window.NotificationSystem = window.Notifications;
     }
 });
