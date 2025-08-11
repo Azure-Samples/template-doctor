@@ -7,8 +7,7 @@ This is the root repository for Template Doctor, a tool for analyzing, validatin
 ## Project Structure
 
 - `api/` - Azure Functions backend providing authentication and API services
-- `frontend/` - Web-based frontend for the Template Doctor application
-- `src/` - Source code and utilities for template analysis
+- `src/frontend/` - Web-based frontend for the Template Doctor application and utilities for template analysis
 - `docs/` - Documentation for GitHub Action and App setup
 - `results/` - Storage for analysis results and reports
 
@@ -67,6 +66,19 @@ For detailed information on specific components:
 - [GitHub App](docs/GITHUB_APP.md)
 - [GitHub Pages Implementation](docs/github-pages-implementation.md)
 
+## Contributing
+
+Contributions are welcome. Please follow these guidelines so changes are easy to review and safe to merge:
+
+- Add or update tests for any bug fix or feature. Use Playwright E2E tests under `src/frontend/tests`. Run tests from the repo root with `npm test` and ensure they all pass.
+- Do not introduce native browser dialogs (`alert`, `confirm`, `prompt`) in the UI; use the notification system instead—tests will fail if native dialogs are used.
+- Format code before committing. In `src/frontend`, run `npm run format` and ensure `npm run format:check` passes.
+- Avoid committing generated or backup content: `results/`, `src/frontend/_backup_unused/`, `playwright-report/`, `node_modules/`.
+- Update documentation when behavior or configuration changes.
+- Keep PRs focused, reference related issues, and ensure CI workflows are green.
+
 ---
+
+
 
 For any issues, please open an issue in the repository.
