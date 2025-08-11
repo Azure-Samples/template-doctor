@@ -485,18 +485,25 @@ document.addEventListener('DOMContentLoaded', function () {
       const height = 120;
       const padding = 12;
 
-      const times = points.map((p) => p.x.getTime());
-      const values = points.map((p) => p.y);
-      const minX = Math.min(...times);
-      const maxX = Math.max(...times);
-      const minY = 0; // clamp to 0-100
-      const maxY = 100;
+  const times = points.map((p) => p.x.getTime());
+  const values = points.map((p) => p.y);
+  const minX = Math.min(...times);
+  const maxX = Math.max(...times);
+  // Compute y-bounds from data and clamp to [0,100]
+  let minY = Math.min(...values);
+  let maxY = Math.max(...values);
+  minY = Math.max(0, Math.min(100, minY));
+  maxY = Math.max(0, Math.min(100, maxY));
 
       const xScale = (t) => {
         if (maxX === minX) return padding;
         return padding + ((t - minX) / (maxX - minX)) * (width - 2 * padding);
       };
       const yScale = (v) => {
+        // Avoid division by zero when all y-values are equal
+        if (maxY === minY) {
+          return height / 2; // draw a flat line across the middle
+        }
         return height - padding - ((v - minY) / (maxY - minY)) * (height - 2 * padding);
       };
 
