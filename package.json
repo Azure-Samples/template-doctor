@@ -22,11 +22,17 @@
     "license": "MIT",
     "devDependencies": {
         "@playwright/test": "^1.54.1",
+        "@types/express": "^5.0.3",
         "@types/node": "^24.0.14",
+        "@types/serve-static": "^1.15.8",
         "typescript": "^5.8.3"
     },
     "dependencies": {
+        "@octokit/graphql": "^9.0.1",
+        "@octokit/rest": "^22.0.0",
         "dotenv": "^17.2.0",
-        "open": "^10.2.0"
+        "express": "^5.1.0",
+        "open": "^10.2.0",
+        "serve-static": "^2.2.0"
     }
 }
