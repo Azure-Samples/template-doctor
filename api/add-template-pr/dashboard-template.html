@@ -409,8 +409,9 @@
                 <div class="gauge-container">
                     <h3>Compliance Score: {{COMPLIANCE_PERCENTAGE}}%</h3>
                     <div class="gauge">
-                        <div class="gauge-fill GAUGE_CLASS" style="width: COMPLIANCE_PERCENTAGE%;"></div>
-                    </div>
+                        <!-- Do not try to fix this. This is just VS Code unable to parse the dynamic value -->
+                        <div class="gauge-fill {{GAUGE_CLASS}}" role="progressbar" aria-label="Compliance score" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{COMPLIANCE_PERCENTAGE}}" style="width: clamp(0%, {{COMPLIANCE_PERCENTAGE}}%, 100%);"></div>
+                    </div> 
                 </div>
             </div>
             
