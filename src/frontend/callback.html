@@ -1,112 +1,114 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>GitHub OAuth Callback</title>
-  <style>
-    body {
-      font-family: 'Inter', sans-serif;
-      background-color: #f5f5f5;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      margin: 0;
-      padding: 20px;
-      text-align: center;
-      color: #333;
-    }
-    .container {
-      background-color: white;
-      border-radius: 8px;
-      padding: 30px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      max-width: 500px;
-      width: 100%;
-    }
-    .spinner {
-      border: 4px solid rgba(0, 0, 0, 0.1);
-      border-left-color: #0078d4;
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      animation: spin 1s linear infinite;
-      margin: 20px auto;
-    }
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-    h2 {
-      color: #0078d4;
-      margin-top: 0;
-    }
-    p {
-      margin: 15px 0;
-    }
-    .error {
-      color: #d83b01;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h2>GitHub Authentication</h2>
-    <div id="loading">
-      <div class="spinner"></div>
-      <p>Processing authentication...</p>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GitHub OAuth Callback</title>
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+        background-color: #f5f5f5;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+        padding: 20px;
+        text-align: center;
+        color: #333;
+      }
+      .container {
+        background-color: white;
+        border-radius: 8px;
+        padding: 30px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        max-width: 500px;
+        width: 100%;
+      }
+      .spinner {
+        border: 4px solid rgba(0, 0, 0, 0.1);
+        border-left-color: #0078d4;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 20px auto;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      h2 {
+        color: #0078d4;
+        margin-top: 0;
+      }
+      p {
+        margin: 15px 0;
+      }
+      .error {
+        color: #d83b01;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2>GitHub Authentication</h2>
+      <div id="loading">
+        <div class="spinner"></div>
+        <p>Processing authentication...</p>
+      </div>
+      <div id="error-message" style="display: none" class="error"></div>
     </div>
-    <div id="error-message" style="display: none;" class="error"></div>
-  </div>
 
-  <script>
-    // Parse the URL parameters
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-    const state = urlParams.get('state');
-    const error = urlParams.get('error');
-    const errorDescription = urlParams.get('error_description');
+    <script>
+      // Parse the URL parameters
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      const state = urlParams.get('state');
+      const error = urlParams.get('error');
+      const errorDescription = urlParams.get('error_description');
 
-    // Show error if present
-    if (error) {
-      document.getElementById('loading').style.display = 'none';
-      const errorElement = document.getElementById('error-message');
-      errorElement.textContent = `Error: ${error}${errorDescription ? ' - ' + errorDescription : ''}`;
-      errorElement.style.display = 'block';
-      
-      // Store error in session storage to show on main page
-      sessionStorage.setItem('auth_error', errorDescription || error);
-      
-      // Redirect back to main page after 3 seconds
-      setTimeout(() => {
+      // Show error if present
+      if (error) {
+        document.getElementById('loading').style.display = 'none';
+        const errorElement = document.getElementById('error-message');
+        errorElement.textContent = `Error: ${error}${errorDescription ? ' - ' + errorDescription : ''}`;
+        errorElement.style.display = 'block';
+
+        // Store error in session storage to show on main page
+        sessionStorage.setItem('auth_error', errorDescription || error);
+
+        // Redirect back to main page after 3 seconds
+        setTimeout(() => {
+          window.location.href = window.location.origin + '/index.html';
+        }, 3000);
+      }
+      // Process code
+      else if (code && state) {
+        // Send code and state back to index page and redirect
+        sessionStorage.setItem('gh_auth_code', code);
+        sessionStorage.setItem('gh_auth_state', state);
+
+        // Redirect back to index.html
         window.location.href = window.location.origin + '/index.html';
-      }, 3000);
-    } 
-    // Process code
-    else if (code && state) {
-      // Send code and state back to index page and redirect
-      sessionStorage.setItem('gh_auth_code', code);
-      sessionStorage.setItem('gh_auth_state', state);
-      
-      // Redirect back to index.html
-      window.location.href = window.location.origin + '/index.html';
-    } 
-    // No code or error
-    else {
-      document.getElementById('loading').style.display = 'none';
-      const errorElement = document.getElementById('error-message');
-      errorElement.textContent = 'Error: No authorization code received from GitHub.';
-      errorElement.style.display = 'block';
-      
-      // Store error
-      sessionStorage.setItem('auth_error', 'No authorization code received from GitHub.');
-      
-      // Redirect back to main page after 3 seconds
-      setTimeout(() => {
-        window.location.href = window.location.origin + '/index.html';
-      }, 3000);
-    }
-  </script>
-</body>
+      }
+      // No code or error
+      else {
+        document.getElementById('loading').style.display = 'none';
+        const errorElement = document.getElementById('error-message');
+        errorElement.textContent = 'Error: No authorization code received from GitHub.';
+        errorElement.style.display = 'block';
+
+        // Store error
+        sessionStorage.setItem('auth_error', 'No authorization code received from GitHub.');
+
+        // Redirect back to main page after 3 seconds
+        setTimeout(() => {
+          window.location.href = window.location.origin + '/index.html';
+        }, 3000);
+      }
+    </script>
+  </body>
 </html>

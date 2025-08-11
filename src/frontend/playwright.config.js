@@ -10,7 +10,7 @@ module.exports = defineConfig({
   retries: process.env.CI ? 2 : 1, // Add one retry for flaky tests
   workers: 1, // Use single worker for predictable execution
   reporter: 'html', // Use HTML reporter
-  
+
   use: {
     baseURL: 'http://localhost:8080', // Ensure tests navigate to the correct server
     trace: 'on', // Capture traces for all tests
@@ -33,7 +33,7 @@ module.exports = defineConfig({
     stdout: 'pipe',
     stderr: 'pipe',
   },
-  
+
   // Increase timeouts for debugging
   timeout: 60000, // Global timeout
   expect: {

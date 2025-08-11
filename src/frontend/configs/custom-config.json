@@ -1,14 +1,7 @@
 {
-  "requiredFiles": [
-    "README.md",
-    "azure.yaml"
-  ],
-  "requiredFolders": [
-    "infra"
-  ],
+  "requiredFiles": ["README.md", "azure.yaml"],
+  "requiredFolders": ["infra"],
   "readmeRequirements": {
-    "requiredHeadings": [
-      "Getting Started"
-    ]
+    "requiredHeadings": ["Getting Started"]
   }
 }

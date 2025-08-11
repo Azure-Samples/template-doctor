@@ -6,7 +6,11 @@
     "test": "playwright test",
     "test:ui": "playwright test --ui",
     "test:debug": "playwright test --debug",
-    "start": "python3 -m http.server 8080"
+    "start": "python3 -m http.server 8080",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "prettier": "^3.6.2"
+  }
 }

@@ -4,7 +4,7 @@ This directory contains tests for the Template Doctor frontend, focusing on app.
 
 ## Test Structure
 
-- `app.spec.js`: Tests for basic application functionality 
+- `app.spec.js`: Tests for basic application functionality
 - `url-search.spec.js`: Tests for URL matching and search functionality
 - `edge-cases.spec.js`: Tests for edge cases in the URL matching logic
 
@@ -36,7 +36,7 @@ npm run test:debug
 
 ## Test Strategy
 
-These tests mock the template data and inject it into the page to test the search functionality. 
+These tests mock the template data and inject it into the page to test the search functionality.
 They verify that:
 
 1. Searching with a full URL finds the correct template

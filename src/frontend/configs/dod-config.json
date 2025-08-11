@@ -1,31 +1,21 @@
 {
-  "requiredFiles": [
-    "README.md",
-    "azure.yaml",
-    "LICENSE"
-  ],
-  "requiredFolders": [
-    "infra",
-    ".github"
-  ],
+  "requiredFiles": ["README.md", "azure.yaml", "LICENSE"],
+  "requiredFolders": ["infra", ".github"],
   "requiredWorkflowFiles": [
-    { "pattern": ".github/workflows/azure-dev.yml", "message": "Missing required GitHub workflow: azure-dev.yml" }
+    {
+      "pattern": ".github/workflows/azure-dev.yml",
+      "message": "Missing required GitHub workflow: azure-dev.yml"
+    }
   ],
   "readmeRequirements": {
-    "requiredHeadings": [
-      "Prerequisites",
-      "Getting Started"
-    ],
+    "requiredHeadings": ["Prerequisites", "Getting Started"],
     "architectureDiagram": {
       "heading": "Architecture",
       "requiresImage": true
     }
   },
   "bicepChecks": {
-    "requiredResources": [
-      "Microsoft.Resources/resourceGroups",
-      "Microsoft.KeyVault/vaults"
-    ]
+    "requiredResources": ["Microsoft.Resources/resourceGroups", "Microsoft.KeyVault/vaults"]
   },
   "azureYamlRules": {
     "mustDefineServices": true

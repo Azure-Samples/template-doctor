@@ -13,6 +13,7 @@ The application uses three types of rulesets:
 ### Custom Configuration
 
 Users can define their own custom ruleset by:
+
 - Pasting a JSON configuration
 - Loading configuration from a GitHub Gist URL
 
