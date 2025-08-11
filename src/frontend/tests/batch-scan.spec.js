@@ -68,23 +68,36 @@ function buildFakeResult(repoUrl, issues = 2, passed = 5) {
   };
 }
 
+async function enableBatchMode(page) {
+  await page.evaluate(() => {
+    const toggle = document.getElementById('scan-mode-toggle');
+    if (toggle) {
+      toggle.checked = true;
+      toggle.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  });
+  await expect(page.locator('#batch-urls-container')).toHaveClass(/active/);
+}
+
 test.describe('Batch Scan', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await mockAuthAndDeps(page);
-    await page.waitForSelector('#scan-mode-toggle');
+    await page.waitForSelector('#scan-mode-toggle', { state: 'attached' });
+    // Switch to batch mode programmatically (checkbox is visually hidden under CSS)
+    await enableBatchMode(page);
     await page.waitForSelector('#batch-urls');
     await page.waitForSelector('#batch-scan-button');
   });
 
   test('toggles to batch mode and shows inputs', async ({ page }) => {
-    await page.check('#scan-mode-toggle');
+  // Already enabled in beforeEach
     await expect(page.locator('#batch-urls-container')).toHaveClass(/active/);
     await expect(page.locator('#single-scan-container')).toBeHidden();
   });
 
   test('processes multiple URLs and updates progress', async ({ page }) => {
-    await page.check('#scan-mode-toggle');
+  // Already enabled in beforeEach
     const urls = ['https://github.com/owner1/repo-one', 'https://github.com/owner2/repo-two'].join(
       '\n',
     );
@@ -104,7 +117,7 @@ test.describe('Batch Scan', () => {
   });
 
   test('handles error then retry success for a URL', async ({ page }) => {
-    await page.check('#scan-mode-toggle');
+  // Already enabled in beforeEach
 
     // Override analyzer to be flaky for a specific URL
     await page.evaluate(() => {

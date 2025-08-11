@@ -559,11 +559,29 @@ class GitHubAuth {
   }
 
   /**
+   * Backward-compatibility alias for tokens
+   * Some callers use auth.getToken(); keep it working.
+   * @returns {string|null}
+   */
+  getToken() {
+    return this.getAccessToken();
+  }
+
+  /**
    * Get the current user info
    * @returns {Object|null} The user info or null if not authenticated
    */
   getUserInfo() {
     return this.userInfo;
+  }
+
+  /**
+   * Backward-compatibility helper to return the username (login)
+   * Some callers use auth.getUsername(); keep it working.
+   * @returns {string|null}
+   */
+  getUsername() {
+    return this.userInfo && (this.userInfo.login || this.userInfo.name) ? (this.userInfo.login || this.userInfo.name) : null;
   }
 
   /**
