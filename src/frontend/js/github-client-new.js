@@ -523,11 +523,11 @@ class GitHubClient {
     }
 
     const existingNames = new Set(existing.map((l) => l.name));
-  const toCreate = labels.filter((l) => !existingNames.has(l));
+    const toCreate = labels.filter((l) => !existingNames.has(l));
     if (toCreate.length === 0) return;
 
-  // Deduplicate to avoid redundant POSTs
-  const toCreateUnique = Array.from(new Set(toCreate));
+    // Deduplicate to avoid redundant POSTs
+    const toCreateUnique = Array.from(new Set(toCreate));
 
     // Simple color map for known families
     const colorFor = (name) => {
@@ -544,18 +544,17 @@ class GitHubClient {
     };
 
     // Create missing labels concurrently for performance; handle failures gracefully
-  const creationPromises = toCreateUnique.map((label) =>
+    const creationPromises = toCreateUnique.map((label) =>
       this.request(`/repos/${owner}/${repo}/labels`, {
         method: 'POST',
         body: JSON.stringify({
           name: label,
           color: colorFor(label),
-          description:
-            label.startsWith('severity:')
-              ? 'Severity level for Template Doctor issues'
-              : label.startsWith('ruleset:')
-                ? 'Ruleset used by Template Doctor'
-                : 'Template Doctor',
+          description: label.startsWith('severity:')
+            ? 'Severity level for Template Doctor issues'
+            : label.startsWith('ruleset:')
+              ? 'Ruleset used by Template Doctor'
+              : 'Template Doctor',
         }),
       }).catch((e) => {
         console.warn(`Failed creating label '${label}':`, e.message);

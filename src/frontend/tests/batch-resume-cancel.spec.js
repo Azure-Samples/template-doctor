@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { test, expect } from '@playwright/test';
+import { enableBatchMode } from './testUtils.js';
 
 async function mockAuthAndDeps(page) {
   await page.evaluate(() => {
@@ -37,11 +38,11 @@ test.describe('Batch resume and cancel', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await mockAuthAndDeps(page);
-    await page.waitForSelector('#scan-mode-toggle');
+    // No need to wait for the hidden toggle; we'll force-check when needed
   });
 
   test('resume skips previously successful items and updates progress', async ({ page }) => {
-    await page.check('#scan-mode-toggle');
+    await enableBatchMode(page);
 
     // First run with two URLs: complete first, error second to keep progress
     await page.evaluate(() => {
@@ -67,7 +68,7 @@ test.describe('Batch resume and cancel', () => {
     // Reload page to simulate return, keep IndexedDB
     await page.reload();
     await mockAuthAndDeps(page);
-    await page.check('#scan-mode-toggle');
+    await enableBatchMode(page);
 
     // Clear fail override so both can succeed; choose Resume in confirmation
     await page.evaluate(() => {
@@ -79,12 +80,12 @@ test.describe('Batch resume and cancel', () => {
     // The app uses NotificationSystem.showConfirmation. Ensure it exists and auto-confirm.
     await page.evaluate(() => {
       const ns = window.NotificationSystem || window.Notifications;
-      if (ns) {
-        const origConfirm = ns.confirm.bind(ns);
-        ns.confirm = (title, message, opts = {}) => {
-          // Auto choose confirm
-          setTimeout(() => opts.onConfirm && opts.onConfirm(), 0);
-          return origConfirm(title, message, opts);
+      if (ns && typeof ns.showConfirmation === 'function') {
+        const orig = ns.showConfirmation.bind(ns);
+        // Auto-select primary action (Resume)
+        ns.showConfirmation = (title, message, primaryLabel, secondaryLabel, callback) => {
+          setTimeout(() => callback && callback(true), 0);
+          return orig(title, message, primaryLabel, secondaryLabel, callback);
         };
       }
     });
@@ -102,7 +103,7 @@ test.describe('Batch resume and cancel', () => {
   });
 
   test('cancel stops further processing and shows cancelled notification', async ({ page }) => {
-    await page.check('#scan-mode-toggle');
+    await enableBatchMode(page);
 
     // Slow down analyzer to allow cancel in between
     await page.evaluate(() => {

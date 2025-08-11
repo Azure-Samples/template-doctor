@@ -224,7 +224,9 @@ async function processIssueCreation(github) {
     const ruleSet = window.reportData.ruleSet || 'dod';
     const ruleSetDisplay = ruleSet === 'dod' ? 'DoD' : ruleSet === 'partner' ? 'Partner' : 'Custom';
     const customGistUrl =
-      ruleSet === 'custom' && window.reportData.customConfig && window.reportData.customConfig.gistUrl
+      ruleSet === 'custom' &&
+      window.reportData.customConfig &&
+      window.reportData.customConfig.gistUrl
         ? window.reportData.customConfig.gistUrl
         : null;
 
@@ -264,7 +266,7 @@ async function processIssueCreation(github) {
     if (notification)
       notification.update('Checking for duplicates', 'Looking for existing issues...');
 
-  const issueTitle = `Template Doctor Analysis: ${window.reportData.compliance.summary} ${formattedDate}`;
+    const issueTitle = `Template Doctor Analysis: ${window.reportData.compliance.summary} ${formattedDate}`;
     let existingIssues;
 
     try {
@@ -317,19 +319,23 @@ async function processIssueCreation(github) {
           'Creating issue and assigning to Copilot Agent...',
         );
 
-  // Configurable GitHub labels
-  const baseLabels =
+      // Configurable GitHub labels
+      const baseLabels =
         typeof window.GITHUB_LABELS !== 'undefined' && Array.isArray(window.GITHUB_LABELS)
           ? window.GITHUB_LABELS
           : ['template-doctor', 'template-doctor-full-scan'];
 
-  // Add ruleset label to the main issue
-  const rulesetLabel = `ruleset:${ruleSet}`;
-  const mainIssueLabels = Array.from(new Set([...baseLabels, rulesetLabel]));
+      // Add ruleset label to the main issue
+      const rulesetLabel = `ruleset:${ruleSet}`;
+      const mainIssueLabels = Array.from(new Set([...baseLabels, rulesetLabel]));
 
-  // Ensure label families exist up-front (base + ruleset + severity family)
-  const severityFamily = ['severity:high', 'severity:medium', 'severity:low'];
-  await github.ensureLabelsExist(owner, repo, Array.from(new Set([...mainIssueLabels, ...severityFamily])));
+      // Ensure label families exist up-front (base + ruleset + severity family)
+      const severityFamily = ['severity:high', 'severity:medium', 'severity:low'];
+      await github.ensureLabelsExist(
+        owner,
+        repo,
+        Array.from(new Set([...mainIssueLabels, ...severityFamily])),
+      );
 
       mainIssue = await github.createIssueGraphQL(
         owner,
@@ -392,7 +398,8 @@ async function processIssueCreation(github) {
 
           // Add severity + configuration context
           const severity = (issue.severity || 'warning').toLowerCase();
-          const severityDisplay = severity === 'error' ? 'High' : severity === 'warning' ? 'Medium' : 'Low';
+          const severityDisplay =
+            severity === 'error' ? 'High' : severity === 'warning' ? 'Medium' : 'Low';
           childBody += `## Context\n\n- Severity: ${severityDisplay}\n- Rule Set: ${ruleSetDisplay}${customGistUrl ? ` (custom from ${customGistUrl})` : ''}\n`;
 
           childBody += `\n---\n*This is a child issue created by Template Doctor. Parent issue: #${mainIssue.number}*`;
@@ -402,11 +409,20 @@ async function processIssueCreation(github) {
 
           // Map severity to standardized label values
           const sevLabel =
-            severity === 'error' ? 'severity:high' : severity === 'warning' ? 'severity:medium' : 'severity:low';
+            severity === 'error'
+              ? 'severity:high'
+              : severity === 'warning'
+                ? 'severity:medium'
+                : 'severity:low';
 
           // Ensure child labels exist (severity + ruleset + base)
           const childLabels = Array.from(
-            new Set(['template-doctor', 'template-doctor-child-issue', sevLabel, `ruleset:${ruleSet}`]),
+            new Set([
+              'template-doctor',
+              'template-doctor-child-issue',
+              sevLabel,
+              `ruleset:${ruleSet}`,
+            ]),
           );
           await github.ensureLabelsExist(owner, repo, childLabels);
 
