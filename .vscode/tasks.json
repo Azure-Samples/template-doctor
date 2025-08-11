@@ -1,0 +1,67 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run Playwright tests (issue-labels)",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"test",
+				"--",
+				"-g",
+				"GitHub issue creation labels and body metadata",
+				"src/frontend/tests/issue-labels.spec.js"
+			],
+			"problemMatcher": [
+				"$eslint - stylish"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Re-run Playwright tests (issue-labels)",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"test",
+				"--",
+				"-g",
+				"GitHub issue creation labels and body metadata",
+				"src/frontend/tests/issue-labels.spec.js"
+			],
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Re-run Playwright tests (issue-labels, direct process)",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"test",
+				"--",
+				"-g",
+				"GitHub issue creation labels and body metadata",
+				"src/frontend/tests/issue-labels.spec.js"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Re-run Playwright tests (issue-labels after showLoading)",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"test",
+				"--",
+				"-g",
+				"GitHub issue creation labels and body metadata",
+				"src/frontend/tests/issue-labels.spec.js"
+			],
+			"group": "build"
+		}
+	]
+}

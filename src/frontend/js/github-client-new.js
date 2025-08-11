@@ -426,6 +426,82 @@ class GitHubClient {
   }
 
   /**
+   * Create an issue without assigning to Copilot (used for child issues)
+   * @param {string} owner - Repository owner
+   * @param {string} repo - Repository name
+   * @param {string} title - Issue title
+   * @param {string} body - Issue body
+   * @param {Array<string>} labels - Labels to apply
+   * @returns {Promise<Object>} - Created issue (number, title, url)
+   */
+  async createIssueWithoutCopilot(owner, repo, title, body, labels = []) {
+    const created = await this.createIssue(owner, repo, title, body, labels);
+    // Normalize return shape to match GraphQL createIssueGraphQL
+    return {
+      id: created.node_id || created.id,
+      number: created.number,
+      url: created.html_url,
+      title: created.title,
+    };
+  }
+
+  /**
+   * Ensure the provided labels exist in the repository. Creates any missing ones.
+   * @param {string} owner
+   * @param {string} repo
+   * @param {Array<string>} labels
+   */
+  async ensureLabelsExist(owner, repo, labels = []) {
+    if (!labels || labels.length === 0) return;
+    // Fetch existing labels (first 100)
+    let existing = [];
+    try {
+      existing = await this.request(`/repos/${owner}/${repo}/labels?per_page=100`);
+    } catch (e) {
+      console.warn('Could not list repository labels; skipping ensureLabelsExist', e.message);
+      return;
+    }
+
+    const existingNames = new Set(existing.map((l) => l.name));
+    const toCreate = labels.filter((l) => !existingNames.has(l));
+    if (toCreate.length === 0) return;
+
+    // Simple color map for known families
+    const colorFor = (name) => {
+      if (name.startsWith('severity:')) {
+        const level = name.split(':')[1];
+        if (level === 'high') return 'd73a4a'; // red
+        if (level === 'medium') return 'fbca04'; // yellow
+        if (level === 'low') return '0e8a16'; // green
+        return 'c5def5';
+      }
+      if (name.startsWith('ruleset:')) return '0366d6'; // blue
+      if (name.includes('template-doctor')) return '5319e7'; // purple
+      return 'c5def5'; // default light blue
+    };
+
+    for (const label of toCreate) {
+      try {
+        await this.request(`/repos/${owner}/${repo}/labels`, {
+          method: 'POST',
+          body: JSON.stringify({
+            name: label,
+            color: colorFor(label),
+            description:
+              label.startsWith('severity:')
+                ? 'Severity level for Template Doctor issues'
+                : label.startsWith('ruleset:')
+                  ? 'Ruleset used by Template Doctor'
+                  : 'Template Doctor',
+          }),
+        });
+      } catch (e) {
+        console.warn(`Failed creating label '${label}':`, e.message);
+      }
+    }
+  }
+
+  /**
    * Get a user's node_id by login (for assignee)
    * @param {string} login - GitHub username
    * @returns {Promise<string>} - The user's node_id
@@ -484,7 +560,7 @@ class GitHubClient {
     if (!labelNames || labelNames.length === 0) return [];
     const query = `query($owner: String!, $name: String!) {
             repository(owner: $owner, name: $name) {
-                labels(first: 20) { nodes { id name } }
+                labels(first: 100) { nodes { id name } }
             }
         }`;
     const data = await this.graphql(query, { owner, name });
