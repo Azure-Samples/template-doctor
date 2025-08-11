@@ -163,6 +163,65 @@ class GitHubClient {
   }
 
   /**
+   * Make paginated requests to the GitHub API and return concatenated results (array endpoints).
+   * Follows the Link: rel="next" header until exhaustion.
+   * @param {string} path - The API endpoint path or full URL
+   * @param {Object} options - Fetch options
+   * @returns {Promise<Array>} - Concatenated array of all pages
+   */
+  async requestAllPages(path, options = {}) {
+    const token = this.auth && this.auth.getAccessToken ? this.auth.getAccessToken() : null;
+    if (!token) {
+      console.warn('[GitHubClient] requestAllPages called without token; returning empty array');
+      return [];
+    }
+
+    const base = path.startsWith('http') ? '' : this.baseUrl;
+    let nextUrl = `${base}${path}`;
+    const results = [];
+
+    const headers = {
+      Accept: 'application/vnd.github.v3+json',
+      Authorization: `token ${token}`,
+      ...(options.headers || {}),
+    };
+
+    const getNextFromLink = (linkHeader) => {
+      if (!linkHeader) return null;
+      // Example: <https://api.github.com/resource?page=2>; rel="next", <...>; rel="last"
+      const parts = linkHeader.split(',');
+      for (const part of parts) {
+        const m = part.trim().match(/<([^>]+)>;\s*rel="([^"]+)"/);
+        if (m && m[2] === 'next') return m[1];
+      }
+      return null;
+    };
+
+    while (nextUrl) {
+      const response = await fetch(nextUrl, { ...options, headers });
+      if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        const err = new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+        err.status = response.status;
+        err.body = text;
+        throw err;
+      }
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        results.push(...data);
+      } else {
+        // Non-array endpoints aren't supported here; return as-is if first page
+        if (results.length === 0) return data;
+        break;
+      }
+      const link = response.headers.get('Link');
+      nextUrl = getNextFromLink(link);
+    }
+
+    return results;
+  }
+
+  /**
    * Make a GraphQL request to GitHub API
    * @param {string} query - The GraphQL query
    * @param {Object} variables - Query variables
@@ -456,15 +515,19 @@ class GitHubClient {
     // Fetch existing labels (first 100)
     let existing = [];
     try {
-      existing = await this.request(`/repos/${owner}/${repo}/labels?per_page=100`);
+      // Fetch all existing labels (handle pagination beyond first 100)
+      existing = await this.requestAllPages(`/repos/${owner}/${repo}/labels?per_page=100`);
     } catch (e) {
       console.warn('Could not list repository labels; skipping ensureLabelsExist', e.message);
       return;
     }
 
     const existingNames = new Set(existing.map((l) => l.name));
-    const toCreate = labels.filter((l) => !existingNames.has(l));
+  const toCreate = labels.filter((l) => !existingNames.has(l));
     if (toCreate.length === 0) return;
+
+  // Deduplicate to avoid redundant POSTs
+  const toCreateUnique = Array.from(new Set(toCreate));
 
     // Simple color map for known families
     const colorFor = (name) => {
@@ -480,25 +543,27 @@ class GitHubClient {
       return 'c5def5'; // default light blue
     };
 
-    for (const label of toCreate) {
-      try {
-        await this.request(`/repos/${owner}/${repo}/labels`, {
-          method: 'POST',
-          body: JSON.stringify({
-            name: label,
-            color: colorFor(label),
-            description:
-              label.startsWith('severity:')
-                ? 'Severity level for Template Doctor issues'
-                : label.startsWith('ruleset:')
-                  ? 'Ruleset used by Template Doctor'
-                  : 'Template Doctor',
-          }),
-        });
-      } catch (e) {
+    // Create missing labels concurrently for performance; handle failures gracefully
+  const creationPromises = toCreateUnique.map((label) =>
+      this.request(`/repos/${owner}/${repo}/labels`, {
+        method: 'POST',
+        body: JSON.stringify({
+          name: label,
+          color: colorFor(label),
+          description:
+            label.startsWith('severity:')
+              ? 'Severity level for Template Doctor issues'
+              : label.startsWith('ruleset:')
+                ? 'Ruleset used by Template Doctor'
+                : 'Template Doctor',
+        }),
+      }).catch((e) => {
         console.warn(`Failed creating label '${label}':`, e.message);
-      }
-    }
+        return null; // swallow error per-label
+      }),
+    );
+
+    await Promise.allSettled(creationPromises);
   }
 
   /**

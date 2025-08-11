@@ -62,6 +62,62 @@
 				"src/frontend/tests/issue-labels.spec.js"
 			],
 			"group": "build"
+		},
+		{
+			"label": "Run Playwright smoke for issue handler after label var rename",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"test",
+				"--",
+				"-g",
+				"GitHub issue creation labels and body metadata",
+				"src/frontend/tests/issue-labels.spec.js"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Run focused Playwright tests after ensureLabelsExist concurrency refactor",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"test",
+				"--",
+				"-g",
+				"GitHub issue creation labels and body metadata",
+				"src/frontend/tests/issue-labels.spec.js"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Re-run focused Playwright tests after label dedupe tweak",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"test",
+				"--",
+				"-g",
+				"GitHub issue creation labels and body metadata",
+				"src/frontend/tests/issue-labels.spec.js"
+			],
+			"group": "build"
+		},
+		{
+			"label": "Run focused Playwright tests after pagination helper change",
+			"type": "shell",
+			"command": "npm",
+			"args": [
+				"run",
+				"test",
+				"--",
+				"-g",
+				"GitHub issue creation labels and body metadata",
+				"src/frontend/tests/issue-labels.spec.js"
+			],
+			"group": "build"
 		}
 	]
 }

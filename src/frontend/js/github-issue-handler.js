@@ -325,18 +325,18 @@ async function processIssueCreation(github) {
 
   // Add ruleset label to the main issue
   const rulesetLabel = `ruleset:${ruleSet}`;
-  const GITHUB_LABELS = Array.from(new Set([...baseLabels, rulesetLabel]));
+  const mainIssueLabels = Array.from(new Set([...baseLabels, rulesetLabel]));
 
-      // Ensure label families exist up-front (base + ruleset + severity family)
-      const severityFamily = ['severity:high', 'severity:medium', 'severity:low'];
-      await github.ensureLabelsExist(owner, repo, Array.from(new Set([...GITHUB_LABELS, ...severityFamily])));
+  // Ensure label families exist up-front (base + ruleset + severity family)
+  const severityFamily = ['severity:high', 'severity:medium', 'severity:low'];
+  await github.ensureLabelsExist(owner, repo, Array.from(new Set([...mainIssueLabels, ...severityFamily])));
 
       mainIssue = await github.createIssueGraphQL(
         owner,
         repo,
         issueTitle,
         issueBody,
-        GITHUB_LABELS,
+        mainIssueLabels,
       );
 
       console.log('Main issue created:', mainIssue);
