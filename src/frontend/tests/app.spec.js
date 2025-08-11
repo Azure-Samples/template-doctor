@@ -10,7 +10,7 @@ async function mockAuthentication(page) {
     const mockUserInfo = {
       login: 'test-user',
       name: 'Test User',
-      avatarUrl: 'https://avatars.githubusercontent.com/u/0'
+      avatarUrl: 'https://avatars.githubusercontent.com/u/0',
     };
 
     // Mock localStorage values
@@ -25,7 +25,7 @@ async function mockAuthentication(page) {
       getAccessToken: () => 'mock_access_token',
       getUserInfo: () => mockUserInfo,
       checkAuthentication: () => true,
-      updateUI: () => {}
+      updateUI: () => {},
     };
   });
 }
@@ -49,7 +49,7 @@ test.describe('App.js Functionality', () => {
         auth: !!window.GitHubAuth,
         github: !!window.GitHubClient,
         analyzer: !!window.TemplateAnalyzer,
-        dashboard: !!window.DashboardRenderer
+        dashboard: !!window.DashboardRenderer,
       };
     });
 
@@ -82,8 +82,8 @@ test.describe('App.js Functionality', () => {
           relativePath: 'test-owner-test-repo',
           compliance: { percentage: 85, issues: 3, passed: 17 },
           timestamp: new Date('2023-01-01').toISOString(),
-          scannedBy: ['test-user']
-        }
+          scannedBy: ['test-user'],
+        },
       ];
 
       document.dispatchEvent(new CustomEvent('template-data-loaded'));
@@ -100,7 +100,7 @@ test.describe('App.js Functionality', () => {
       const mockUserInfo = {
         login: 'test-user',
         name: 'Test User',
-        avatarUrl: 'https://avatars.githubusercontent.com/u/0'
+        avatarUrl: 'https://avatars.githubusercontent.com/u/0',
       };
 
       localStorage.setItem('gh_access_token', 'mock_access_token');
@@ -118,7 +118,7 @@ test.describe('App.js Functionality', () => {
           if (searchSection) {
             searchSection.style.display = 'block';
           }
-        }
+        },
       };
 
       window.GitHubAuth.updateUI();
@@ -132,8 +132,8 @@ test.describe('App.js Functionality', () => {
           relativePath: 'test-owner-test-repo',
           compliance: { percentage: 85, issues: 3, passed: 17 },
           timestamp: new Date('2023-01-01').toISOString(),
-          scannedBy: ['test-user']
-        }
+          scannedBy: ['test-user'],
+        },
       ];
 
       document.dispatchEvent(new CustomEvent('template-data-loaded'));

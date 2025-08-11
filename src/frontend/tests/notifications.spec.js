@@ -49,8 +49,12 @@ test.describe('Notification system', () => {
       ns.confirm('Confirm?', 'Proceed now?', {
         confirmLabel: 'Yes',
         cancelLabel: 'No',
-        onConfirm: () => { window.__confirmed = true; },
-        onCancel: () => { window.__cancelled = true; },
+        onConfirm: () => {
+          window.__confirmed = true;
+        },
+        onCancel: () => {
+          window.__cancelled = true;
+        },
       });
     });
 

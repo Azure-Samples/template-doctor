@@ -19,24 +19,24 @@ const contentTypeMap = {
 const server = http.createServer((req, res) => {
   // Parse the URL
   const parsedUrl = url.parse(req.url);
-  
+
   // Get the path from the URL
   let pathname = parsedUrl.pathname;
-  
+
   // Default to index.html if path is /
   if (pathname === '/') {
     pathname = '/index.html';
   }
-  
+
   // Construct the file path (relative to frontend directory)
   const filePath = path.join(__dirname, pathname);
-  
+
   // Get the file extension
   const extname = path.extname(filePath);
-  
+
   // Set the content type based on the file extension
   const contentType = contentTypeMap[extname] || 'text/plain';
-  
+
   // Read the file
   fs.readFile(filePath, (err, content) => {
     if (err) {

@@ -1,0 +1,15 @@
+# Build outputs
+playwright-report/
+**/dist/
+**/build/
+
+# Dependency folders
+**/node_modules/
+
+# Generated artifacts
+**/*.min.js
+**/*.bundle.js
+
+# Generated scan output
+results/**
+test-results/**

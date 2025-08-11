@@ -14,7 +14,11 @@ async function mockAuthAndDeps(page) {
     if (welcomeSection) welcomeSection.style.display = 'none';
 
     window.GitHubClient = {
-      auth: { isAuthenticated: () => true, getUsername: () => 'test-user', getToken: () => 'mock_access_token' },
+      auth: {
+        isAuthenticated: () => true,
+        getUsername: () => 'test-user',
+        getToken: () => 'mock_access_token',
+      },
     };
     window.DashboardRenderer = { render: () => {} };
     window.TemplateAnalyzer = {
@@ -51,7 +55,10 @@ test.describe('Batch resume and cancel', () => {
       };
     });
 
-    await page.fill('#batch-urls', 'https://github.com/owner/repo-one\nhttps://github.com/owner/repo-two');
+    await page.fill(
+      '#batch-urls',
+      'https://github.com/owner/repo-one\nhttps://github.com/owner/repo-two',
+    );
     await page.click('#batch-scan-button');
     await expect(page.locator('#batch-items .batch-item')).toHaveCount(2);
     await expect(page.locator('#batch-items .batch-item.success')).toHaveCount(1);
@@ -82,7 +89,10 @@ test.describe('Batch resume and cancel', () => {
       }
     });
 
-    await page.fill('#batch-urls', 'https://github.com/owner/repo-one\nhttps://github.com/owner/repo-two');
+    await page.fill(
+      '#batch-urls',
+      'https://github.com/owner/repo-one\nhttps://github.com/owner/repo-two',
+    );
     await page.click('#batch-scan-button');
 
     // Should mark repo-one as already success and only process repo-two
@@ -104,7 +114,10 @@ test.describe('Batch resume and cancel', () => {
       };
     });
 
-    await page.fill('#batch-urls', 'https://github.com/owner/a\nhttps://github.com/owner/b\nhttps://github.com/owner/c');
+    await page.fill(
+      '#batch-urls',
+      'https://github.com/owner/a\nhttps://github.com/owner/b\nhttps://github.com/owner/c',
+    );
     await page.click('#batch-scan-button');
 
     // Click cancel when visible
@@ -117,12 +130,13 @@ test.describe('Batch resume and cancel', () => {
     await expect(cancelBtn).toHaveText(/Cancelling/);
 
     // Wait for processing to end and for at least one notification to appear
-    await expect.poll(async () => await page.locator('.notification.success, .notification.info').count())
+    await expect
+      .poll(async () => await page.locator('.notification.success, .notification.info').count())
       .toBeGreaterThanOrEqual(1);
     await expect
       .poll(async () => {
         const titles = await page.locator('.notification .notification-title').allTextContents();
-        const match = titles.find(t => /Batch Scan Cancelled|Batch Scan Complete/.test(t));
+        const match = titles.find((t) => /Batch Scan Cancelled|Batch Scan Complete/.test(t));
         return match || '';
       })
       .not.toEqual('');

@@ -1,262 +1,277 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Template Doctor - Batch Scanning Test</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            line-height: 1.6;
-        }
-        .test-section {
-            margin-bottom: 30px;
-            padding: 20px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-        }
-        h1 {
-            color: #0078d4;
-        }
-        h2 {
-            color: #333;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 10px;
-        }
-        pre {
-            background-color: #f5f5f5;
-            padding: 10px;
-            border-radius: 5px;
-            overflow: auto;
-        }
-        .url-sample {
-            background-color: #e6f7ff;
-            padding: 10px;
-            border-left: 4px solid #0078d4;
-            margin: 10px 0;
-        }
-        .test-step {
-            margin: 10px 0;
-            padding-left: 20px;
-            position: relative;
-        }
-        .test-step:before {
-            content: "→";
-            position: absolute;
-            left: 0;
-            color: #0078d4;
-        }
-        .note {
-            background-color: #fffde7;
-            padding: 10px;
-            border-left: 4px solid #ffc107;
-            margin: 10px 0;
-        }
-        .expected-result {
-            background-color: #f1f8e9;
-            padding: 10px;
-            border-left: 4px solid #7cb342;
-            margin: 10px 0;
-        }
+      body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        line-height: 1.6;
+      }
+      .test-section {
+        margin-bottom: 30px;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+      }
+      h1 {
+        color: #0078d4;
+      }
+      h2 {
+        color: #333;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 10px;
+      }
+      pre {
+        background-color: #f5f5f5;
+        padding: 10px;
+        border-radius: 5px;
+        overflow: auto;
+      }
+      .url-sample {
+        background-color: #e6f7ff;
+        padding: 10px;
+        border-left: 4px solid #0078d4;
+        margin: 10px 0;
+      }
+      .test-step {
+        margin: 10px 0;
+        padding-left: 20px;
+        position: relative;
+      }
+      .test-step:before {
+        content: '→';
+        position: absolute;
+        left: 0;
+        color: #0078d4;
+      }
+      .note {
+        background-color: #fffde7;
+        padding: 10px;
+        border-left: 4px solid #ffc107;
+        margin: 10px 0;
+      }
+      .expected-result {
+        background-color: #f1f8e9;
+        padding: 10px;
+        border-left: 4px solid #7cb342;
+        margin: 10px 0;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <h1>Template Doctor - Batch Scanning Test Cases</h1>
-    
+
     <div class="test-section">
-        <h2>Test Case 1: Basic Batch Scanning Functionality</h2>
-        <p>This test case verifies the basic functionality of the batch scanning feature.</p>
-        
-        <h3>Test Data</h3>
-        <p>Use the following sample repositories:</p>
-        <div class="url-sample">
-            <pre>https://github.com/Azure-Samples/todo-nodejs-mongo-aca
+      <h2>Test Case 1: Basic Batch Scanning Functionality</h2>
+      <p>This test case verifies the basic functionality of the batch scanning feature.</p>
+
+      <h3>Test Data</h3>
+      <p>Use the following sample repositories:</p>
+      <div class="url-sample">
+        <pre>
+https://github.com/Azure-Samples/todo-nodejs-mongo-aca
 https://github.com/Azure-Samples/todo-csharp-cosmos-sql
-https://github.com/Azure-Samples/todo-nodejs-mongo</pre>
-        </div>
-        
-        <h3>Test Steps</h3>
-        <ol>
-            <li class="test-step">Log in to GitHub using the login button</li>
-            <li class="test-step">Toggle the scan mode switch to "Batch" mode</li>
-            <li class="test-step">Paste the sample repositories into the textarea</li>
-            <li class="test-step">Click "Start Batch Scan"</li>
-            <li class="test-step">Observe the progress bar and status updates</li>
-            <li class="test-step">After completion, click "View Report" on one of the successful items</li>
-            <li class="test-step">Verify that the report displays correctly</li>
-            <li class="test-step">Use the back button to return to the batch results</li>
-        </ol>
-        
-        <h3>Expected Results</h3>
-        <div class="expected-result">
-            <p>The system should:</p>
-            <ul>
-                <li>Display progress as each repository is processed</li>
-                <li>Fork repositories if needed (check the repository URLs)</li>
-                <li>Complete analysis for each repository</li>
-                <li>Show appropriate status for each item (success or error)</li>
-                <li>Allow viewing individual reports</li>
-                <li>Create PRs for each successfully analyzed repository</li>
-            </ul>
-        </div>
+https://github.com/Azure-Samples/todo-nodejs-mongo</pre
+        >
+      </div>
+
+      <h3>Test Steps</h3>
+      <ol>
+        <li class="test-step">Log in to GitHub using the login button</li>
+        <li class="test-step">Toggle the scan mode switch to "Batch" mode</li>
+        <li class="test-step">Paste the sample repositories into the textarea</li>
+        <li class="test-step">Click "Start Batch Scan"</li>
+        <li class="test-step">Observe the progress bar and status updates</li>
+        <li class="test-step">
+          After completion, click "View Report" on one of the successful items
+        </li>
+        <li class="test-step">Verify that the report displays correctly</li>
+        <li class="test-step">Use the back button to return to the batch results</li>
+      </ol>
+
+      <h3>Expected Results</h3>
+      <div class="expected-result">
+        <p>The system should:</p>
+        <ul>
+          <li>Display progress as each repository is processed</li>
+          <li>Fork repositories if needed (check the repository URLs)</li>
+          <li>Complete analysis for each repository</li>
+          <li>Show appropriate status for each item (success or error)</li>
+          <li>Allow viewing individual reports</li>
+          <li>Create PRs for each successfully analyzed repository</li>
+        </ul>
+      </div>
     </div>
 
     <div class="test-section">
-        <h2>Test Case 2: URL Format Variations</h2>
-        <p>This test case verifies that different URL formats are correctly handled.</p>
-        
-        <h3>Test Data</h3>
-        <p>Use the following sample repositories with different formats:</p>
-        <div class="url-sample">
-            <pre>https://github.com/Azure-Samples/todo-nodejs-mongo-aca
+      <h2>Test Case 2: URL Format Variations</h2>
+      <p>This test case verifies that different URL formats are correctly handled.</p>
+
+      <h3>Test Data</h3>
+      <p>Use the following sample repositories with different formats:</p>
+      <div class="url-sample">
+        <pre>
+https://github.com/Azure-Samples/todo-nodejs-mongo-aca
 Azure-Samples/todo-csharp-cosmos-sql
-github.com/Azure-Samples/todo-nodejs-mongo</pre>
-        </div>
-        
-        <h3>Test Steps</h3>
-        <ol>
-            <li class="test-step">Toggle to "Batch" mode</li>
-            <li class="test-step">Paste the varied format URLs into the textarea</li>
-            <li class="test-step">Click "Start Batch Scan"</li>
-            <li class="test-step">Observe how each URL is processed</li>
-        </ol>
-        
-        <h3>Expected Results</h3>
-        <div class="expected-result">
-            <p>The system should:</p>
-            <ul>
-                <li>Correctly parse and normalize all URL formats</li>
-                <li>Process each repository regardless of input format</li>
-                <li>Display consistent repository names in the results</li>
-            </ul>
-        </div>
+github.com/Azure-Samples/todo-nodejs-mongo</pre
+        >
+      </div>
+
+      <h3>Test Steps</h3>
+      <ol>
+        <li class="test-step">Toggle to "Batch" mode</li>
+        <li class="test-step">Paste the varied format URLs into the textarea</li>
+        <li class="test-step">Click "Start Batch Scan"</li>
+        <li class="test-step">Observe how each URL is processed</li>
+      </ol>
+
+      <h3>Expected Results</h3>
+      <div class="expected-result">
+        <p>The system should:</p>
+        <ul>
+          <li>Correctly parse and normalize all URL formats</li>
+          <li>Process each repository regardless of input format</li>
+          <li>Display consistent repository names in the results</li>
+        </ul>
+      </div>
     </div>
 
     <div class="test-section">
-        <h2>Test Case 3: Comma-Separated URLs</h2>
-        <p>This test case verifies that comma-separated URLs are correctly parsed.</p>
-        
-        <h3>Test Data</h3>
-        <p>Use the following comma-separated list:</p>
-        <div class="url-sample">
-            <pre>https://github.com/Azure-Samples/todo-nodejs-mongo-aca, https://github.com/Azure-Samples/todo-csharp-cosmos-sql, https://github.com/Azure-Samples/todo-nodejs-mongo</pre>
-        </div>
-        
-        <h3>Test Steps</h3>
-        <ol>
-            <li class="test-step">Toggle to "Batch" mode</li>
-            <li class="test-step">Paste the comma-separated URLs into the textarea</li>
-            <li class="test-step">Click "Start Batch Scan"</li>
-        </ol>
-        
-        <h3>Expected Results</h3>
-        <div class="expected-result">
-            <p>The system should:</p>
-            <ul>
-                <li>Correctly parse the comma-separated list</li>
-                <li>Process each repository as in Test Case 1</li>
-                <li>Create separate result items for each repository</li>
-            </ul>
-        </div>
+      <h2>Test Case 3: Comma-Separated URLs</h2>
+      <p>This test case verifies that comma-separated URLs are correctly parsed.</p>
+
+      <h3>Test Data</h3>
+      <p>Use the following comma-separated list:</p>
+      <div class="url-sample">
+        <pre>
+https://github.com/Azure-Samples/todo-nodejs-mongo-aca, https://github.com/Azure-Samples/todo-csharp-cosmos-sql, https://github.com/Azure-Samples/todo-nodejs-mongo</pre
+        >
+      </div>
+
+      <h3>Test Steps</h3>
+      <ol>
+        <li class="test-step">Toggle to "Batch" mode</li>
+        <li class="test-step">Paste the comma-separated URLs into the textarea</li>
+        <li class="test-step">Click "Start Batch Scan"</li>
+      </ol>
+
+      <h3>Expected Results</h3>
+      <div class="expected-result">
+        <p>The system should:</p>
+        <ul>
+          <li>Correctly parse the comma-separated list</li>
+          <li>Process each repository as in Test Case 1</li>
+          <li>Create separate result items for each repository</li>
+        </ul>
+      </div>
     </div>
 
     <div class="test-section">
-        <h2>Test Case 4: Cancel Operation</h2>
-        <p>This test case verifies that the cancel operation works correctly.</p>
-        
-        <h3>Test Data</h3>
-        <p>Use 5 or more repositories to allow time for cancellation:</p>
-        <div class="url-sample">
-            <pre>https://github.com/Azure-Samples/todo-nodejs-mongo-aca
+      <h2>Test Case 4: Cancel Operation</h2>
+      <p>This test case verifies that the cancel operation works correctly.</p>
+
+      <h3>Test Data</h3>
+      <p>Use 5 or more repositories to allow time for cancellation:</p>
+      <div class="url-sample">
+        <pre>
+https://github.com/Azure-Samples/todo-nodejs-mongo-aca
 https://github.com/Azure-Samples/todo-csharp-cosmos-sql
 https://github.com/Azure-Samples/todo-nodejs-mongo
 https://github.com/Azure-Samples/azure-search-openai-demo
-https://github.com/Azure-Samples/app-service-web-nodejs-get-started</pre>
-        </div>
-        
-        <h3>Test Steps</h3>
-        <ol>
-            <li class="test-step">Toggle to "Batch" mode</li>
-            <li class="test-step">Paste the repositories into the textarea</li>
-            <li class="test-step">Click "Start Batch Scan"</li>
-            <li class="test-step">Wait for 1-2 repositories to complete</li>
-            <li class="test-step">Click "Cancel Remaining Scans"</li>
-        </ol>
-        
-        <h3>Expected Results</h3>
-        <div class="expected-result">
-            <p>The system should:</p>
-            <ul>
-                <li>Complete the current scan in progress</li>
-                <li>Cancel all remaining scans</li>
-                <li>Display appropriate status for all items</li>
-                <li>Show a notification that the batch was cancelled</li>
-            </ul>
-        </div>
-        
-        <div class="note">
-            <p><strong>Note:</strong> The current implementation will allow the currently processing repository to complete, but will cancel any repositories that haven't started yet.</p>
-        </div>
+https://github.com/Azure-Samples/app-service-web-nodejs-get-started</pre
+        >
+      </div>
+
+      <h3>Test Steps</h3>
+      <ol>
+        <li class="test-step">Toggle to "Batch" mode</li>
+        <li class="test-step">Paste the repositories into the textarea</li>
+        <li class="test-step">Click "Start Batch Scan"</li>
+        <li class="test-step">Wait for 1-2 repositories to complete</li>
+        <li class="test-step">Click "Cancel Remaining Scans"</li>
+      </ol>
+
+      <h3>Expected Results</h3>
+      <div class="expected-result">
+        <p>The system should:</p>
+        <ul>
+          <li>Complete the current scan in progress</li>
+          <li>Cancel all remaining scans</li>
+          <li>Display appropriate status for all items</li>
+          <li>Show a notification that the batch was cancelled</li>
+        </ul>
+      </div>
+
+      <div class="note">
+        <p>
+          <strong>Note:</strong> The current implementation will allow the currently processing
+          repository to complete, but will cancel any repositories that haven't started yet.
+        </p>
+      </div>
     </div>
 
     <div class="test-section">
-        <h2>Test Case 5: Error Handling</h2>
-        <p>This test case verifies error handling for invalid repositories.</p>
-        
-        <h3>Test Data</h3>
-        <p>Use a mix of valid and invalid repositories:</p>
-        <div class="url-sample">
-            <pre>https://github.com/Azure-Samples/todo-nodejs-mongo-aca
+      <h2>Test Case 5: Error Handling</h2>
+      <p>This test case verifies error handling for invalid repositories.</p>
+
+      <h3>Test Data</h3>
+      <p>Use a mix of valid and invalid repositories:</p>
+      <div class="url-sample">
+        <pre>
+https://github.com/Azure-Samples/todo-nodejs-mongo-aca
 https://github.com/Azure-Samples/this-repo-does-not-exist
-https://github.com/Azure-Samples/todo-nodejs-mongo</pre>
-        </div>
-        
-        <h3>Test Steps</h3>
-        <ol>
-            <li class="test-step">Toggle to "Batch" mode</li>
-            <li class="test-step">Paste the mixed URLs into the textarea</li>
-            <li class="test-step">Click "Start Batch Scan"</li>
-            <li class="test-step">Observe how errors are handled</li>
-            <li class="test-step">Click "Retry" on a failed item</li>
-        </ol>
-        
-        <h3>Expected Results</h3>
-        <div class="expected-result">
-            <p>The system should:</p>
-            <ul>
-                <li>Process valid repositories successfully</li>
-                <li>Display appropriate error messages for invalid repositories</li>
-                <li>Allow retrying failed items</li>
-                <li>Continue processing other items even if one fails</li>
-            </ul>
-        </div>
+https://github.com/Azure-Samples/todo-nodejs-mongo</pre
+        >
+      </div>
+
+      <h3>Test Steps</h3>
+      <ol>
+        <li class="test-step">Toggle to "Batch" mode</li>
+        <li class="test-step">Paste the mixed URLs into the textarea</li>
+        <li class="test-step">Click "Start Batch Scan"</li>
+        <li class="test-step">Observe how errors are handled</li>
+        <li class="test-step">Click "Retry" on a failed item</li>
+      </ol>
+
+      <h3>Expected Results</h3>
+      <div class="expected-result">
+        <p>The system should:</p>
+        <ul>
+          <li>Process valid repositories successfully</li>
+          <li>Display appropriate error messages for invalid repositories</li>
+          <li>Allow retrying failed items</li>
+          <li>Continue processing other items even if one fails</li>
+        </ul>
+      </div>
     </div>
 
     <div class="test-section">
-        <h2>Test Case 6: Mode Switching</h2>
-        <p>This test case verifies that switching between modes works correctly.</p>
-        
-        <h3>Test Steps</h3>
-        <ol>
-            <li class="test-step">Start in single mode and enter a repository in the search box</li>
-            <li class="test-step">Toggle to batch mode</li>
-            <li class="test-step">Enter repositories in the textarea</li>
-            <li class="test-step">Toggle back to single mode</li>
-            <li class="test-step">Search for a repository</li>
-            <li class="test-step">Toggle to batch mode again</li>
-            <li class="test-step">Verify the textarea still contains the previously entered URLs</li>
-        </ol>
-        
-        <h3>Expected Results</h3>
-        <div class="expected-result">
-            <p>The system should:</p>
-            <ul>
-                <li>Correctly switch between single and batch modes</li>
-                <li>Preserve the content in the textarea when switching modes</li>
-                <li>Show/hide appropriate UI elements for each mode</li>
-            </ul>
-        </div>
+      <h2>Test Case 6: Mode Switching</h2>
+      <p>This test case verifies that switching between modes works correctly.</p>
+
+      <h3>Test Steps</h3>
+      <ol>
+        <li class="test-step">Start in single mode and enter a repository in the search box</li>
+        <li class="test-step">Toggle to batch mode</li>
+        <li class="test-step">Enter repositories in the textarea</li>
+        <li class="test-step">Toggle back to single mode</li>
+        <li class="test-step">Search for a repository</li>
+        <li class="test-step">Toggle to batch mode again</li>
+        <li class="test-step">Verify the textarea still contains the previously entered URLs</li>
+      </ol>
+
+      <h3>Expected Results</h3>
+      <div class="expected-result">
+        <p>The system should:</p>
+        <ul>
+          <li>Correctly switch between single and batch modes</li>
+          <li>Preserve the content in the textarea when switching modes</li>
+          <li>Show/hide appropriate UI elements for each mode</li>
+        </ul>
+      </div>
     </div>
-</body>
+  </body>
 </html>

@@ -10,13 +10,13 @@ async function mockAuthentication(page) {
     const mockUserInfo = {
       login: 'test-user',
       name: 'Test User',
-      avatarUrl: 'https://avatars.githubusercontent.com/u/0'
+      avatarUrl: 'https://avatars.githubusercontent.com/u/0',
     };
-    
+
     // Mock localStorage values
     localStorage.setItem('gh_access_token', 'mock_access_token');
     localStorage.setItem('gh_user_info', JSON.stringify(mockUserInfo));
-    
+
     // Create auth elements if they don't exist
     if (!document.getElementById('user-profile')) {
       const header = document.querySelector('header') || document.body;
@@ -24,40 +24,40 @@ async function mockAuthentication(page) {
       const userProfile = document.createElement('div');
       userProfile.id = 'user-profile';
       userProfile.style.display = 'flex';
-      
+
       // Create username element
       const username = document.createElement('span');
       username.id = 'username';
       username.textContent = mockUserInfo.name;
       userProfile.appendChild(username);
-      
+
       // Create user avatar
       const userAvatar = document.createElement('img');
       userAvatar.id = 'user-avatar';
       userAvatar.src = mockUserInfo.avatarUrl;
       userProfile.appendChild(userAvatar);
-      
+
       header.appendChild(userProfile);
     }
-    
+
     // Hide login button if it exists
     const loginButton = document.getElementById('login-button');
     if (loginButton) {
       loginButton.style.display = 'none';
     }
-    
+
     // Show search section if it exists
     const searchSection = document.getElementById('search-section');
     if (searchSection) {
       searchSection.style.display = 'block';
     }
-    
+
     // Hide welcome section if it exists
     const welcomeSection = document.getElementById('welcome-section');
     if (welcomeSection) {
       welcomeSection.style.display = 'none';
     }
-    
+
     // Create mock auth object
     window.GitHubAuth = {
       accessToken: 'mock_access_token',
@@ -66,7 +66,7 @@ async function mockAuthentication(page) {
       getAccessToken: () => 'mock_access_token',
       getUserInfo: () => mockUserInfo,
       checkAuthentication: () => true,
-      updateUI: () => {}
+      updateUI: () => {},
     };
   });
 }
@@ -76,10 +76,10 @@ test.describe('Template Doctor Edge Cases', () => {
   // Setup for each test: navigate to the application
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
-    
+
     // Mock authentication first - this is critical for the app to function correctly
     await mockAuthentication(page);
-    
+
     // Wait for the app to initialize
     await page.waitForSelector('#search-section');
 
@@ -92,7 +92,7 @@ test.describe('Template Doctor Edge Cases', () => {
           relativePath: 'edge-owner-trailing-slash',
           compliance: { percentage: 85, issues: 3, passed: 17 },
           timestamp: new Date().toISOString(),
-          scannedBy: ['edge-user']
+          scannedBy: ['edge-user'],
         },
         // Repo with .git extension
         {
@@ -100,7 +100,7 @@ test.describe('Template Doctor Edge Cases', () => {
           relativePath: 'edge-owner-git-extension',
           compliance: { percentage: 72, issues: 5, passed: 13 },
           timestamp: new Date().toISOString(),
-          scannedBy: ['edge-user']
+          scannedBy: ['edge-user'],
         },
         // Two repos with same name but different owners
         {
@@ -108,17 +108,17 @@ test.describe('Template Doctor Edge Cases', () => {
           relativePath: 'owner-one-same-name-repo',
           compliance: { percentage: 95, issues: 1, passed: 19 },
           timestamp: new Date().toISOString(),
-          scannedBy: ['owner-one']
+          scannedBy: ['owner-one'],
         },
         {
           repoUrl: 'https://github.com/owner-two/same-name-repo',
           relativePath: 'owner-two-same-name-repo',
           compliance: { percentage: 80, issues: 4, passed: 16 },
           timestamp: new Date().toISOString(),
-          scannedBy: ['owner-two']
-        }
+          scannedBy: ['owner-two'],
+        },
       ];
-      
+
       // Dispatch the template data loaded event
       document.dispatchEvent(new CustomEvent('template-data-loaded'));
     });
@@ -131,7 +131,7 @@ test.describe('Template Doctor Edge Cases', () => {
       const mockUserInfo = {
         login: 'test-user',
         name: 'Test User',
-        avatarUrl: 'https://avatars.githubusercontent.com/u/0'
+        avatarUrl: 'https://avatars.githubusercontent.com/u/0',
       };
 
       localStorage.setItem('gh_access_token', 'mock_access_token');
@@ -149,7 +149,7 @@ test.describe('Template Doctor Edge Cases', () => {
           if (searchSection) {
             searchSection.style.display = 'block';
           }
-        }
+        },
       };
 
       window.GitHubAuth.updateUI();
@@ -163,8 +163,8 @@ test.describe('Template Doctor Edge Cases', () => {
           relativePath: 'edge-owner-trailing-slash',
           compliance: { percentage: 90, issues: 2, passed: 18 },
           timestamp: new Date('2023-01-02').toISOString(),
-          scannedBy: ['edge-user']
-        }
+          scannedBy: ['edge-user'],
+        },
       ];
 
       document.dispatchEvent(new CustomEvent('template-data-loaded'));
@@ -183,7 +183,9 @@ test.describe('Template Doctor Edge Cases', () => {
 
     // Check if template is highlighted
     const isHighlighted = await page.evaluate(() => {
-      const template = document.querySelector('.template-card[data-repo-url="https://github.com/edge-owner/trailing-slash/"]');
+      const template = document.querySelector(
+        '.template-card[data-repo-url="https://github.com/edge-owner/trailing-slash/"]',
+      );
       return template ? template.classList.contains('highlight-template') : false;
     });
   });
@@ -193,10 +195,10 @@ test.describe('Template Doctor Edge Cases', () => {
     // Search without .git extension
     await page.fill('#repo-search', 'git-extension');
     await page.click('#search-button');
-    
+
     // Wait for search results
     await page.waitForSelector('#search-results');
-    
+
     // Verify previously scanned badge appears
     const scannedBadge = await page.locator('.scanned-badge').first();
     expect(await scannedBadge.isVisible()).toBeTruthy();
@@ -207,10 +209,10 @@ test.describe('Template Doctor Edge Cases', () => {
     // Search for the common repo name
     await page.fill('#repo-search', 'same-name-repo');
     await page.click('#search-button');
-    
+
     // Wait for search results
     await page.waitForSelector('#search-results');
-    
+
     // Verify previously scanned badge appears
     const scannedBadge = await page.locator('.scanned-badge').first();
     expect(await scannedBadge.isVisible()).toBeTruthy();
