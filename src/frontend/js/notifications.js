@@ -325,6 +325,10 @@ class NotificationSystem {
   showError(title, message, duration) {
     return this.error(title, message, duration);
   }
+  // Legacy alias for loading spinner notifications
+  showLoading(title, message) {
+    return this.loading(title, message);
+  }
   showConfirmation(title, message, confirmLabel = 'Confirm', cancelLabel = 'Cancel', callback) {
     return this.confirm(title, message, {
       confirmLabel,

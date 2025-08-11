@@ -163,6 +163,65 @@ class GitHubClient {
   }
 
   /**
+   * Make paginated requests to the GitHub API and return concatenated results (array endpoints).
+   * Follows the Link: rel="next" header until exhaustion.
+   * @param {string} path - The API endpoint path or full URL
+   * @param {Object} options - Fetch options
+   * @returns {Promise<Array>} - Concatenated array of all pages
+   */
+  async requestAllPages(path, options = {}) {
+    const token = this.auth && this.auth.getAccessToken ? this.auth.getAccessToken() : null;
+    if (!token) {
+      console.warn('[GitHubClient] requestAllPages called without token; returning empty array');
+      return [];
+    }
+
+    const base = path.startsWith('http') ? '' : this.baseUrl;
+    let nextUrl = `${base}${path}`;
+    const results = [];
+
+    const headers = {
+      Accept: 'application/vnd.github.v3+json',
+      Authorization: `token ${token}`,
+      ...(options.headers || {}),
+    };
+
+    const getNextFromLink = (linkHeader) => {
+      if (!linkHeader) return null;
+      // Example: <https://api.github.com/resource?page=2>; rel="next", <...>; rel="last"
+      const parts = linkHeader.split(',');
+      for (const part of parts) {
+        const m = part.trim().match(/<([^>]+)>;\s*rel="([^"]+)"/);
+        if (m && m[2] === 'next') return m[1];
+      }
+      return null;
+    };
+
+    while (nextUrl) {
+      const response = await fetch(nextUrl, { ...options, headers });
+      if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        const err = new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+        err.status = response.status;
+        err.body = text;
+        throw err;
+      }
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        results.push(...data);
+      } else {
+        // Non-array endpoints aren't supported here; return as-is if first page
+        if (results.length === 0) return data;
+        break;
+      }
+      const link = response.headers.get('Link');
+      nextUrl = getNextFromLink(link);
+    }
+
+    return results;
+  }
+
+  /**
    * Make a GraphQL request to GitHub API
    * @param {string} query - The GraphQL query
    * @param {Object} variables - Query variables
@@ -426,6 +485,88 @@ class GitHubClient {
   }
 
   /**
+   * Create an issue without assigning to Copilot (used for child issues)
+   * @param {string} owner - Repository owner
+   * @param {string} repo - Repository name
+   * @param {string} title - Issue title
+   * @param {string} body - Issue body
+   * @param {Array<string>} labels - Labels to apply
+   * @returns {Promise<Object>} - Created issue (number, title, url)
+   */
+  async createIssueWithoutCopilot(owner, repo, title, body, labels = []) {
+    const created = await this.createIssue(owner, repo, title, body, labels);
+    // Normalize return shape to match GraphQL createIssueGraphQL
+    return {
+      id: created.node_id || created.id,
+      number: created.number,
+      url: created.html_url,
+      title: created.title,
+    };
+  }
+
+  /**
+   * Ensure the provided labels exist in the repository. Creates any missing ones.
+   * @param {string} owner
+   * @param {string} repo
+   * @param {Array<string>} labels
+   */
+  async ensureLabelsExist(owner, repo, labels = []) {
+    if (!labels || labels.length === 0) return;
+    // Fetch existing labels (first 100)
+    let existing = [];
+    try {
+      // Fetch all existing labels (handle pagination beyond first 100)
+      existing = await this.requestAllPages(`/repos/${owner}/${repo}/labels?per_page=100`);
+    } catch (e) {
+      console.warn('Could not list repository labels; skipping ensureLabelsExist', e.message);
+      return;
+    }
+
+    const existingNames = new Set(existing.map((l) => l.name));
+  const toCreate = labels.filter((l) => !existingNames.has(l));
+    if (toCreate.length === 0) return;
+
+  // Deduplicate to avoid redundant POSTs
+  const toCreateUnique = Array.from(new Set(toCreate));
+
+    // Simple color map for known families
+    const colorFor = (name) => {
+      if (name.startsWith('severity:')) {
+        const level = name.split(':')[1];
+        if (level === 'high') return 'd73a4a'; // red
+        if (level === 'medium') return 'fbca04'; // yellow
+        if (level === 'low') return '0e8a16'; // green
+        return 'c5def5';
+      }
+      if (name.startsWith('ruleset:')) return '0366d6'; // blue
+      if (name.includes('template-doctor')) return '5319e7'; // purple
+      return 'c5def5'; // default light blue
+    };
+
+    // Create missing labels concurrently for performance; handle failures gracefully
+  const creationPromises = toCreateUnique.map((label) =>
+      this.request(`/repos/${owner}/${repo}/labels`, {
+        method: 'POST',
+        body: JSON.stringify({
+          name: label,
+          color: colorFor(label),
+          description:
+            label.startsWith('severity:')
+              ? 'Severity level for Template Doctor issues'
+              : label.startsWith('ruleset:')
+                ? 'Ruleset used by Template Doctor'
+                : 'Template Doctor',
+        }),
+      }).catch((e) => {
+        console.warn(`Failed creating label '${label}':`, e.message);
+        return null; // swallow error per-label
+      }),
+    );
+
+    await Promise.allSettled(creationPromises);
+  }
+
+  /**
    * Get a user's node_id by login (for assignee)
    * @param {string} login - GitHub username
    * @returns {Promise<string>} - The user's node_id
@@ -484,7 +625,7 @@ class GitHubClient {
     if (!labelNames || labelNames.length === 0) return [];
     const query = `query($owner: String!, $name: String!) {
             repository(owner: $owner, name: $name) {
-                labels(first: 20) { nodes { id name } }
+                labels(first: 100) { nodes { id name } }
             }
         }`;
     const data = await this.graphql(query, { owner, name });
