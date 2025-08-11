@@ -379,6 +379,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
       container.appendChild(overviewSection);
 
+      // After overview is added, attempt to render historical compliance trend
+      try {
+        this.loadAndRenderTrend(data, overviewSection);
+      } catch (e) {
+        console.warn('Failed to initialize compliance trend rendering:', e);
+      }
+
       // Add event listener for change ruleset button
       setTimeout(() => {
         const changeRulesetBtn = document.getElementById('change-ruleset-btn');
@@ -394,6 +401,134 @@ document.addEventListener('DOMContentLoaded', function () {
           });
         }
       }, 100);
+    };
+
+    /**
+     * Locate the results folder name for a given repo URL using window.templatesData or fallback
+     * @param {string} repoUrl
+     * @returns {string|null}
+     */
+    this.getResultsFolderForRepo = function (repoUrl) {
+      if (!repoUrl) return null;
+      try {
+        // Prefer templatesData mapping if present
+        if (Array.isArray(window.templatesData)) {
+          const match = window.templatesData.find((t) => {
+            // Normalize possible trailing .git and case
+            const a = String(t.repoUrl || '').replace(/\.git$/, '').toLowerCase();
+            const b = String(repoUrl).replace(/\.git$/, '').toLowerCase();
+            return a === b;
+          });
+          if (match && match.relativePath) {
+            const folder = match.relativePath.split('/')[0];
+            if (folder) return folder;
+          }
+        }
+
+        // Fallback: construct owner-repo pattern
+        const u = new URL(repoUrl);
+        const parts = u.pathname.split('/').filter(Boolean);
+        if (parts.length >= 2) {
+          return `${parts[0]}-${parts[1]}`.toLowerCase();
+        }
+      } catch (_) {}
+      return null;
+    };
+
+    /**
+     * Load history.json and render the trend chart
+     * @param {Object} data - adapted data (needs repoUrl)
+     * @param {HTMLElement} section - the overview section containing the trendChart node
+     */
+    this.loadAndRenderTrend = async function (data, section) {
+      const trendHost = section.querySelector('#trendChart');
+      if (!trendHost) return;
+
+      const folder = this.getResultsFolderForRepo(data.repoUrl);
+      if (!folder) return; // leave default "no data" text
+
+      // Fetch history.json
+      let history = [];
+      try {
+        const resp = await fetch(`/results/${folder}/history.json`, { cache: 'no-store' });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        history = await resp.json();
+      } catch (err) {
+        console.warn(`No history.json found for ${folder}:`, err.message);
+        return;
+      }
+
+      if (!Array.isArray(history) || history.length < 2) {
+        // Not enough points to draw a trend
+        return;
+      }
+
+      // Prepare data: map to {x: Date, y: percentage}
+      const points = history
+        .map((h) => ({ x: new Date(h.timestamp), y: Number(h.percentage) || 0 }))
+        .sort((a, b) => a.x - b.x);
+
+      // Render simple inline SVG sparkline
+      this.renderTrendSVG(trendHost, points);
+    };
+
+    /**
+     * Render a simple responsive SVG line chart into the host element
+     * @param {HTMLElement} host
+     * @param {{x: Date, y: number}[]} points
+     */
+    this.renderTrendSVG = function (host, points) {
+      // Clear placeholder
+      host.innerHTML = '';
+
+      const width = host.clientWidth || 360;
+      const height = 120;
+      const padding = 12;
+
+      const times = points.map((p) => p.x.getTime());
+      const values = points.map((p) => p.y);
+      const minX = Math.min(...times);
+      const maxX = Math.max(...times);
+      const minY = 0; // clamp to 0-100
+      const maxY = 100;
+
+      const xScale = (t) => {
+        if (maxX === minX) return padding;
+        return padding + ((t - minX) / (maxX - minX)) * (width - 2 * padding);
+      };
+      const yScale = (v) => {
+        return height - padding - ((v - minY) / (maxY - minY)) * (height - 2 * padding);
+      };
+
+      const pathD = points
+        .map((p, i) => `${i === 0 ? 'M' : 'L'} ${xScale(p.x.getTime()).toFixed(2)} ${yScale(p.y).toFixed(2)}`)
+        .join(' ');
+
+      const last = points[points.length - 1];
+
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+      svg.setAttribute('width', '100%');
+      svg.setAttribute('height', `${height}`);
+      svg.innerHTML = `
+        <defs>
+          <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#28a745" stop-opacity="0.8" />
+            <stop offset="100%" stop-color="#28a745" stop-opacity="0.2" />
+          </linearGradient>
+        </defs>
+        <rect x="0" y="0" width="${width}" height="${height}" fill="transparent"/>
+        <path d="${pathD}" fill="none" stroke="#28a745" stroke-width="2" />
+        <circle cx="${xScale(last.x.getTime()).toFixed(2)}" cy="${yScale(last.y).toFixed(2)}" r="3" fill="#28a745" />
+      `;
+
+      host.appendChild(svg);
+
+      // Add an accessible label with the last percentage
+      const sr = document.createElement('div');
+      sr.className = 'sr-only';
+      sr.textContent = `Latest compliance: ${last.y}%`;
+      host.appendChild(sr);
     };
 
     /**

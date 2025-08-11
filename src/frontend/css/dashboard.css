@@ -64,15 +64,13 @@
 #toggle-raw-data {
   padding: 5px 10px;
   font-size: 0.9em;
-  background-color: #f0f0f0;
-  border: 1px solid #ddd;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 #toggle-raw-data:hover {
-  background-color: #e0e0e0;
+  background-color: #1843ff;
 }
 
 #toggle-raw-data.active {
