@@ -1,0 +1,37 @@
+name: Deploy Azure Functions API
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'api/**'
+  workflow_dispatch: {}
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        working-directory: api
+        run: npm ci
+
+      - name: Archive Function App
+        run: |
+          cd api
+          zip -r ../functionapp.zip . -x "node_modules/**"
+
+      - name: Deploy to Azure Functions
+        uses: azure/functions-action@v1
+        with:
+          app-name: ${{ secrets.AZ_FUNCTIONAPP_NAME }}
+          package: functionapp.zip
+          publish-profile: ${{ secrets.AZ_FUNCTIONAPP_PUBLISH_PROFILE }}
+

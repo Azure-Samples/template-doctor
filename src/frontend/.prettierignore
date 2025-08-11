@@ -13,3 +13,4 @@ playwright-report/
 # Generated scan output
 results/**
 test-results/**
+_backup_unused/**
