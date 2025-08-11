@@ -82,7 +82,12 @@
 
         // Redirect back to main page after 3 seconds
         setTimeout(() => {
-          window.location.href = window.location.origin + '/index.html';
+          const pathname = window.location.pathname || '/';
+          const withoutFile = pathname.match(/\.[a-zA-Z0-9]+$/)
+            ? pathname.substring(0, pathname.lastIndexOf('/'))
+            : pathname;
+          const basePath = withoutFile === '/' ? '' : (withoutFile.endsWith('/') ? withoutFile.slice(0, -1) : withoutFile);
+          window.location.href = window.location.origin + basePath + '/index.html';
         }, 3000);
       }
       // Process code
@@ -91,8 +96,15 @@
         sessionStorage.setItem('gh_auth_code', code);
         sessionStorage.setItem('gh_auth_state', state);
 
-        // Redirect back to index.html
-        window.location.href = window.location.origin + '/index.html';
+        // Redirect back to index.html (handle GitHub Pages base path)
+        (function(){
+          const pathname = window.location.pathname || '/';
+          const withoutFile = pathname.match(/\.[a-zA-Z0-9]+$/)
+            ? pathname.substring(0, pathname.lastIndexOf('/'))
+            : pathname;
+          const basePath = withoutFile === '/' ? '' : (withoutFile.endsWith('/') ? withoutFile.slice(0, -1) : withoutFile);
+          window.location.href = window.location.origin + basePath + '/index.html';
+        })();
       }
       // No code or error
       else {
@@ -106,7 +118,12 @@
 
         // Redirect back to main page after 3 seconds
         setTimeout(() => {
-          window.location.href = window.location.origin + '/index.html';
+          const pathname = window.location.pathname || '/';
+          const withoutFile = pathname.match(/\.[a-zA-Z0-9]+$/)
+            ? pathname.substring(0, pathname.lastIndexOf('/'))
+            : pathname;
+          const basePath = withoutFile === '/' ? '' : (withoutFile.endsWith('/') ? withoutFile.slice(0, -1) : withoutFile);
+          window.location.href = window.location.origin + basePath + '/index.html';
         }, 3000);
       }
     </script>

@@ -8,20 +8,59 @@ function debug(module, message, data) {
   console.log(`[${timestamp}][${module}] ${message}`, data !== undefined ? data : '');
 }
 
+// Compute the site base path to support GitHub Pages project sites
+function getBasePath() {
+  // Examples:
+  // - Local dev: http://localhost:xxxx/index.html => basePath = ''
+  // - Pages: https://<user>.github.io/<repo>/index.html => basePath = '/<repo>'
+  const pathname = window.location.pathname || '/';
+  // If path ends with a file, drop the file segment
+  const withoutFile = pathname.match(/\.[a-zA-Z0-9]+$/)
+    ? pathname.substring(0, pathname.lastIndexOf('/'))
+    : pathname;
+  // Ensure we don't return just '/' for base path
+  if (withoutFile === '/') return '';
+  return withoutFile.endsWith('/') ? withoutFile.slice(0, -1) : withoutFile;
+}
+
 /**
  * GitHub OAuth configuration
  * Note: This is the client-side implementation for GitHub OAuth flow
  * Remember to register your OAuth app at: https://github.com/settings/applications/new
  * with callback URL set to your GitHub Pages URL
  */
-const AUTH_CONFIG = {
-  clientId: 'Ov23li2nstp4WdgRG6vZ', // Replace with your GitHub OAuth app client ID
-  redirectUri: window.location.origin + '/callback.html',
+const AUTH_CONFIG = { 
+  clientId: '', // Provided via _site/config.json at deploy time
+  redirectUri: window.location.origin + getBasePath() + '/callback.html',
   scope: 'public_repo read:user', // public_repo gives issue creation/assignment for public repos
   authUrl: 'https://github.com/login/oauth/authorize',
   tokenStorageKey: 'gh_access_token',
   userStorageKey: 'gh_user_info',
-};
+}; 
+
+// Load runtime config if present and merge into AUTH_CONFIG
+async function loadRuntimeAuthConfig() {
+  try {
+    const basePath = getBasePath();
+    const res = await fetch(`${basePath}/config.json`, { cache: 'no-store' });
+    if (!res.ok) return;
+    const cfg = await res.json();
+    if (cfg?.githubOAuth?.clientId) {
+      AUTH_CONFIG.clientId = cfg.githubOAuth.clientId;
+    }
+    if (cfg?.githubOAuth?.scope) {
+      AUTH_CONFIG.scope = cfg.githubOAuth.scope;
+    }
+    if (cfg?.githubOAuth?.authUrl) {
+      AUTH_CONFIG.authUrl = cfg.githubOAuth.authUrl;
+    }
+    if (cfg?.githubOAuth?.redirectUri) {
+      AUTH_CONFIG.redirectUri = cfg.githubOAuth.redirectUri;
+    }
+  } catch (_) {
+    // Best-effort; keep defaults
+  }
+}
 
 class GitHubAuth {
   constructor() {
@@ -74,6 +113,22 @@ class GitHubAuth {
     authUrl.searchParams.append('redirect_uri', AUTH_CONFIG.redirectUri);
     authUrl.searchParams.append('scope', AUTH_CONFIG.scope);
     authUrl.searchParams.append('state', this.generateState());
+    if (!AUTH_CONFIG.clientId) {
+      // Ensure runtime config is loaded before proceeding
+      // This is synchronous if already loaded; otherwise fetch once
+      // We intentionally block the login flow to avoid a broken redirect
+      const notify = window.Notifications?.info?.bind(window.Notifications);
+      notify && notify('Preparing login…', 'Loading authentication configuration', 2000);
+      const error = window.Notifications?.error?.bind(window.Notifications);
+      error
+        ? error(
+            'Missing OAuth client ID',
+            'GitHub OAuth clientId is not configured. Set GH_OAUTH_CLIENT_ID secret and redeploy Pages.',
+            6000,
+          )
+        : alert('GitHub OAuth clientId is not configured. Please set GH_OAUTH_CLIENT_ID secret.');
+      return;
+    }
 
     // Force consent screen to show again
     authUrl.searchParams.append('allow_signup', 'true');
@@ -594,8 +649,11 @@ class GitHubAuth {
   }
 }
 
-// Initialize the auth handler
-const auth = new GitHubAuth();
-
-// Export the auth instance
-window.GitHubAuth = auth;
+// Initialize after loading runtime config to ensure clientId is set
+window.GitHubAuth = null;
+loadRuntimeAuthConfig()
+  .catch(() => {})
+  .finally(() => {
+    const auth = new GitHubAuth();
+    window.GitHubAuth = auth;
+  });

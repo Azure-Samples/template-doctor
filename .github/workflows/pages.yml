@@ -32,6 +32,21 @@ jobs:
             --exclude 'playwright-report/' \
             src/frontend/ _site/
 
+      - name: Generate runtime config.json
+        env:
+          GH_OAUTH_CLIENT_ID: ${{ secrets.GH_OAUTH_CLIENT_ID }}
+          GH_OAUTH_SCOPE: public_repo read:user
+        run: |
+          mkdir -p _site
+          cat > _site/config.json << 'JSON'
+          {
+            "githubOAuth": {
+              "clientId": "${GH_OAUTH_CLIENT_ID}",
+              "scope": "${GH_OAUTH_SCOPE}"
+            }
+          }
+          JSON
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
