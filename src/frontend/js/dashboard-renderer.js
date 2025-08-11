@@ -205,7 +205,7 @@ document.addEventListener('DOMContentLoaded', function () {
       const compliant = [];
 
       // Handle the new data format where issues are directly in result.compliance.issues
-  if (result.compliance && Array.isArray(result.compliance.issues)) {
+      if (result.compliance && Array.isArray(result.compliance.issues)) {
         // Direct issues array format (newer format)
         result.compliance.issues.forEach((issue) => {
           issues.push({
@@ -213,8 +213,8 @@ document.addEventListener('DOMContentLoaded', function () {
             category: issue.id ? issue.id.split('-')[0] : 'general',
             message: issue.message || 'Unknown issue',
             error: issue.error || issue.message || 'No details available',
-    // Preserve severity if provided by analyzer; default to 'warning'
-    severity: issue.severity || 'warning',
+            // Preserve severity if provided by analyzer; default to 'warning'
+            severity: issue.severity || 'warning',
             details: {},
           });
         });

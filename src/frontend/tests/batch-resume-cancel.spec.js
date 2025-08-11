@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { test, expect } from '@playwright/test';
+import { enableBatchMode } from './testUtils.js';
 
 async function mockAuthAndDeps(page) {
   await page.evaluate(() => {
@@ -33,26 +34,15 @@ async function mockAuthAndDeps(page) {
   });
 }
 
-async function enableBatchMode(page) {
-  await page.evaluate(() => {
-    const toggle = document.getElementById('scan-mode-toggle');
-    if (toggle) {
-      toggle.checked = true;
-      toggle.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-  });
-  await expect(page.locator('#batch-urls-container')).toHaveClass(/active/);
-}
-
 test.describe('Batch resume and cancel', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await mockAuthAndDeps(page);
-  // No need to wait for the hidden toggle; we'll force-check when needed
+    // No need to wait for the hidden toggle; we'll force-check when needed
   });
 
   test('resume skips previously successful items and updates progress', async ({ page }) => {
-  await enableBatchMode(page);
+    await enableBatchMode(page);
 
     // First run with two URLs: complete first, error second to keep progress
     await page.evaluate(() => {
@@ -78,7 +68,7 @@ test.describe('Batch resume and cancel', () => {
     // Reload page to simulate return, keep IndexedDB
     await page.reload();
     await mockAuthAndDeps(page);
-  await enableBatchMode(page);
+    await enableBatchMode(page);
 
     // Clear fail override so both can succeed; choose Resume in confirmation
     await page.evaluate(() => {
@@ -113,7 +103,7 @@ test.describe('Batch resume and cancel', () => {
   });
 
   test('cancel stops further processing and shows cancelled notification', async ({ page }) => {
-  await enableBatchMode(page);
+    await enableBatchMode(page);
 
     // Slow down analyzer to allow cancel in between
     await page.evaluate(() => {
