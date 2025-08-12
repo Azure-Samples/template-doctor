@@ -8,8 +8,11 @@
   },
   "dependencies": {
     "@azure/functions": "^3.5.0",
-    "@octokit/rest": "^22.0.0",
-    "node-fetch": "^2.6.7"
+  "@octokit/rest": "^22.0.0",
+  "node-fetch": "^2.6.7",
+  "@azure/identity": "^4.0.0",
+  "@azure/arm-appcontainers": "^2.2.0",
+  "@azure/monitor-query": "^1.2.0"
   },
   "engines": {
     "node": ">=16"

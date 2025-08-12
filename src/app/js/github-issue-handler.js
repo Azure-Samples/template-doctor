@@ -608,7 +608,7 @@ function testAzdProvision() {
   if (window.Notifications) {
     window.Notifications.confirm(
       'Test AZD Provision',
-      'This will test AZD provisioning for the template. Since this is a frontend-only implementation, this will be simulated. Proceed?',
+      'This will run azd up/down remotely in an isolated container and stream logs here. Proceed?',
       {
         onConfirm: () => runAzdProvisionTest(),
       },
@@ -627,7 +627,35 @@ function testAzdProvision() {
 /**
  * Run the AZD provision test
  */
-function runAzdProvisionTest() {
+function runAzdProvisionTest(action = 'up') {
+  // Helper to fetch runtime config (cached)
+  function getBasePath() {
+    const pathname = window.location.pathname || '/';
+    const withoutFile = pathname.match(/\.[a-zA-Z0-9]+$/)
+      ? pathname.substring(0, pathname.lastIndexOf('/'))
+      : pathname;
+    if (withoutFile === '/') return '';
+    return withoutFile.endsWith('/') ? withoutFile.slice(0, -1) : withoutFile;
+  }
+  async function fetchRuntimeConfig() {
+    try {
+      if (window.RUNTIME_CONFIG) return window.RUNTIME_CONFIG;
+      const basePath = getBasePath();
+      const res = await fetch(`${basePath}/config.json`, { cache: 'no-store' });
+      if (!res.ok) return {};
+      const cfg = await res.json();
+      window.RUNTIME_CONFIG = cfg;
+      return cfg;
+    } catch (_) {
+      return {};
+    }
+  }
+  function joinUrl(base, path, query) {
+    const b = (base || '').replace(/\/$/, '');
+    const p = (path || '').startsWith('/') ? path : `/${path || ''}`;
+    const q = query ? (query.startsWith('?') ? query : `?${query}`) : '';
+    return `${b}${p}${q}`;
+  }
   // Get the template URL
   const templateUrl = window.reportData.repoUrl;
 
@@ -647,7 +675,7 @@ function runAzdProvisionTest() {
   const testProvisionButton = document.getElementById('testProvisionButton');
   if (testProvisionButton) {
     const originalText = testProvisionButton.innerHTML;
-    testProvisionButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting Test...';
+    testProvisionButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting…';
     testProvisionButton.disabled = true;
 
     // Function to restore button
@@ -660,137 +688,88 @@ function runAzdProvisionTest() {
     };
   }
 
-  // Simulate the AZD provision test
-  const runId = Math.random().toString(36).substring(2, 15);
+  // Create a live log container below the header (simple terminal-style area)
+  let logEl = document.getElementById('azd-provision-logs');
+  if (!logEl) {
+    logEl = document.createElement('pre');
+    logEl.id = 'azd-provision-logs';
+    logEl.style.cssText = 'max-height: 300px; overflow:auto; background:#0b0c0c; color:#d0d0d0; padding:10px; border-radius:4px; font-size:12px;';
+    const header = document.querySelector('.report-actions') || document.body;
+    header.parentNode.insertBefore(logEl, header.nextSibling);
+  } else {
+    logEl.textContent = '';
+  }
 
-  // Create a loading notification
+  const baseUrl = window.location.origin + (window.location.pathname.includes('/index.html') ? window.location.pathname.replace('/index.html','') : window.location.pathname);
+
   let notification;
   if (window.Notifications) {
     notification = window.Notifications.loading(
-      'Starting AZD Provision Test',
-      `Preparing to test provisioning for template: ${owner}/${repo}`,
+      'Starting AZD Provision',
+      `Starting ${action.toUpperCase()} for ${owner}/${repo}…`,
     );
   }
 
-  // Simulate provisioning steps with progress updates
-  const steps = [
-    { message: 'Initializing AZD environment...', duration: 1500 },
-    { message: 'Validating template structure...', duration: 2000 },
-    { message: 'Processing azure.yaml configuration...', duration: 1500 },
-    { message: 'Checking Bicep files...', duration: 2000 },
-    { message: 'Validating ARM templates...', duration: 2500 },
-    { message: 'Deploying infrastructure...', duration: 3000 },
-    { message: 'Setting up resources...', duration: 2500 },
-    { message: 'Configuring dependencies...', duration: 2000 },
-    { message: 'Finalizing deployment...', duration: 1500 },
-  ];
+  // Resolve backend base URL and optional function key from runtime config
+  fetchRuntimeConfig()
+    .then((cfg) => {
+      const backendBase = (cfg && cfg.backend && cfg.backend.baseUrl ? cfg.backend.baseUrl.trim() : '') || '';
+      const functionKey = (cfg && cfg.backend && cfg.backend.functionKey ? cfg.backend.functionKey.trim() : '') || '';
+      // Fallback to SWA-linked /api if no backend base provided
+      const apiBase = backendBase || '';
+      const query = functionKey ? `code=${encodeURIComponent(functionKey)}` : '';
 
-  let currentStep = 0;
-
-  const runStep = () => {
-    if (currentStep >= steps.length) {
-      // Provisioning complete
-      // Simulate random success/failure
-      const success = Math.random() > 0.3; // 70% chance of success
-
-      if (success) {
-        if (notification) {
-          notification.success(
-            'Provision Completed Successfully',
-            'The template was successfully provisioned in the simulated environment.',
-            {
-              actions: [
-                {
-                  label: 'View Details',
-                  onClick: () => {
-                    window.Notifications.info(
-                      'Provision Details',
-                      `<strong>Run ID:</strong> ${runId}<br>
-                                            <strong>Template:</strong> ${owner}/${repo}<br>
-                                            <strong>Duration:</strong> ${Math.floor(steps.reduce((acc, step) => acc + step.duration, 0) / 1000)} seconds<br>
-                                            <strong>Resources:</strong> 12 deployed<br>
-                                            <strong>Status:</strong> Success`,
-                      10000,
-                    );
-                  },
-                  primary: true,
-                },
-              ],
-            },
-          );
+      // Kick off ACA Job via Function
+      const startUrl = joinUrl(apiBase, '/api/start-job', query);
+      return fetch(startUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repoUrl: templateUrl, action })
+      }).then(async (r) => {
+        if (!r.ok) throw new Error(`Start failed: ${r.status}`);
+        const json = await r.json();
+        return { json, apiBase, functionKey };
+      });
+    })
+    .then(async (r) => {
+      const { json, apiBase, functionKey } = r;
+      const { executionName } = json;
+      appendLog(logEl, `[info] Job started: ${executionName}`);
+      // Open SSE stream
+      const codeParam = functionKey ? `?code=${encodeURIComponent(functionKey)}` : '';
+      const streamPath = `/api/job-logs/${encodeURIComponent(executionName)}${codeParam}`;
+      const streamUrl = joinUrl(apiBase, streamPath);
+      const ev = new EventSource(streamUrl);
+      ev.addEventListener('status', (e) => {
+        try { const d = JSON.parse(e.data); appendLog(logEl, `[status] ${d.state}`); } catch {}
+      });
+      ev.addEventListener('message', (e) => {
+        appendLog(logEl, e.data);
+      });
+      ev.addEventListener('error', (e) => {
+        appendLog(logEl, `[error] stream error`);
+      });
+      ev.addEventListener('complete', (e) => {
+        try {
+          const d = JSON.parse(e.data);
+          if (d.succeeded) {
+            if (notification) notification.success('Provision Completed', 'azd completed successfully');
+          } else {
+            if (notification) notification.error('Provision Failed', `Status: ${d.status || 'Failed'}`);
+          }
+        } catch {
+          if (notification) notification.error('Provision Finished', 'Unknown status');
         }
+        ev.close();
+      });
+    })
+    .catch((err) => {
+      appendLog(logEl, `[error] ${err.message}`);
+      if (notification) notification.error('Error', err.message);
+    });
+}
 
-        if (testProvisionButton) {
-          testProvisionButton.innerHTML = '<i class="fas fa-check"></i> Provision Completed';
-          testProvisionButton.style.backgroundColor = '#107c10'; // Success green
-          restoreButton();
-        }
-      } else {
-        const errorDetails = [
-          'Missing required resource provider registration',
-          'Invalid parameter values in main.bicep',
-          'Resource naming conflicts in target subscription',
-          'Insufficient permissions for service principal',
-          'Quota limits exceeded in target region',
-        ];
-
-        const randomError = errorDetails[Math.floor(Math.random() * errorDetails.length)];
-
-        if (notification) {
-          notification.error(
-            'Provision Failed',
-            `The template provisioning failed:<br><br><code>${randomError}</code><br><br>Check the template's infrastructure files and try again.`,
-            {
-              actions: [
-                {
-                  label: 'View Logs',
-                  onClick: () => {
-                    window.Notifications.info(
-                      'Provision Logs',
-                      `<pre style="max-height: 300px; overflow: auto; background: #f5f5f5; padding: 10px; border-radius: 4px; font-size: 12px;">
-[error] Failed to provision resource: ${randomError}
-[info] Template: ${owner}/${repo}
-[info] Run ID: ${runId}
-[error] Error code: AZD4001
-[debug] See full log at /tmp/azd-${runId}.log
-</pre>`,
-                      0, // No auto-close
-                    );
-                  },
-                  primary: true,
-                },
-              ],
-            },
-          );
-        }
-
-        if (testProvisionButton) {
-          testProvisionButton.innerHTML = '<i class="fas fa-times"></i> Provision Failed';
-          testProvisionButton.style.backgroundColor = '#d83b01'; // Error color
-          restoreButton();
-        }
-      }
-      return;
-    }
-
-    const step = steps[currentStep];
-
-    if (notification) {
-      const progress = Math.floor(((currentStep + 1) / steps.length) * 100);
-      notification.update(`Provisioning (${progress}%)`, step.message);
-    }
-
-    if (testProvisionButton) {
-      const progress = Math.floor(((currentStep + 1) / steps.length) * 100);
-      testProvisionButton.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Running (${progress}%)`;
-    }
-
-    currentStep++;
-
-    // Run next step after the current step's duration
-    setTimeout(runStep, step.duration);
-  };
-
-  // Start the first step
-  setTimeout(runStep, 1000);
+function appendLog(el, line) {
+  el.textContent += (line.endsWith('\n') ? line : line + '\n');
+  el.scrollTop = el.scrollHeight;
 }
