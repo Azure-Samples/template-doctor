@@ -2,5 +2,9 @@
   "githubOAuth": {
     "clientId": "Ov23li2nstp4WdgRG6vZ",
     "scope": "repo read:user"
+  },
+  "backend": {
+    "baseUrl": "",
+    "functionKey": ""
   }
 }

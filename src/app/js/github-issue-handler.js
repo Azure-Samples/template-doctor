@@ -640,10 +640,35 @@ function runAzdProvisionTest(action = 'up') {
   async function fetchRuntimeConfig() {
     try {
       if (window.RUNTIME_CONFIG) return window.RUNTIME_CONFIG;
-      const basePath = getBasePath();
-      const res = await fetch(`${basePath}/config.json`, { cache: 'no-store' });
-      if (!res.ok) return {};
-      const cfg = await res.json();
+  const basePath = getBasePath();
+  console.log('[runtime-config] basePath:', basePath);
+  // First try static config.json (always from site root)
+  const configJsonUrl = `/config.json`;
+      console.log('[runtime-config] fetching config.json:', configJsonUrl);
+      const res = await fetch(configJsonUrl, { cache: 'no-store' });
+      let cfg = {};
+      if (res.ok) {
+        cfg = await res.json();
+        if (cfg.backend && cfg.backend.baseUrl) {
+          console.log('[runtime-config] config.json backend.baseUrl:', cfg.backend.baseUrl);
+        }
+      }
+    // If backend.baseUrl not provided, try runtime-config managed function (always from site root)
+      if (!cfg.backend || !cfg.backend.baseUrl) {
+        try {
+      const runtimeUrl = `/api/runtime-config`;
+          console.log('[runtime-config] fetching runtime-config:', runtimeUrl);
+          const dyn = await fetch(runtimeUrl, { cache: 'no-store' });
+          if (dyn.ok) {
+            const d = await dyn.json();
+            cfg.backend = cfg.backend || {};
+            if (d.backend?.baseUrl) cfg.backend.baseUrl = d.backend.baseUrl;
+            if (d.backend?.functionKey) cfg.backend.functionKey = d.backend.functionKey;
+            console.log('[runtime-config] TD_BACKEND_BASE_URL:', cfg.backend.baseUrl || '(empty)');
+            console.log('[runtime-config] TD_BACKEND_FUNCTION_KEY present:', !!cfg.backend.functionKey);
+          }
+        } catch (_) {}
+      }
       window.RUNTIME_CONFIG = cfg;
       return cfg;
     } catch (_) {
@@ -715,12 +740,19 @@ function runAzdProvisionTest(action = 'up') {
     .then((cfg) => {
       const backendBase = (cfg && cfg.backend && cfg.backend.baseUrl ? cfg.backend.baseUrl.trim() : '') || '';
       const functionKey = (cfg && cfg.backend && cfg.backend.functionKey ? cfg.backend.functionKey.trim() : '') || '';
-      // Fallback to SWA-linked /api if no backend base provided
-      const apiBase = backendBase || '';
+      // Require a backend base; do not fallback to SWA-managed /api for ACA endpoints
+      if (!backendBase) {
+        appendLog(logEl, '[error] Missing TD_BACKEND_BASE_URL. Configure it in SWA environment.');
+        throw new Error('Missing TD_BACKEND_BASE_URL');
+      }
+  const apiBase = backendBase;
+  console.log('[azd] apiBase:', apiBase);
       const query = functionKey ? `code=${encodeURIComponent(functionKey)}` : '';
 
-      // Kick off ACA Job via Function
+  // Kick off ACA Job via Function
       const startUrl = joinUrl(apiBase, '/api/start-job', query);
+  appendLog(logEl, `[info] Calling start URL: ${startUrl}`);
+  console.log('[azd] startUrl:', startUrl);
       return fetch(startUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -735,11 +767,13 @@ function runAzdProvisionTest(action = 'up') {
       const { json, apiBase, functionKey } = r;
       const { executionName } = json;
       appendLog(logEl, `[info] Job started: ${executionName}`);
-      // Open SSE stream
+  // Open SSE stream
       const codeParam = functionKey ? `?code=${encodeURIComponent(functionKey)}` : '';
-      const streamPath = `/api/job-logs/${encodeURIComponent(executionName)}${codeParam}`;
+  const streamPath = `/api/job-logs/${encodeURIComponent(executionName)}${codeParam}`;
       const streamUrl = joinUrl(apiBase, streamPath);
-      const ev = new EventSource(streamUrl);
+  appendLog(logEl, `[info] Connecting logs stream: ${streamUrl}`);
+  console.log('[azd] streamUrl:', streamUrl);
+  const ev = new EventSource(streamUrl);
       ev.addEventListener('status', (e) => {
         try { const d = JSON.parse(e.data); appendLog(logEl, `[status] ${d.state}`); } catch {}
       });
