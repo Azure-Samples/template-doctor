@@ -628,6 +628,8 @@ function testAzdProvision() {
  * Run the AZD provision test
  */
 function runAzdProvisionTest(action = 'up') {
+  // Hardcoded override for standalone Functions base (temporary until runtime-config is live)
+  const FORCED_BACKEND_BASE = 'https://template-doctor-standalone-nv.azurewebsites.net';
   // Helper to fetch runtime config (cached)
   function getBasePath() {
     const pathname = window.location.pathname || '/';
@@ -637,44 +639,7 @@ function runAzdProvisionTest(action = 'up') {
     if (withoutFile === '/') return '';
     return withoutFile.endsWith('/') ? withoutFile.slice(0, -1) : withoutFile;
   }
-  async function fetchRuntimeConfig() {
-    try {
-      if (window.RUNTIME_CONFIG) return window.RUNTIME_CONFIG;
-  const basePath = getBasePath();
-  console.log('[runtime-config] basePath:', basePath);
-  // First try static config.json (always from site root)
-  const configJsonUrl = `/config.json`;
-      console.log('[runtime-config] fetching config.json:', configJsonUrl);
-      const res = await fetch(configJsonUrl, { cache: 'no-store' });
-      let cfg = {};
-      if (res.ok) {
-        cfg = await res.json();
-        if (cfg.backend && cfg.backend.baseUrl) {
-          console.log('[runtime-config] config.json backend.baseUrl:', cfg.backend.baseUrl);
-        }
-      }
-    // If backend.baseUrl not provided, try runtime-config managed function (always from site root)
-      if (!cfg.backend || !cfg.backend.baseUrl) {
-        try {
-      const runtimeUrl = `/api/runtime-config`;
-          console.log('[runtime-config] fetching runtime-config:', runtimeUrl);
-          const dyn = await fetch(runtimeUrl, { cache: 'no-store' });
-          if (dyn.ok) {
-            const d = await dyn.json();
-            cfg.backend = cfg.backend || {};
-            if (d.backend?.baseUrl) cfg.backend.baseUrl = d.backend.baseUrl;
-            if (d.backend?.functionKey) cfg.backend.functionKey = d.backend.functionKey;
-            console.log('[runtime-config] TD_BACKEND_BASE_URL:', cfg.backend.baseUrl || '(empty)');
-            console.log('[runtime-config] TD_BACKEND_FUNCTION_KEY present:', !!cfg.backend.functionKey);
-          }
-        } catch (_) {}
-      }
-      window.RUNTIME_CONFIG = cfg;
-      return cfg;
-    } catch (_) {
-      return {};
-    }
-  }
+  // No runtime-config fetch: we will use FORCED_BACKEND_BASE directly to avoid 404s
   function joinUrl(base, path, query) {
     const b = (base || '').replace(/\/$/, '');
     const p = (path || '').startsWith('/') ? path : `/${path || ''}`;
@@ -718,12 +683,35 @@ function runAzdProvisionTest(action = 'up') {
   if (!logEl) {
     logEl = document.createElement('pre');
     logEl.id = 'azd-provision-logs';
-    logEl.style.cssText = 'max-height: 300px; overflow:auto; background:#0b0c0c; color:#d0d0d0; padding:10px; border-radius:4px; font-size:12px;';
+    logEl.style.cssText = 'max-height: 300px; overflow:auto; background:#0b0c0c; color:#d0d0d0; padding:10px; border-radius:6px; font-size:12px; margin-top:6px;';
     const header = document.querySelector('.report-actions') || document.body;
     header.parentNode.insertBefore(logEl, header.nextSibling);
+    // Add controls row (Stop button)
+    const controls = document.createElement('div');
+    controls.id = 'azd-provision-controls';
+    controls.style.cssText = 'margin:10px 0 6px; display:flex; gap:8px; align-items:center;';
+    const stopBtn = document.createElement('button');
+    stopBtn.id = 'azd-stop-btn';
+    stopBtn.textContent = 'Stop Provision';
+    stopBtn.style.cssText = 'padding:6px 12px; background:#b10e1e; color:#fff; border:none; border-radius:6px; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,0.15); margin: 0 0 10px 20px';
+    stopBtn.disabled = true;
+    controls.appendChild(stopBtn);
+    logEl.parentNode.insertBefore(controls, logEl);
   } else {
     logEl.textContent = '';
   }
+  try {
+    const sb = document.getElementById('azd-stop-btn');
+    if (sb) {
+      const rect = sb.getBoundingClientRect();
+      const absY = rect.top + window.scrollY + 200; // target Stop button + 200px offset
+      const maxY = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      const targetY = Math.min(absY, maxY);
+      window.scrollTo({ top: targetY, behavior: 'smooth' });
+    } else {
+      logEl.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+  } catch {}
 
   const baseUrl = window.location.origin + (window.location.pathname.includes('/index.html') ? window.location.pathname.replace('/index.html','') : window.location.pathname);
 
@@ -736,74 +724,199 @@ function runAzdProvisionTest(action = 'up') {
   }
 
   // Resolve backend base URL and optional function key from runtime config
-  fetchRuntimeConfig()
-    .then((cfg) => {
-      const backendBase = (cfg && cfg.backend && cfg.backend.baseUrl ? cfg.backend.baseUrl.trim() : '') || '';
-      const functionKey = (cfg && cfg.backend && cfg.backend.functionKey ? cfg.backend.functionKey.trim() : '') || '';
-      // Require a backend base; do not fallback to SWA-managed /api for ACA endpoints
-      if (!backendBase) {
-        appendLog(logEl, '[error] Missing TD_BACKEND_BASE_URL. Configure it in SWA environment.');
-        throw new Error('Missing TD_BACKEND_BASE_URL');
-      }
-  const apiBase = backendBase;
+  const apiBase = (FORCED_BACKEND_BASE || '').trim();
+  if (!apiBase) {
+    appendLog(logEl, '[error] Missing backend base URL. Set FORCED_BACKEND_BASE.');
+    return;
+  }
   console.log('[azd] apiBase:', apiBase);
-      const query = functionKey ? `code=${encodeURIComponent(functionKey)}` : '';
-
-  // Kick off ACA Job via Function
-      const startUrl = joinUrl(apiBase, '/api/start-job', query);
+  // Kick off ACA Job via Function (public routes, no /aca prefix)
+  const startUrl = joinUrl(apiBase, '/api/start-job');
   appendLog(logEl, `[info] Calling start URL: ${startUrl}`);
   console.log('[azd] startUrl:', startUrl);
-      return fetch(startUrl, {
+  fetch(startUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ repoUrl: templateUrl, action })
-      }).then(async (r) => {
-        if (!r.ok) throw new Error(`Start failed: ${r.status}`);
-        const json = await r.json();
-        return { json, apiBase, functionKey };
-      });
-    })
+      })
     .then(async (r) => {
-      const { json, apiBase, functionKey } = r;
+      if (!r.ok) {
+        let detail = '';
+        try {
+          const ct = r.headers.get('content-type') || '';
+          if (ct.includes('application/json')) {
+            const j = await r.json();
+            detail = j && (j.error || j.message) ? ` - ${j.error || j.message}` : '';
+          } else {
+            const t = await r.text();
+            detail = t ? ` - ${t.substring(0, 200)}` : '';
+          }
+        } catch {}
+        throw new Error(`Start failed: ${r.status}${detail}`);
+      }
+      const json = await r.json();
       const { executionName } = json;
       appendLog(logEl, `[info] Job started: ${executionName}`);
-  // Open SSE stream
-      const codeParam = functionKey ? `?code=${encodeURIComponent(functionKey)}` : '';
-  const streamPath = `/api/job-logs/${encodeURIComponent(executionName)}${codeParam}`;
+      // Open SSE stream with polling fallback and Stop button support
+      const streamPath = `/api/job-logs/${encodeURIComponent(executionName)}`;
       const streamUrl = joinUrl(apiBase, streamPath);
-  appendLog(logEl, `[info] Connecting logs stream: ${streamUrl}`);
-  console.log('[azd] streamUrl:', streamUrl);
-  const ev = new EventSource(streamUrl);
-      ev.addEventListener('status', (e) => {
-        try { const d = JSON.parse(e.data); appendLog(logEl, `[status] ${d.state}`); } catch {}
-      });
-      ev.addEventListener('message', (e) => {
-        appendLog(logEl, e.data);
-      });
-      ev.addEventListener('error', (e) => {
-        appendLog(logEl, `[error] stream error`);
-      });
-      ev.addEventListener('complete', (e) => {
-        try {
-          const d = JSON.parse(e.data);
-          if (d.succeeded) {
-            if (notification) notification.success('Provision Completed', 'azd completed successfully');
-          } else {
-            if (notification) notification.error('Provision Failed', `Status: ${d.status || 'Failed'}`);
-          }
-        } catch {
-          if (notification) notification.error('Provision Finished', 'Unknown status');
+      appendLog(logEl, `[info] Connecting logs stream: ${streamUrl}`);
+      console.log('[azd] streamUrl:', streamUrl);
+      const stopBtn = document.getElementById('azd-stop-btn');
+  let ev;
+      let pollTimer;
+      let pollSince = '';
+      let finished = false;
+  let currentExecution = executionName;
+
+      function finalize(result) {
+        finished = true;
+        if (ev) try { ev.close(); } catch {}
+        if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+        if (stopBtn) stopBtn.disabled = true;
+        if (!notification) return;
+        if (result && result.succeeded) {
+          notification.success('Provision Completed', 'azd completed successfully');
+        } else if (result && result.status) {
+          notification.error('Provision Failed', `Status: ${result.status}`);
         }
-        ev.close();
-      });
-    })
-    .catch((err) => {
+      }
+
+      function startPolling() {
+        const doPoll = async () => {
+          if (finished) return;
+          try {
+            const url = streamUrl + `?mode=poll${pollSince ? `&since=${encodeURIComponent(pollSince)}` : ''}`;
+            const pr = await fetch(url, { headers: { Accept: 'application/json' } });
+            if (!pr.ok) throw new Error(`poll ${pr.status}`);
+            const data = await pr.json();
+            if (Array.isArray(data.messages)) {
+              data.messages.forEach((m) => appendLog(logEl, m));
+            }
+            if (data.nextSince) pollSince = data.nextSince;
+            if (data.status) {
+              const det = data.details || {};
+              const extras = [];
+              if (det.provisioningState) extras.push(`prov=${det.provisioningState}`);
+              if (det.status) extras.push(`status=${det.status}`);
+              if (typeof det.exitCode !== 'undefined' && det.exitCode !== null) extras.push(`exit=${det.exitCode}`);
+              appendLog(logEl, `[status] ${data.status}${extras.length ? ' (' + extras.join(', ') + ')' : ''}`);
+            }
+            if (data.done) return finalize({ succeeded: data.status === 'Succeeded', status: data.status });
+          } catch (e) {
+            appendLog(logEl, `[error] poll: ${e.message}`);
+          } finally {
+            if (!finished) pollTimer = setTimeout(doPoll, 3000);
+          }
+        };
+        doPoll();
+      }
+
+      function trySSE() {
+        try {
+          ev = new EventSource(streamUrl);
+        } catch (e) {
+          appendLog(logEl, `[warn] SSE unavailable, falling back to polling`);
+          return startPolling();
+        }
+        ev.addEventListener('open', () => { if (stopBtn) stopBtn.disabled = false; });
+        ev.addEventListener('status', (e) => {
+          try {
+            const d = JSON.parse(e.data);
+            if (d && typeof d === 'object') {
+              const det = d.details || {};
+              const extras = [];
+              if (det.provisioningState) extras.push(`prov=${det.provisioningState}`);
+              if (det.status) extras.push(`status=${det.status}`);
+              if (typeof det.exitCode !== 'undefined' && det.exitCode !== null) extras.push(`exit=${det.exitCode}`);
+              appendLog(logEl, `[status] ${d.state}${extras.length ? ' (' + extras.join(', ') + ')' : ''}`);
+            } else {
+              appendLog(logEl, `[status] ${d}`);
+            }
+          } catch {}
+        });
+        ev.addEventListener('message', (e) => { appendLog(logEl, e.data); });
+        ev.addEventListener('error', () => {
+          if (!finished) {
+            appendLog(logEl, `[warn] Stream error, switching to polling`);
+            try { ev.close(); } catch {}
+            startPolling();
+          }
+        });
+        ev.addEventListener('complete', (e) => {
+          try {
+            const d = JSON.parse(e.data);
+            if (d && d.details) {
+              const { startTime, endTime, exitCode } = d.details;
+              if (startTime && endTime) {
+                const st = new Date(startTime);
+                const et = new Date(endTime);
+                const durMs = Math.max(0, et - st);
+                const mins = Math.floor(durMs / 60000);
+                const secs = Math.floor((durMs % 60000) / 1000);
+                appendLog(logEl, `[summary] ${d.status} in ${mins}m ${secs}s${typeof exitCode === 'number' ? ` (exit=${exitCode})` : ''}`);
+              }
+            }
+            finalize(d);
+          } catch {
+            finalize({ succeeded: false, status: 'Unknown' });
+          }
+        });
+      }
+
+      // Wire Stop button
+      if (stopBtn) {
+        stopBtn.disabled = false;
+        stopBtn.onclick = () => {
+          appendLog(logEl, '[info] Stopping…');
+          // Best-effort: ask backend to stop the job execution
+          try {
+            const stopUrl = joinUrl(apiBase, '/api/stop-job');
+            fetch(stopUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ executionName: currentExecution })
+            }).then(async (r) => {
+              if (!r.ok) {
+                let msg = '';
+                try { const j = await r.json(); msg = j.error || ''; } catch {}
+                appendLog(logEl, `[warn] Stop request failed: ${r.status}${msg ? ' - ' + msg : ''}`);
+              } else {
+                appendLog(logEl, '[info] Stop requested');
+              }
+            }).catch(() => {});
+          } catch {}
+          finalize({ succeeded: false, status: 'Stopped' });
+        };
+      }
+
+      // Start with SSE, fallback to polling
+      trySSE();
+  })
+  .catch((err) => {
       appendLog(logEl, `[error] ${err.message}`);
       if (notification) notification.error('Error', err.message);
-    });
+  });
 }
 
 function appendLog(el, line) {
   el.textContent += (line.endsWith('\n') ? line : line + '\n');
   el.scrollTop = el.scrollHeight;
+  // Also scroll the viewport so the console is fully visible: target Stop button + 200px
+  try {
+    const sb = document.getElementById('azd-stop-btn');
+    if (sb) {
+      const rect = sb.getBoundingClientRect();
+      const absY = rect.top + window.scrollY + 200; // 200px below the Stop button
+      const maxY = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      const targetY = Math.min(absY, maxY);
+      // Only scroll down if the target is below current viewport by a noticeable margin
+      const currentBottom = window.scrollY + window.innerHeight;
+      if (currentBottom + 40 < targetY) {
+        window.scrollTo({ top: targetY, behavior: 'smooth' });
+      }
+    } else {
+      el.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+  } catch {}
 }

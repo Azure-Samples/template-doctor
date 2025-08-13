@@ -7,7 +7,7 @@
       "outputLocation": ".",
       "apiLanguage": "node",
       "apiVersion": "18",
-      "apiBuildCommand": "npm ci --omit=dev",
+      "apiBuildCommand": "rm -rf node_modules && npm ci --omit=dev",
       "appName": "template-doctor",
       "resourceGroup": "template-doctor-rg"
     }

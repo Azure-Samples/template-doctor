@@ -1,12 +1,12 @@
 {
   "bindings": [
     {
-      "authLevel": "function",
+      "authLevel": "anonymous",
       "type": "httpTrigger",
       "direction": "in",
       "name": "req",
       "methods": ["get", "options"],
-      "route": "aca/job-logs/{executionName}"
+      "route": "job-logs/{executionName}"
     },
     {
       "type": "http",
