@@ -65,7 +65,7 @@ function initRulesetModal() {
                         
                         <p class="helper-text">
                             JSON format should match the structure of the DoD ruleset. 
-                            <a href="https://github.com/Azure-Samples/azd-template-artifacts/blob/main/publishing-guidelines.md" target="_blank">Learn More</a>
+                            <a href="https://gist.github.com/anfibiacreativa/d8f29b232397069ec3157c8be799c1ac" target="_blank">Learn More</a>
                         </p>
                     </div>
                 </form>
