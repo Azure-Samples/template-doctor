@@ -5,7 +5,8 @@ const { LogsQueryClient } = require('@azure/monitor-query');
 const SUBSCRIPTION_ID = process.env.AZURE_SUBSCRIPTION_ID;
 const RESOURCE_GROUP = process.env.ACA_RESOURCE_GROUP;
 const JOB_NAME = process.env.ACA_JOB_NAME;
-const LOG_WORKSPACE_ID = process.env.LOG_ANALYTICS_WORKSPACE_ID || process.env.WORKSPACE_ID;
+// Accept either LOG_ANALYTICS_WORKSPACE (preferred) or LOG_ANALYTICS_WORKSPACE_ID (compat), fallback WORKSPACE_ID
+const LOG_WORKSPACE_ID = process.env.LOG_ANALYTICS_WORKSPACE || process.env.LOG_ANALYTICS_WORKSPACE_ID || process.env.WORKSPACE_ID;
 
 function getCredential() {
 	const clientId = process.env.AZURE_CLIENT_ID;

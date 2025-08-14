@@ -646,10 +646,8 @@ function runAzdProvisionTest(action = 'up') {
     const q = query ? (query.startsWith('?') ? query : `?${query}`) : '';
     return `${b}${p}${q}`;
   }
-  // Get the template URL
+  // Get the template URL and parse owner/repo
   const templateUrl = window.reportData.repoUrl;
-
-  // Parse the owner and repo from the URL
   let owner, repo;
   try {
     const urlParts = new URL(templateUrl).pathname.split('/');
@@ -659,6 +657,20 @@ function runAzdProvisionTest(action = 'up') {
     }
   } catch (e) {
     console.error('Failed to parse repository URL', e);
+  }
+
+  // Prefer upstream template name if provided in report data; otherwise use owner/repo from the report URL
+  let templateName = null;
+  const upstreamFromReport = (window.reportData && (window.reportData.upstreamTemplate || window.reportData.upstream)) || '';
+  if (typeof upstreamFromReport === 'string' && upstreamFromReport.includes('/')) {
+    templateName = upstreamFromReport.trim();
+  } else if (owner && repo) {
+    templateName = `${owner}/${repo}`;
+  }
+  if (!templateName) {
+    const msg = '[error] Could not determine template name from repository URL.';
+    try { appendLog(document.getElementById('azd-provision-logs') || console, msg); } catch { console.error(msg); }
+    return;
   }
 
   // Show loading state
@@ -683,7 +695,7 @@ function runAzdProvisionTest(action = 'up') {
   if (!logEl) {
     logEl = document.createElement('pre');
     logEl.id = 'azd-provision-logs';
-    logEl.style.cssText = 'max-height: 300px; overflow:auto; background:#0b0c0c; color:#d0d0d0; padding:10px; border-radius:6px; font-size:12px; margin-top:6px;';
+    logEl.style.cssText = 'max-height: 300px; overflow:auto; background:#0b0c0c; color:#d0d0d0; padding:20px; border-radius:6px 0 0 6px; font-size:12px; margin:10px 0 50px 0;';
     const header = document.querySelector('.report-actions') || document.body;
     header.parentNode.insertBefore(logEl, header.nextSibling);
     // Add controls row (Stop button)
@@ -737,7 +749,7 @@ function runAzdProvisionTest(action = 'up') {
   fetch(startUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repoUrl: templateUrl, action })
+        body: JSON.stringify({ templateName, action })
       })
     .then(async (r) => {
       if (!r.ok) {

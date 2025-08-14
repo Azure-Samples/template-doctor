@@ -1,6 +1,7 @@
 window.reportData = {
   "repoUrl": "https://github.com/anfibiacreativa/todo-nodejs-mongo-coreconf",
   "timestamp": "2025-07-24T16:34:48.932Z",
+  "upstreamTemplate": "Azure-Samples/todo-nodejs-mongo-coreconf",
   "compliance": {
     "issues": [
       {

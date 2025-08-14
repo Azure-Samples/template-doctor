@@ -2,6 +2,7 @@ window.reportData = {
   "repoUrl": "https://github.com/anfibiacreativa/openai-langchainjs",
   "ruleSet": "partner",
   "timestamp": "2025-07-25T08:38:45.913Z",
+  "upstreamTemplate": "Azure-Samples/openai-langchainjs",
   "compliance": {
     "issues": [
       {

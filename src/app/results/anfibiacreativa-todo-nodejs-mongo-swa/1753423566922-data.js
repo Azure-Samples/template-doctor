@@ -1,6 +1,7 @@
 window.reportData = {
   "repoUrl": "https://github.com/anfibiacreativa/todo-nodejs-mongo-swa",
   "timestamp": "2025-07-25T06:06:06.910Z",
+  "upstreamTemplate": "Azure-Samples/todo-nodejs-mongo-swa",
   "compliance": {
     "issues": [
       {

@@ -202,6 +202,10 @@ module.exports = async function (context, req) {
         templateData.dashboardPath = dashboardFileName;
         templateData.dataPath = dataFileName;
         templateData.relativePath = `${folderName}/${dashboardFileName}`;
+        // If caller provided originUpstream (canonical upstream owner/repo), persist it
+        if (templateData.originUpstream && typeof templateData.originUpstream === 'string') {
+            templateData.originUpstream = templateData.originUpstream.trim();
+        }
         
         // Update the content by adding the new template
         const updatedContent = addTemplateToIndexData(content, templateData);
@@ -375,6 +379,10 @@ function createResultData(templateData) {
             compliant: compliant,
             summary: `Issues found - Compliance: ${templateData.compliance.percentage}%`
         },
+        // Propagate canonical upstream template name if provided (used by frontend to run azd init)
+        upstreamTemplate: (typeof templateData.originUpstream === 'string' && templateData.originUpstream.includes('/'))
+            ? templateData.originUpstream.trim()
+            : undefined,
         history: [
             {
                 timestamp: templateData.timestamp,

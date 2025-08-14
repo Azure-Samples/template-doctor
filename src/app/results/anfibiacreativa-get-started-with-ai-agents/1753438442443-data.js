@@ -2,6 +2,7 @@ window.reportData = {
   "repoUrl": "https://github.com/anfibiacreativa/get-started-with-ai-agents",
   "ruleSet": "partner",
   "timestamp": "2025-07-25T10:14:02.435Z",
+  "upstreamTemplate": "Azure-Samples/get-started-with-ai-agents",
   "compliance": {
     "issues": [
       {

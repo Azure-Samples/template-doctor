@@ -1,6 +1,7 @@
 window.reportData = {
   "repoUrl": "https://github.com/anfibiacreativa/todo-csharp-sql-swa-func",
   "timestamp": "2025-07-24T19:00:06.379Z",
+  "upstreamTemplate": "Azure-Samples/todo-csharp-sql-swa-func",
   "compliance": {
     "issues": [
       {

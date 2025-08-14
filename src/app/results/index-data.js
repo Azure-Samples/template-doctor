@@ -4,6 +4,7 @@ window.templatesData = [
     "dashboardPath": "1753438442443-dashboard.html",
     "dataPath": "1753438442443-data.js",
     "repoUrl": "https://github.com/Azure-Samples/get-started-with-ai-agents",
+  "originUpstream": "Azure-Samples/get-started-with-ai-agents",
     "ruleSet": "partner",
     "compliance": {
       "percentage": 56,
@@ -18,6 +19,7 @@ window.templatesData = [
     "dashboardPath": "1753432725919-dashboard.html",
     "dataPath": "1753432725919-data.js",
     "repoUrl": "https://github.com/Azure-Samples/openai-langchainjs",
+  "originUpstream": "Azure-Samples/openai-langchainjs",
     "ruleSet": "partner",
     "compliance": {
       "percentage": 60,
@@ -32,6 +34,7 @@ window.templatesData = [
     "dashboardPath": "1753383606390-dashboard.html",
     "dataPath": "1753383606390-data.js",
     "repoUrl": "https://github.com/Azure-Samples/todo-csharp-sql-swa-func",
+  "originUpstream": "Azure-Samples/todo-csharp-sql-swa-func",
     "ruleSet": "dod",
     "compliance": {
       "percentage": 51,
@@ -46,6 +49,7 @@ window.templatesData = [
     "dashboardPath": "1753374888936-dashboard.html",
     "dataPath": "1753374888936-data.js",
     "repoUrl": "https://github.com/Azure-Samples/todo-nodejs-mongo-coreconf",
+  "originUpstream": "Azure-Samples/todo-nodejs-mongo-coreconf",
     "ruleSet": "dod",
     "compliance": {
       "percentage": 52,
@@ -60,6 +64,7 @@ window.templatesData = [
     "dashboardPath": "1753423566922-dashboard.html",
     "dataPath": "1753423566922-data.js",
     "repoUrl": "https://github.com/Azure-Samples/todo-nodejs-mongo-swa",
+  "originUpstream": "Azure-Samples/todo-nodejs-mongo-swa",
     "ruleSet": "dod",
     "compliance": {
       "percentage": 52,
