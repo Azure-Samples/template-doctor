@@ -3,15 +3,20 @@
     "version": "0.0.1",
     "description": "An Azure Developer CLI template analysis and healing agent",
     "main": "bin/cli.js",
+    "private": true,
+    "workspaces": [
+        "packages/*"
+    ],
     "bin": {
         "template-doctor": "dist/cli.js"
     },
     "scripts": {
         "build": "tsc",
+        "build:all": "npm run -ws build",
         "start": "node --experimental-json-modules dist/cli.js",
-    "test": "playwright test -c src/frontend/playwright.config.js",
-    "test:ui": "playwright test -c src/frontend/playwright.config.js --ui",
-    "test:debug": "playwright test -c src/frontend/playwright.config.js --debug"
+        "test": "npm run -w packages/app test",
+        "test:ui": "npm run -w packages/app test:ui",
+        "test:debug": "npm run -w packages/app test:debug"
     },
     "keywords": [
         "azd",

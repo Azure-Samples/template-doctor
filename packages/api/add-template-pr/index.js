@@ -132,8 +132,8 @@ module.exports = async function (context, req) {
         context.log(`Created branch: ${branchName}`);
         
         // Create folder for the template results if it doesn't exist
-        const folderName = getTemplateFolderName(templateData.repoUrl);
-        const folderPath = `results/${folderName}`;
+    const folderName = getTemplateFolderName(templateData.repoUrl);
+    const folderPath = `packages/app/results/${folderName}`;
         
         try {
             // Check if folder exists
@@ -191,7 +191,7 @@ module.exports = async function (context, req) {
         const { data: fileData } = await octokit.repos.getContent({
             owner,
             repo,
-            path: 'results/index-data.js',
+            path: 'packages/app/results/index-data.js',
             ref: branchName
         });
         
@@ -214,7 +214,7 @@ module.exports = async function (context, req) {
         await octokit.repos.createOrUpdateFileContents({
             owner,
             repo,
-            path: 'results/index-data.js',
+            path: 'packages/app/results/index-data.js',
             message: `Add template: ${repoIdentifier} to index`,
             content: Buffer.from(updatedContent).toString('base64'),
             branch: branchName,

@@ -1,84 +1,122 @@
-# Template Doctor
+# Template Doctor (Monorepo)
 
-This is the root repository for Template Doctor, a tool for analyzing, validating, and ensuring compliance of templates with organizational standards.
+Template Doctor analyzes and validates Azure Developer CLI (azd) templates, provides a web UI, and automates PR updates with scan results. This repository is structured as a monorepo with independent deployable packages.
 
-> **Important Note**: The implementation in the `src/backend` folder is not to be used and is just a remnant of a previous version. Please use the Azure Functions in the `api/` folder for backend services.
+## Monorepo layout
 
-## Project Structure
+- packages/app — Static web app (frontend UI)
+	- Serves the dashboard and loads scan results from `packages/app/results/`
+- packages/api — Azure Functions (PR creation, OAuth helpers)
+- packages/functions-aca — Azure Functions to orchestrate Azure Container Apps (ACA) Jobs (start/stop/query logs)
+- packages/infra — Infrastructure (placeholder for Bicep/Terraform)
+- docs — Documentation for GitHub Action/App and usage
 
-- `api/` - Azure Functions backend providing authentication and API services
-- `src/frontend/` - Web-based frontend for the Template Doctor application and utilities for template analysis
-- `docs/` - Documentation for GitHub Action and App setup
-- `results/` - Storage for analysis results and reports
+Results live under `packages/app/results/`:
+- `packages/app/results/index-data.js` — master list of scanned templates (window.templatesData)
+- `packages/app/results/<owner-repo>/<timestamp>-data.js` — per-scan data (window.reportData)
+- `packages/app/results/<owner-repo>/<timestamp>-dashboard.html` — per-scan dashboard
 
-## Prerequisites
+## Requirements and conventions
+
+- Canonical upstream is required to provision with azd: the repository dispatch and GitHub Action take `originUpstream` (preferred) or `upstream` in the format `owner/repo`. This is used for `azd init -t <owner/repo>`.
+- New scan PRs write to `packages/app/results` and update `packages/app/results/index-data.js`.
+- Each package is deployable independently via dedicated workflows.
+
+## Workspaces and root scripts
+
+This repo uses npm workspaces.
+
+- Install deps (root + packages):
+	- `npm ci`
+- Build all packages:
+	- `npm run build:all`
+- Run frontend tests (Playwright) from root:
+	- `npm test`
+	- `npm run test:ui`
+	- `npm run test:debug`
+- Start API locally:
+	- `npm run -w packages/api start`
+- Start ACA orchestrator locally:
+	- `npm run -w packages/functions-aca start`
+- Start frontend locally (simple static server):
+	- `npm run -w packages/app start` (serves on http://localhost:8080)
+
+## Deployments (CI/CD)
+
+Workflows under `.github/workflows/`:
+
+- Azure Static Web Apps (SWA):
+	- Uses `Azure/static-web-apps-deploy@v1`
+	- `app_location: /packages/app`
+	- `api_location: /packages/api`
+- Deploy Azure Functions API:
+	- `.github/workflows/azure-functions.yml`
+	- Triggers on `packages/api/**`
+	- Zips and deploys with `azure/functions-action@v1`
+- Deploy Functions (ACA Orchestrator):
+	- `.github/workflows/functions-aca-deploy.yml`
+	- Triggers on `packages/functions-aca/**`
+	- Zips and deploys with `azure/functions-action@v1`
+- Submit Template Analysis:
+	- `.github/workflows/submit-analysis.yml`
+	- Triggered by `repository_dispatch (template-analysis-completed)`
+	- Requires `originUpstream` (or `upstream`) in `client_payload`
+	- Invokes local action to update `packages/app/results/index-data.js` and add per-scan files
+- Template Doctor (manual scan):
+	- `.github/workflows/template-doctor.yml`
+	- Runs CLI to analyze a repo and updates results under `packages/app/results`
+
+## Local development
+
+1) Install tools:
 - Node.js and npm
-- Python 3
-- Azure Functions Core Tools (for running the API)
+- Azure Functions Core Tools (for API and functions-aca)
+- Python 3 (optional static server for frontend)
 
-## Setup Instructions
-
-### 1. Install Dependencies
-First, install the required npm packages for both the API and the frontend:
-
+2) Install dependencies and build:
 ```
-cd ../api
-npm install
-cd ../frontend
-npm install
+npm ci
+npm run build:all
 ```
 
-### 2. Start the API (Azure Function)
-The backend API is located in the `../api` folder and must be running for the frontend to function properly. Start it with:
-
+3) Run services:
 ```
-cd ../api
-func start
-```
+# Frontend
+npm run -w packages/app start
 
-This will start the Azure Function locally (usually on port 7071).
+# API (Functions)
+npm run -w packages/api start
 
-### 3. Start the Frontend
-The frontend is a static site that can be served locally using Python:
-
-```
-cd ../frontend
-python3 -m http.server 8080
+# ACA Orchestrator (Functions)
+npm run -w packages/functions-aca start
 ```
 
-This will serve the frontend at [http://localhost:8080](http://localhost:8080).
+Open http://localhost:8080 for the UI. The frontend expects the API at http://localhost:7071 by default.
 
-## Local Testing
-- Ensure both the API and the frontend are running as described above.
-- Open your browser and navigate to [http://localhost:8080](http://localhost:8080) to use the app.
+## Origin upstream requirement
 
-## Notes
-- The frontend expects the API to be running at its default local address (http://localhost:7071).
-- If you change the API port, update the frontend configuration accordingly.
-- Remember that the `src/backend` implementation should not be used - it's only kept for historical reference.
+For provisioning templates with azd, the canonical upstream must be provided:
+
+- Repository dispatch payload must include `originUpstream` (preferred) or `upstream` as `owner/repo`.
+- The GitHub Action input `origin-upstream` is required and will fail fast if missing.
+
+This ensures the test/provision flow uses the correct azd template (no heuristics).
+
+## Contributing
+
+- Add/update tests for features and fixes. Frontend E2E tests live in the app package; run from root via `npm test`.
+- Avoid native browser dialogs; use notifications to keep tests stable.
+- Format code before committing (packages may include prettier configs and scripts).
+- Don’t commit generated artifacts like `node_modules/` or large reports.
+- Update docs and workflows when changing paths or behavior.
 
 ## Documentation
-
-For detailed information on specific components:
 
 - [GitHub Action Setup](docs/GITHUB_ACTION_SETUP.md)
 - [GitHub Action](docs/GITHUB_ACTION.md)
 - [GitHub App](docs/GITHUB_APP.md)
 - [GitHub Pages Implementation](docs/github-pages-implementation.md)
 
-## Contributing
-
-Contributions are welcome. Please follow these guidelines so changes are easy to review and safe to merge:
-
-- Add or update tests for any bug fix or feature. Use Playwright E2E tests under `src/frontend/tests`. Run tests from the repo root with `npm test` and ensure they all pass.
-- Do not introduce native browser dialogs (`alert`, `confirm`, `prompt`) in the UI; use the notification system instead—tests will fail if native dialogs are used.
-- Format code before committing. In `src/frontend`, run `npm run format` and ensure `npm run format:check` passes.
-- Avoid committing generated or backup content: `results/`, `src/frontend/_backup_unused/`, `playwright-report/`, `node_modules/`.
-- Update documentation when behavior or configuration changes.
-- Keep PRs focused, reference related issues, and ensure CI workflows are green.
-
 ---
 
-
-
-For any issues, please open an issue in the repository.
+For issues, please open a GitHub issue.

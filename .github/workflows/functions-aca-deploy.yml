@@ -1,0 +1,39 @@
+name: Deploy Functions (ACA Orchestrator)
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'packages/functions-aca/**'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        working-directory: packages/functions-aca
+        run: npm ci
+
+      - name: Archive Function App (functions-aca)
+        run: |
+          cd packages/functions-aca
+          zip -r ../functions-aca.zip . -x "node_modules/**"
+
+      - name: Deploy to Azure Functions (functions-aca)
+        uses: azure/functions-action@v1
+        with:
+          app-name: ${{ secrets.AZ_FUNCTIONAPP_ACA_NAME }}
+          package: functions-aca.zip
+          publish-profile: ${{ secrets.AZ_FUNCTIONAPP_ACA_PUBLISH_PROFILE }}
