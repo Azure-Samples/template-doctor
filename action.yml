@@ -18,6 +18,12 @@ inputs:
   analysis-data:
     description: 'JSON string containing the analysis results'
     required: true
+  upstream:
+    description: 'Canonical upstream repo in the form owner/repo (e.g., Azure-Samples/openai-langchainjs)'
+    required: false
+  origin-upstream:
+    description: 'Alias for upstream; if provided, takes precedence over upstream'
+  required: true
 outputs:
   template-data:
     description: 'Template data object that was created/updated'

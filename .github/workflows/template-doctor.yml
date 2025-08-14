@@ -31,7 +31,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
       
-      - name: Run template analysis
+  - name: Run template analysis
         id: analysis
         run: |
           REPO_URL="${{ github.event.inputs.repo_url }}"
@@ -54,7 +54,12 @@ jobs:
           mkdir -p $RESULT_PATH
           
           # Run analysis and capture the output
-          node src/cli.js analyze "$REPO_URL" -r "$RULE_SET" -o "$RESULT_PATH/index.html"
+          # Use built CLI in dist or npm bin
+          if [ -f "dist/cli.js" ]; then
+            node dist/cli.js analyze "$REPO_URL" -r "$RULE_SET" -o "$RESULT_PATH/index.html"
+          else
+            npx -y template-doctor analyze "$REPO_URL" -r "$RULE_SET" -o "$RESULT_PATH/index.html"
+          fi
           
           # Set outputs for use in the next steps
           echo "owner=$OWNER" >> $GITHUB_OUTPUT
@@ -80,7 +85,7 @@ jobs:
           echo "total=$TOTAL" >> $GITHUB_OUTPUT
           echo "percentage=$PERCENTAGE" >> $GITHUB_OUTPUT
       
-      - name: Update index-data.js
+  - name: Update index-data.js
         id: update_index
         run: |
           # Create a new entry for the scanned template
@@ -102,14 +107,14 @@ jobs:
           )
           
           # Check if index-data.js exists, if not create it
-          if [ ! -f "frontend/results/index-data.js" ]; then
-            mkdir -p frontend/results
+          if [ ! -f "packages/app/results/index-data.js" ]; then
+            mkdir -p packages/app/results
             echo "// Template Doctor scanned templates data
-          window.templatesData = [];" > frontend/results/index-data.js
+          window.templatesData = [];" > packages/app/results/index-data.js
           fi
           
           # Update the file by inserting the new entry at the beginning of the array
-          sed -i "s|window.templatesData = \[|window.templatesData = \[$NEW_ENTRY,|" frontend/results/index-data.js
+          sed -i "s|window.templatesData = \[|window.templatesData = \[$NEW_ENTRY,|" packages/app/results/index-data.js
       
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5

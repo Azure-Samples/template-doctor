@@ -19,7 +19,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '16'
+          node-version: '20'
 
       - name: Install dependencies
         run: npm ci
@@ -31,16 +31,26 @@ jobs:
           echo "Rule Set: ${{ github.event.client_payload.ruleSet }}"
           echo "Username: ${{ github.event.client_payload.username }}"
           echo "Timestamp: ${{ github.event.client_payload.timestamp }}"
+          echo "Upstream: ${{ github.event.client_payload.upstream }}"
+          echo "Origin Upstream: ${{ github.event.client_payload.originUpstream }}"
+          if [ -z "${{ github.event.client_payload.originUpstream }}" ] && [ -z "${{ github.event.client_payload.upstream }}" ]; then
+            echo "ERROR: originUpstream (preferred) or upstream must be provided in repository_dispatch.client_payload to run azd init."
+            exit 1
+          fi
           
       - name: Process analysis result
         id: process
         uses: ./
         with:
           repo-url: ${{ github.event.client_payload.repoUrl }}
+
           rule-set: ${{ github.event.client_payload.ruleSet }}
           username: ${{ github.event.client_payload.username }}
           timestamp: ${{ github.event.client_payload.timestamp }}
           analysis-data: ${{ toJSON(github.event.client_payload.analysisData) }}
+          # Prefer originUpstream but accept upstream for backward-compat
+          origin-upstream: ${{ github.event.client_payload.originUpstream || github.event.client_payload.upstream }}
+          upstream: ${{ github.event.client_payload.upstream }}
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v5

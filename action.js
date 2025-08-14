@@ -11,9 +11,13 @@ async function run() {
     const username = core.getInput('username');
     const timestamp = core.getInput('timestamp');
     const analysisDataRaw = core.getInput('analysis-data');
+  const upstreamInput = core.getInput('upstream');
+  const originUpstreamInput = core.getInput('origin-upstream');
     
-    core.info(`Processing analysis for repo: ${repoUrl}`);
+  core.info(`Processing analysis for repo: ${repoUrl}`);
     core.info(`Rule Set: ${ruleSet}, Username: ${username}`);
+  if (upstreamInput) core.info(`Upstream (from input): ${upstreamInput}`);
+  if (originUpstreamInput) core.info(`Origin Upstream (from input): ${originUpstreamInput}`);
     
     // Parse analysis data
     let analysisData;
@@ -57,6 +61,13 @@ async function run() {
     // Create timestamp for file names
     const fileTimestamp = Date.now();
     
+    // Determine canonical upstream (prefer origin-upstream, then upstream)
+    const canonicalOriginUpstream = (originUpstreamInput || upstreamInput || '').trim();
+    if (!canonicalOriginUpstream) {
+      core.setFailed('origin-upstream (or upstream) is required but was not provided. Please supply the canonical azd template as owner/repo, e.g., Azure-Samples/openai-langchainjs.');
+      return;
+    }
+
     // Create the base template data object
     const templateData = {
       timestamp,
@@ -70,11 +81,12 @@ async function run() {
         passed: passedCount
       },
       scannedBy: [username],
-      relativePath: `${repoName}/${fileTimestamp}-dashboard.html`
+      relativePath: `${repoName}/${fileTimestamp}-dashboard.html`,
+      ...(canonicalOriginUpstream ? { originUpstream: canonicalOriginUpstream } : {})
     };
 
-    // Read the current index-data.js file
-    const indexDataPath = path.join(__dirname, 'frontend', 'results', 'index-data.js');
+  // Read the current index-data.js file (monorepo path)
+  const indexDataPath = path.join(__dirname, 'packages', 'app', 'results', 'index-data.js');
     core.info(`Reading index data from: ${indexDataPath}`);
     
     let indexData;
@@ -104,7 +116,7 @@ async function run() {
     }
 
     // Check if the repository already exists in the data
-    const existingIndex = templatesData.findIndex(t => t.repoUrl === repoUrl);
+  const existingIndex = templatesData.findIndex(t => t.repoUrl === repoUrl);
     
     if (existingIndex >= 0) {
       // Repository exists, update it
@@ -132,15 +144,26 @@ async function run() {
       existing.ruleSet = ruleSet;
       existing.compliance = templateData.compliance;
       existing.relativePath = templateData.relativePath;
+      if (canonicalOriginUpstream) {
+        existing.originUpstream = canonicalOriginUpstream;
+        core.info(`Set originUpstream on existing entry: ${canonicalOriginUpstream}`);
+      }
       
       // Replace in array
       templatesData[existingIndex] = existing;
       core.info('Updated existing template data');
     } else {
       // Add new repository
-      core.info(`Adding new template data for ${repoUrl}`);
+  core.info(`Adding new template data for ${repoUrl}`);
       templatesData.unshift(templateData);
       core.info('Template data added to beginning of array');
+    }
+
+    // Ensure the frontend/results directory exists
+    const indexResultsDir = path.dirname(indexDataPath);
+    if (!fs.existsSync(indexResultsDir)) {
+      fs.mkdirSync(indexResultsDir, { recursive: true });
+      core.info(`Created directory: ${indexResultsDir}`);
     }
 
     // Write updated data back to index-data.js
@@ -153,9 +176,9 @@ async function run() {
       fs.mkdirSync(resultsDir, { recursive: true });
     }
 
-    // Write the analysis data
+  // Write the analysis data
     const dataFilePath = path.join(resultsDir, templateData.dataPath);
-    fs.writeFileSync(dataFilePath, `window.templateData = ${JSON.stringify(analysisData, null, 2)};`);
+  fs.writeFileSync(dataFilePath, `window.templateData = ${JSON.stringify(analysisData, null, 2)};`);
 
     // Create a simple dashboard HTML file
     const dashboardHtml = `

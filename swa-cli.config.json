@@ -2,8 +2,8 @@
   "$schema": "https://aka.ms/azure/static-web-apps-cli/schema",
   "configurations": {
     "template-doctor": {
-      "appLocation": "src/app",
-      "apiLocation": "api",
+      "appLocation": "packages/app",
+      "apiLocation": "packages/api",
       "outputLocation": ".",
       "apiLanguage": "node",
       "apiVersion": "18",

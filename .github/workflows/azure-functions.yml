@@ -20,12 +20,12 @@ jobs:
           node-version: '18'
 
       - name: Install dependencies
-        working-directory: api
+        working-directory: packages/api
         run: npm ci
 
       - name: Archive Function App
         run: |
-          cd api
+          cd packages/api
           zip -r ../functionapp.zip . -x "node_modules/**"
 
       - name: Deploy to Azure Functions
