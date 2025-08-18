@@ -5,7 +5,8 @@
   "description": "Standalone Azure Functions app for ACA job orchestration",
   "scripts": {
     "start": "func start",
-    "postinstall": "echo skip"
+    "preinstall": "echo 'Installing packages in functions-aca directory'",
+    "postinstall": "echo 'Packages installed in functions-aca directory'"
   },
   "engines": {
     "node": ">=16"

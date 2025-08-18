@@ -608,7 +608,7 @@ function testAzdProvision() {
   if (window.Notifications) {
     window.Notifications.confirm(
       'Test AZD Provision',
-      'This will run the full azd init/up/down workflow remotely in an isolated container and stream logs here. Proceed?',
+      'This will run azd init on the template repository in an Azure Container. Proceed?',
       {
         onConfirm: () => runAzdProvisionTest(),
       },
@@ -616,7 +616,7 @@ function testAzdProvision() {
   } else {
     if (
       confirm(
-        'This will test AZD provisioning for the template by running init/up/down remotely. Proceed?',
+        'This will run azd init on the template repository in an Azure Container. Proceed?',
       )
     ) {
       runAzdProvisionTest();
@@ -753,8 +753,8 @@ function runAzdProvisionTest() {
   let notification;
   if (window.Notifications) {
     notification = window.Notifications.loading(
-      'Starting AZD Provision Test',
-      `Starting init/up/down workflow for ${templateRepo}...`,
+      'Starting AZD Provision',
+      `Starting provisioning for ${templateRepo} in Azure Container App using Azure CLI image...`,
     );
   }
 
@@ -765,6 +765,10 @@ function runAzdProvisionTest() {
     return;
   }
   console.log('[azd] apiBase:', apiBase);
+  
+  // Add debug log to show we're using the latest frontend code
+  appendLog(logEl, `[debug] Using updated frontend code with enhanced debugging`);
+  appendLog(logEl, `[debug] Template repo: ${templateRepo}, Template name: ${templateName}`);
   // Kick off ACA Job via Function (public routes, now with /aca prefix)
   const startUrl = joinUrl(apiBase, '/api/aca-start-job');
   appendLog(logEl, `[info] Calling start URL: ${startUrl}`);
@@ -826,10 +830,16 @@ function runAzdProvisionTest() {
           if (finished) return;
           try {
             const url = streamUrl + `?mode=poll${pollSince ? `&since=${encodeURIComponent(pollSince)}` : ''}`;
+            appendLog(logEl, `[debug] Polling: ${url.slice(0, 100)}...`);
             const pr = await fetch(url, { headers: { Accept: 'application/json' } });
             if (!pr.ok) throw new Error(`poll ${pr.status}`);
             const data = await pr.json();
+            
+            // Debug raw response
+            console.log('[debug] Poll response:', data);
+            
             if (Array.isArray(data.messages)) {
+              appendLog(logEl, `[debug] Received ${data.messages.length} messages`);
               data.messages.forEach((m) => appendLog(logEl, m));
             }
             if (data.nextSince) pollSince = data.nextSince;
@@ -911,20 +921,56 @@ function runAzdProvisionTest() {
           // Best-effort: ask backend to stop the job execution
           try {
             const stopUrl = joinUrl(apiBase, '/api/aca-stop-job');
+            // Add additional debug for the container app job name prefix
+            const containerAppJobName = 'template-doctor-aca-job'; // Hardcoded job name
+            const jobExecutionName = `${containerAppJobName}-${currentExecution}`;
+            
+            appendLog(logEl, `[debug] Attempting to stop job with full execution name: ${jobExecutionName}`);
+            appendLog(logEl, `[debug] Falling back to short execution name if that fails: ${currentExecution}`);
+            
+            // First try with the fully qualified name
             fetch(stopUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ executionName: currentExecution })
+              body: JSON.stringify({ 
+                executionName: jobExecutionName,
+                originalExecutionName: currentExecution,
+                resourceGroup: 'template-doctor-rg' 
+              })
             }).then(async (r) => {
               if (!r.ok) {
                 let msg = '';
                 try { const j = await r.json(); msg = j.error || ''; } catch {}
-                appendLog(logEl, `[warn] Stop request failed: ${r.status}${msg ? ' - ' + msg : ''}`);
+                appendLog(logEl, `[warn] Stop request failed with full name: ${r.status}${msg ? ' - ' + msg : ''}`);
+                
+                // Fall back to the short name
+                return fetch(stopUrl, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ 
+                    executionName: currentExecution,
+                    resourceGroup: 'template-doctor-rg' 
+                  })
+                });
               } else {
-                appendLog(logEl, '[info] Stop requested');
+                appendLog(logEl, '[info] Stop requested successfully with full execution name');
+                return { ok: true };
               }
-            }).catch(() => {});
-          } catch {}
+            }).then(async (r) => {
+              if (r && !r.ok) {
+                let msg = '';
+                try { const j = await r.json(); msg = j.error || ''; } catch {}
+                appendLog(logEl, `[warn] Stop request failed with short name: ${r.status}${msg ? ' - ' + msg : ''}`);
+                appendLog(logEl, `[warn] Both stop attempts failed. The container job may need to be stopped manually.`);
+              } else if (r && r.ok && r !== true) {
+                appendLog(logEl, '[info] Stop requested successfully with short execution name');
+              }
+            }).catch((error) => {
+              appendLog(logEl, `[error] Stop request error: ${error.message || error}`);
+            });
+          } catch (error) {
+            appendLog(logEl, `[error] Error attempting to stop job: ${error.message || error}`);
+          }
           finalize({ succeeded: false, status: 'Stopped' });
         };
       }

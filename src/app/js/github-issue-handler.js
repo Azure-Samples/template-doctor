@@ -917,20 +917,85 @@ function runAzdProvisionTest(action = 'up') {
           // Best-effort: ask backend to stop the job execution
           try {
             const stopUrl = joinUrl(apiBase, '/api/aca-stop-job');
+            
+            // Store the original execution name (without container job prefix) to help with cache lookup
+            // This is the short ID created in aca-start-job (td-timestamp-template)
+            const originalExecutionName = currentExecution;
+            
+            // Get the proper execution name (might have container job prefix)
+            // We'll extract from logs or element IDs if possible
+            let containerJobPrefix = 'template-doctor-aca-job-';
+            let actualExecutionName = currentExecution;
+            
+            // Look for a container job name in the logs
+            try {
+              // See if we can find the job name in the logs
+              const logContent = logEl.textContent || '';
+              const jobNamePattern = /\[info\] Job execution exists with status:.*?template-doctor-aca-job-(\S+)/;
+              const match = logContent.match(jobNamePattern);
+              if (match && match[1]) {
+                actualExecutionName = `${containerJobPrefix}${match[1]}`;
+                appendLog(logEl, `[debug] Found container job name in logs: ${actualExecutionName}`);
+              } else if (!actualExecutionName.startsWith(containerJobPrefix)) {
+                // If no match in logs and doesn't have prefix, add it
+                actualExecutionName = `${containerJobPrefix}${currentExecution}`;
+                appendLog(logEl, `[debug] Using default container job name: ${actualExecutionName}`);
+              }
+            } catch (e) {
+              appendLog(logEl, `[debug] Error extracting job name: ${e.message}`);
+            }
+            
+            // Send both the original and actual execution names to help with backend lookup
+            const requestBody = { 
+              executionName: actualExecutionName,
+              originalExecutionName: originalExecutionName 
+            };
+            appendLog(logEl, `[debug] Stop request body: ${JSON.stringify(requestBody)}`);
+            
             fetch(stopUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ executionName: currentExecution })
+              body: JSON.stringify(requestBody)
             }).then(async (r) => {
               if (!r.ok) {
                 let msg = '';
-                try { const j = await r.json(); msg = j.error || ''; } catch {}
+                try { 
+                  const j = await r.json(); 
+                  msg = j.error || ''; 
+                  if (j.details) {
+                    msg += ` (${j.details})`;
+                  }
+                } catch {}
                 appendLog(logEl, `[warn] Stop request failed: ${r.status}${msg ? ' - ' + msg : ''}`);
+                
+                // If it's a 404, try with just the original execution name as fallback
+                if (r.status === 404) {
+                  appendLog(logEl, `[debug] Trying alternative stop with original execution name: ${originalExecutionName}`);
+                  fetch(stopUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ executionName: originalExecutionName })
+                  }).then(async (altR) => {
+                    if (!altR.ok) {
+                      let altMsg = '';
+                      try { const j = await altR.json(); altMsg = j.error || ''; } catch {}
+                      appendLog(logEl, `[warn] Alternative stop request also failed: ${altR.status}${altMsg ? ' - ' + altMsg : ''}`);
+                    } else {
+                      appendLog(logEl, '[info] Stop requested (using original execution name)');
+                    }
+                  }).catch((e) => {
+                    appendLog(logEl, `[error] Alternative stop request error: ${e.message}`);
+                  });
+                }
               } else {
                 appendLog(logEl, '[info] Stop requested');
               }
-            }).catch(() => {});
-          } catch {}
+            }).catch((e) => {
+              appendLog(logEl, `[error] Stop request error: ${e.message}`);
+            });
+          } catch (e) {
+            appendLog(logEl, `[error] Error preparing stop request: ${e.message}`);
+          }
           finalize({ succeeded: false, status: 'Stopped' });
         };
       }
