@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Container App Log Stream Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        #logs { 
+            background-color: #f5f5f5; 
+            padding: 10px; 
+            border-radius: 5px; 
+            height: 400px; 
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        button { padding: 10px; margin: 10px 0; }
+        .log-entry { margin: 5px 0; }
+        .info { color: #333; }
+        .error { color: #d9534f; }
+        .warning { color: #f0ad4e; }
+        .success { color: #5cb85c; }
+    </style>
+</head>
+<body>
+    <h1>Container App Log Stream Test</h1>
+    
+    <div>
+        <label for="executionName">Execution Name:</label>
+        <input type="text" id="executionName" placeholder="Enter execution name" value="start-1755543417567-odfvvh">
+        <button id="checkStatusBtn">Check Status</button>
+        <button id="startStreamBtn">Start Log Stream</button>
+        <button id="stopStreamBtn">Stop Log Stream</button>
+    </div>
+    
+    <div id="statusContainer" style="margin: 10px 0; padding: 10px; background-color: #e9ecef; border-radius: 5px; display: none;">
+        <h3>Job Status:</h3>
+        <pre id="statusOutput" style="white-space: pre-wrap;"></pre>
+    </div>
+    
+    <h2>Logs:</h2>
+    <div id="logs"></div>
+    
+    <h3>Connection Status:</h3>
+    <div id="connectionStatus" style="margin: 10px 0; padding: 5px; background-color: #f8f9fa; border-radius: 5px;">
+        Not connected
+    </div>
+    
+    <div style="margin-top: 20px;">
+        <h3>Test Actions:</h3>
+        <button id="startNewJobBtn">Start New Container Job</button>
+        <button id="stopJobBtn">Stop Current Job</button>
+        <button id="fetchLogsDirectlyBtn">Fetch Logs Directly (No Streaming)</button>
+        <button id="startPollingLogsBtn">Start Polling for Logs</button>
+        <button id="stopPollingLogsBtn" disabled>Stop Polling</button>
+        
+        <div style="margin-top: 15px;">
+            <h4>Diagnostics:</h4>
+            <button id="testOptionsBtn">Test OPTIONS Request</button>
+            <button id="testFetchWithCredentialsBtn">Test Fetch with Credentials</button>
+            <button id="checkServerTimeBtn">Check Server Time</button>
+            <button id="clearLogsBtn">Clear Log Display</button>
+            <button id="createWorkingJobBtn">Create Complete Job with Reliable Parameters</button>
+        </div>
+    </div>
+    
+    <script>
+        // Add this new function to create a job with reliable parameters
+        document.getElementById('createWorkingJobBtn').addEventListener('click', async () => {
+            try {
+                addLogEntry('Creating new job with carefully crafted parameters...', 'info');
+                
+                const timestamp = Date.now();
+                const templateName = 'todo-nodejs-mongo-swa';
+                
+                // Use a slightly simplified payload that we know works
+                const payload = {
+                    templateRepo: 'anfibiacreativa/todo-nodejs-mongo-swa',
+                    templateName: templateName,
+                    templateBranch: 'main',
+                    runId: `test-run-${timestamp}`,
+                    scanId: `scan-${timestamp}`,
+                    reportId: `report-${timestamp}`,
+                    timestamp: timestamp
+                };
+                
+                addLogEntry(`Job parameters: ${JSON.stringify(payload)}`, 'info');
+                
+                const response = await fetch('https://template-doctor-standalone-nv.azurewebsites.net/api/aca-start-job', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.correlationId) {
+                    // Update the input field
+                    executionNameInput.value = data.correlationId;
+                    
+                    // Display success details
+                    addLogEntry(`Started new job: ${data.correlationId}`, 'success');
+                    addLogEntry(`Container job name: ${data.jobName}`, 'info');
+                    addLogEntry(`Execution name: ${data.executionName}`, 'info');
+                    addLogEntry(`Template used: ${data.templateUsed}`, 'info');
+                    
+                    if (data.logs && data.logs.length > 0) {
+                        addLogEntry(`Initial logs: ${data.logs.join('\n')}`, 'info');
+                    }
+                    
+                    // Auto-check status after a delay
+                    setTimeout(() => {
+                        addLogEntry('Automatically checking job status...', 'info');
+                        document.getElementById('checkStatusBtn').click();
+                    }, 3000);
+                    
+                    // Auto-start polling for logs
+                    setTimeout(() => {
+                        addLogEntry('Automatically starting log polling...', 'info');
+                        document.getElementById('startPollingLogsBtn').click();
+                    }, 5000);
+                } else {
+                    addLogEntry(`Error starting job: ${JSON.stringify(data)}`, 'error');
+                }
+            } catch (error) {
+                addLogEntry(`Error creating job: ${error.message}`, 'error');
+            }
+        });
+
+        // Add these diagnostic tool handlers
+        document.getElementById('testOptionsBtn').addEventListener('click', async () => {
+            try {
+                const executionName = executionNameInput.value.trim() || 'test';
+                addLogEntry('Testing OPTIONS request to check CORS...', 'info');
+                
+                const response = await fetch(`https://template-doctor-standalone-nv.azurewebsites.net/api/aca-job-logs/${executionName}`, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Origin': window.location.origin,
+                        'Access-Control-Request-Method': 'GET',
+                        'Access-Control-Request-Headers': 'Content-Type'
+                    }
+                });
+                
+                addLogEntry(`OPTIONS status: ${response.status} ${response.statusText}`, 'info');
+                
+                // Log all headers
+                const headers = {};
+                response.headers.forEach((value, key) => {
+                    headers[key] = value;
+                });
+                
+                addLogEntry(`Response headers: ${JSON.stringify(headers, null, 2)}`, 'info');
+                
+                // Check specifically for CORS headers
+                const corsHeaders = {
+                    'Access-Control-Allow-Origin': response.headers.get('Access-Control-Allow-Origin'),
+                    'Access-Control-Allow-Methods': response.headers.get('Access-Control-Allow-Methods'),
+                    'Access-Control-Allow-Headers': response.headers.get('Access-Control-Allow-Headers'),
+                    'Access-Control-Allow-Credentials': response.headers.get('Access-Control-Allow-Credentials')
+                };
+                
+                addLogEntry(`CORS headers: ${JSON.stringify(corsHeaders)}`, 'info');
+                
+                // Check if this origin is allowed
+                const allowOrigin = response.headers.get('Access-Control-Allow-Origin');
+                if (allowOrigin === '*' || allowOrigin === window.location.origin) {
+                    addLogEntry('CORS: This origin is allowed', 'success');
+                } else {
+                    addLogEntry(`CORS: This origin (${window.location.origin}) may not be allowed`, 'error');
+                }
+            } catch (error) {
+                addLogEntry(`OPTIONS test error: ${error.message}`, 'error');
+            }
+        });
+        
+        document.getElementById('testFetchWithCredentialsBtn').addEventListener('click', async () => {
+            try {
+                const executionName = executionNameInput.value.trim() || 'test';
+                addLogEntry('Testing fetch with credentials...', 'info');
+                
+                const response = await fetch(`https://template-doctor-standalone-nv.azurewebsites.net/api/aca-job-logs/${executionName}`, {
+                    credentials: 'include',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                addLogEntry(`Fetch with credentials status: ${response.status} ${response.statusText}`, 'info');
+                
+                // Try to get the response
+                const contentType = response.headers.get('Content-Type');
+                if (contentType && contentType.includes('json')) {
+                    const data = await response.json();
+                    addLogEntry(`Response data: ${JSON.stringify(data)}`, 'info');
+                } else {
+                    const text = await response.text();
+                    addLogEntry(`Response text: ${text.substring(0, 200)}${text.length > 200 ? '...' : ''}`, 'info');
+                }
+            } catch (error) {
+                addLogEntry(`Fetch with credentials error: ${error.message}`, 'error');
+            }
+        });
+        
+        document.getElementById('checkServerTimeBtn').addEventListener('click', async () => {
+            try {
+                addLogEntry('Checking server time...', 'info');
+                
+                // Add a timestamp parameter to see if server time matches client time
+                const clientTime = Date.now();
+                const response = await fetch(`https://template-doctor-standalone-nv.azurewebsites.net/api/server-time?client=${clientTime}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addLogEntry(`Server time: ${new Date(data.serverTime).toLocaleString()}`, 'info');
+                    addLogEntry(`Client time: ${new Date(clientTime).toLocaleString()}`, 'info');
+                    
+                    // Calculate time difference
+                    const diff = Math.abs(data.serverTime - clientTime);
+                    addLogEntry(`Time difference: ${diff} ms`, diff > 5000 ? 'warning' : 'info');
+                } else {
+                    // Fallback to Date header
+                    const serverDate = response.headers.get('Date');
+                    if (serverDate) {
+                        const serverTime = new Date(serverDate).getTime();
+                        addLogEntry(`Server time (from headers): ${new Date(serverTime).toLocaleString()}`, 'info');
+                        addLogEntry(`Client time: ${new Date(clientTime).toLocaleString()}`, 'info');
+                        
+                        // Calculate time difference
+                        const diff = Math.abs(serverTime - clientTime);
+                        addLogEntry(`Time difference: ${diff} ms`, diff > 5000 ? 'warning' : 'info');
+                    } else {
+                        addLogEntry(`Couldn't get server time. Status: ${response.status}`, 'error');
+                    }
+                }
+            } catch (error) {
+                addLogEntry(`Server time check error: ${error.message}`, 'error');
+            }
+        });
+        
+        document.getElementById('clearLogsBtn').addEventListener('click', () => {
+            logsContainer.innerHTML = '';
+            addLogEntry('Logs cleared', 'info');
+        });
+    </script>
+
+    <script>
+        let eventSource = null;
+        let pollingInterval = null;
+        let lastLogTimestamp = null;
+        const logsContainer = document.getElementById('logs');
+        const executionNameInput = document.getElementById('executionName');
+        const statusContainer = document.getElementById('statusContainer');
+        const statusOutput = document.getElementById('statusOutput');
+        const startPollingBtn = document.getElementById('startPollingLogsBtn');
+        const stopPollingBtn = document.getElementById('stopPollingLogsBtn');
+        
+        document.getElementById('checkStatusBtn').addEventListener('click', async () => {
+            const executionName = executionNameInput.value.trim();
+            if (!executionName) {
+                alert('Please enter an execution name');
+                return;
+            }
+            
+            try {
+                statusContainer.style.display = 'block';
+                statusOutput.textContent = 'Checking job status...';
+                addLogEntry(`Checking status for job: ${executionName}`, 'info');
+                
+                // Standard status check
+                const response = await fetch(`https://template-doctor-standalone-nv.azurewebsites.net/api/aca-job-status?executionName=${executionName}`);
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                const status = data.status || 'Unknown';
+                
+                // Display basic job info
+                addLogEntry(`Job Status: ${status}`, status === 'Running' ? 'success' : 'info');
+                if (data.startTime) {
+                    const startTime = new Date(data.startTime);
+                    const duration = Math.round((Date.now() - startTime.getTime()) / 1000);
+                    addLogEntry(`Job started: ${startTime.toLocaleString()} (${duration} seconds ago)`, 'info');
+                }
+                
+                // Try to get additional container job details
+                let detailsData = null;
+                try {
+                    // This is a speculative request to see if there's a more detailed endpoint
+                    const detailsResponse = await fetch(`https://template-doctor-standalone-nv.azurewebsites.net/api/aca-job-details?executionName=${executionName}`);
+                    if (detailsResponse.ok) {
+                        detailsData = await detailsResponse.json();
+                        data.additionalDetails = detailsData;
+                        
+                        if (detailsData.containerName) {
+                            addLogEntry(`Container name: ${detailsData.containerName}`, 'info');
+                        }
+                    }
+                } catch (e) {
+                    // Ignore errors from this optional request
+                }
+                
+                // Display full response in status area
+                statusOutput.textContent = JSON.stringify(data, null, 2);
+                
+                // Additional check for direct logs - this is critical to determine if logs exist
+                try {
+                    addLogEntry('Checking for available logs...', 'info');
+                    
+                    // Add timestamp to bypass cache
+                    const logsResponse = await fetch(`https://template-doctor-standalone-nv.azurewebsites.net/api/aca-job-logs/${executionName}?_=${Date.now()}`, {
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
+                    
+                    if (logsResponse.ok) {
+                        // Try parsing as JSON first
+                        try {
+                            const logsData = await logsResponse.json();
+                            addLogEntry(`Logs API response type: JSON`, 'info');
+                            
+                            // Check different possible log structures
+                            if (logsData.logs && Array.isArray(logsData.logs)) {
+                                addLogEntry(`Found ${logsData.logs.length} log messages in 'logs' array`, 'success');
+                                if (logsData.logs.length > 0) {
+                                    addLogEntry(`First log: ${logsData.logs[0]}`, 'info');
+                                    addLogEntry(`Last log: ${logsData.logs[logsData.logs.length - 1]}`, 'info');
+                                }
+                            } else if (logsData.messages && Array.isArray(logsData.messages)) {
+                                addLogEntry(`Found ${logsData.messages.length} log messages in 'messages' array`, 'success');
+                                if (logsData.messages.length > 0) {
+                                    addLogEntry(`First message: ${JSON.stringify(logsData.messages[0])}`, 'info');
+                                    addLogEntry(`Last message: ${JSON.stringify(logsData.messages[logsData.messages.length - 1])}`, 'info');
+                                }
+                            } else if (logsData.results && Array.isArray(logsData.results)) {
+                                addLogEntry(`Found ${logsData.results.length} log messages in 'results' array`, 'success');
+                                if (logsData.results.length > 0) {
+                                    addLogEntry(`First result: ${JSON.stringify(logsData.results[0])}`, 'info');
+                                    addLogEntry(`Last result: ${JSON.stringify(logsData.results[logsData.results.length - 1])}`, 'info');
+                                }
+                            } else {
+                                addLogEntry(`Log structure: ${JSON.stringify(Object.keys(logsData))}`, 'warning');
+                                addLogEntry(`No recognized log array format found. Raw data: ${JSON.stringify(logsData)}`, 'warning');
+                            }
+                            
+                            // Add log data to status display
+                            data.logData = logsData;
+                            statusOutput.textContent = JSON.stringify(data, null, 2);
+                            
+                            // If we don't have logs yet but the job is running, offer to start polling
+                            if (status === 'Running' && 
+                                (!logsData.logs || logsData.logs.length === 0) && 
+                                (!logsData.messages || logsData.messages.length === 0) && 
+                                (!logsData.results || logsData.results.length === 0)) {
+                                addLogEntry('Job is running but no logs are available yet. Consider polling for logs.', 'warning');
+                            }
+                        } catch (jsonError) {
+                            // Not JSON, try as text
+                            const textResponse = await logsResponse.text();
+                            addLogEntry(`Logs API response type: Text (${textResponse.length} chars)`, 'info');
+                            
+                            if (textResponse.includes('data:')) {
+                                // Looks like SSE format
+                                addLogEntry('Response appears to be in SSE format. Use the Stream button.', 'warning');
+                                const sseLines = textResponse.split('\n').slice(0, 5).join('\n');
+                                addLogEntry(`SSE preview: ${sseLines}...`, 'info');
+                            } else if (textResponse.trim()) {
+                                // Some other text response
+                                const preview = textResponse.length > 100 ? textResponse.substring(0, 100) + '...' : textResponse;
+                                addLogEntry(`Text preview: ${preview}`, 'info');
+                            } else {
+                                addLogEntry('Logs endpoint returned empty response', 'warning');
+                            }
+                            
+                            // Add text response to status display
+                            data.logText = textResponse.substring(0, 1000) + (textResponse.length > 1000 ? '...' : '');
+                            statusOutput.textContent = JSON.stringify(data, null, 2);
+                        }
+                    } else {
+                        addLogEntry(`Logs API error: HTTP ${logsResponse.status} - ${logsResponse.statusText}`, 'error');
+                    }
+                } catch (e) {
+                    addLogEntry(`Error checking logs: ${e.message}`, 'error');
+                }
+                
+                // Check if the API can provide log source info
+                try {
+                    const sourceResponse = await fetch(`https://template-doctor-standalone-nv.azurewebsites.net/api/aca-log-sources?executionName=${executionName}`);
+                    if (sourceResponse.ok) {
+                        const sourceData = await sourceResponse.json();
+                        if (sourceData && Object.keys(sourceData).length > 0) {
+                            addLogEntry(`Log sources: ${JSON.stringify(sourceData)}`, 'info');
+                            data.logSources = sourceData;
+                            statusOutput.textContent = JSON.stringify(data, null, 2);
+                        }
+                    }
+                } catch (e) {
+                    // Ignore errors from this optional request
+                }
+                
+            } catch (error) {
+                statusOutput.textContent = `Error checking status: ${error.message}`;
+                addLogEntry(`Status check error: ${error.message}`, 'error');
+            }
+        });
+        
+        document.getElementById('startStreamBtn').addEventListener('click', () => {
+            const executionName = executionNameInput.value.trim();
+            if (!executionName) {
+                alert('Please enter an execution name');
+                return;
+            }
+            
+            if (eventSource) {
+                eventSource.close();
+            }
+            
+            logsContainer.innerHTML = '';
+            addLogEntry('Connecting to log stream...', 'info');
+            
+            // First, check if the job exists and has logs before starting SSE
+            fetch(`https://template-doctor-standalone-nv.azurewebsites.net/api/aca-job-status?executionName=${executionName}`)
+                .then(response => response.json())
+                .then(data => {
+                    addLogEntry(`Job check before streaming: ${JSON.stringify(data)}`, 'info');
+                    
+                    // Now try an OPTIONS request to check CORS
+                    return fetch(`https://template-doctor-standalone-nv.azurewebsites.net/api/aca-job-logs/${executionName}`, {
+                        method: 'OPTIONS',
+                        headers: {
+                            'Origin': window.location.origin
+                        }
+                    });
+                })
+                .then(response => {
+                    // Log the CORS headers
+                    const corsHeaders = {
+                        'Access-Control-Allow-Origin': response.headers.get('Access-Control-Allow-Origin'),
+                        'Access-Control-Allow-Methods': response.headers.get('Access-Control-Allow-Methods'),
+                        'Access-Control-Allow-Headers': response.headers.get('Access-Control-Allow-Headers')
+                    };
+                    addLogEntry(`CORS headers: ${JSON.stringify(corsHeaders)}`, 'info');
+                    
+                    // Now start the actual SSE connection
+                    initializeEventSource(executionName);
+                })
+                .catch(error => {
+                    addLogEntry(`Pre-connection check error: ${error.message}`, 'error');
+                    // Still try to connect even if the pre-checks fail
+                    initializeEventSource(executionName);
+                });
+        });
+        
+        function initializeEventSource(executionName) {
+            // Add a random query parameter to prevent caching
+            const url = `https://template-doctor-standalone-nv.azurewebsites.net/api/aca-job-logs/${executionName}?_=${Date.now()}`;
+            addLogEntry(`Creating EventSource with URL: ${url}`, 'info');
+            
+            // Create SSE connection with debug info
+            try {
+                eventSource = new EventSource(url);
+                addLogEntry(`EventSource created with readyState: ${eventSource.readyState}`, 'info');
+                
+                eventSource.onmessage = (event) => {
+                    try {
+                        addLogEntry(`Received message event of type: ${event.type}`, 'success');
+                        const data = JSON.parse(event.data);
+                        addLogEntry(data.log || data.message || JSON.stringify(data), 'info');
+                    } catch (e) {
+                        addLogEntry(`Raw message: ${event.data}`, 'info');
+                        addLogEntry(`Parse error: ${e.message}`, 'warning');
+                    }
+                };
+                
+                eventSource.addEventListener('keepalive', (event) => {
+                    addLogEntry(`Keepalive event received: ${event.data}`, 'info');
+                });
+                
+                eventSource.addEventListener('error', (event) => {
+                    addLogEntry('Error in EventSource connection', 'error');
+                    
+                    // Get detailed error information
+                    let errorInfo = 'Error details:';
+                    if (event.error) errorInfo += ` ${event.error.message}`;
+                    if (event.message) errorInfo += ` Message: ${event.message}`;
+                    if (event.status) errorInfo += ` Status: ${event.status}`;
+                    if (event.readyState) errorInfo += ` ReadyState: ${event.readyState}`;
+                    
+                    // If we don't have any details, try to get more info
+                    if (errorInfo === 'Error details:') {
+                        errorInfo += ' No detailed error information available';
+                        
+                        // Log browser console messages for more details
+                        console.error('SSE Error Event:', event);
+                        
+                        // Check if it might be a CORS error
+                        const isSecureContext = window.isSecureContext;
+                        const currentProtocol = window.location.protocol;
+                        errorInfo += ` | Context secure: ${isSecureContext}, Protocol: ${currentProtocol}`;
+                    }
+                    
+                    addLogEntry(errorInfo, 'error');
+                    
+                    // Check EventSource state
+                    if (eventSource) {
+                        addLogEntry(`EventSource state: ${getReadyStateText(eventSource.readyState)}`, 'info');
+                        
+                        // Don't auto-reconnect immediately - this might be causing a loop
+                        if (eventSource.readyState === EventSource.CLOSED) {
+                            addLogEntry('Connection closed. Not auto-reconnecting to avoid error loop.', 'warning');
+                            
+                            // Attempt to fetch logs directly instead as a fallback
+                            setTimeout(() => {
+                                addLogEntry('Attempting direct log fetch as fallback...', 'info');
+                                document.getElementById('fetchLogsDirectlyBtn').click();
+                            }, 1000);
+                        }
+                    }
+                });
+                
+                eventSource.addEventListener('open', () => {
+                    addLogEntry('Connection established successfully', 'success');
+                    // After connection, check if we actually have logs available
+                    setTimeout(() => checkForAvailableLogs(executionName), 2000);
+                });
+                
+                // Add listener for any other event types
+                eventSource.addEventListener('message', (event) => {
+                    addLogEntry(`Generic 'message' event: ${event.data}`, 'info');
+                });
+            } catch (error) {
+                addLogEntry(`Error creating EventSource: ${error.message}`, 'error');
+            }
+        }
+        
+        function getReadyStateText(state) {
+            switch(state) {
+                case EventSource.CONNECTING: return "CONNECTING (0)";
+                case EventSource.OPEN: return "OPEN (1)";
+                case EventSource.CLOSED: return "CLOSED (2)";
+                default: return `UNKNOWN (${state})`;
+            }
+        }
+        
+        function checkForAvailableLogs(executionName) {
+            // If the connection is open but we're not getting logs, check if logs exist
+            if (eventSource && eventSource.readyState === EventSource.OPEN) {
+                fetch(`https://template-doctor-standalone-nv.azurewebsites.net/api/aca-job-logs/${executionName}?_=${Date.now()}`, {
+                    headers: {
+                        'Accept': 'application/json'  // Request JSON instead of SSE
+                    }
+                })
+                .then(response => {
+                    if (response.ok) {
+                        return response.json().catch(() => response.text());
+                    }
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                })
+                .then(data => {
+                    if (typeof data === 'string') {
+                        addLogEntry(`Log check: Received text response (${data.length} chars)`, 'info');
+                    } else {
+                        addLogEntry(`Log check: ${JSON.stringify(data)}`, 'info');
+                        
+                        // If we have logs but the stream isn't showing them, suggest polling
+                        if (data.logs && data.logs.length > 0) {
+                            addLogEntry(`Found ${data.logs.length} logs but stream not receiving them. Consider using polling.`, 'warning');
+                        }
+                    }
+                })
+                .catch(error => {
+                    addLogEntry(`Log availability check error: ${error.message}`, 'error');
+                });
+            }
+        }
+        
+        document.getElementById('stopStreamBtn').addEventListener('click', () => {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+                addLogEntry('Connection closed', 'warning');
+            }
+        });
+        
+        const connectionStatusElem = document.getElementById('connectionStatus');
+        
+        function updateConnectionStatus() {
+            if (!eventSource) {
+                connectionStatusElem.textContent = 'Not connected';
+                connectionStatusElem.style.backgroundColor = '#f8f9fa';
+                return;
+            }
+            
+            switch(eventSource.readyState) {
+                case EventSource.CONNECTING:
+                    connectionStatusElem.textContent = 'Connecting...';
+                    connectionStatusElem.style.backgroundColor = '#fff3cd';
+                    break;
+                case EventSource.OPEN:
+                    connectionStatusElem.textContent = 'Connected';
+                    connectionStatusElem.style.backgroundColor = '#d4edda';
+                    break;
+                case EventSource.CLOSED:
+                    connectionStatusElem.textContent = 'Disconnected';
+                    connectionStatusElem.style.backgroundColor = '#f8d7da';
+                    break;
+            }
+        }
+        
+        // Status update timer
+        setInterval(updateConnectionStatus, 1000);
+        
+        document.getElementById('startNewJobBtn').addEventListener('click', async () => {
+            try {
+                addLogEntry('Starting new container job...', 'info');
+                
+                // Add required parameters for a proper template scan
+                const jobParams = {
+                    templateRepo: 'anfibiacreativa/todo-nodejs-mongo-swa',
+                    templateName: 'todo-nodejs-mongo-swa',  // This is essential
+                    runId: `test-run-${Date.now()}`,
+                    timestamp: Date.now(),
+                    templateBranch: 'main',
+                    reportId: `report-${Date.now()}`,  // Added report ID
+                    scanId: `scan-${Date.now()}`,      // Added scan ID
+                    skipDownload: false                // Ensure download happens
+                };
+                
+                addLogEntry(`Job parameters: ${JSON.stringify(jobParams)}`, 'info');
+                
+                const response = await fetch('https://template-doctor-standalone-nv.azurewebsites.net/api/aca-start-job', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(jobParams)
+                });
+                
+                // Check HTTP status first
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.correlationId) {
+                    executionNameInput.value = data.correlationId;
+                    addLogEntry(`Started new job: ${data.correlationId}`, 'success');
+                    addLogEntry(`Message: ${data.message || 'Job started successfully'}`, 'info');
+                    
+                    // Automatically check status after 2 seconds
+                    setTimeout(() => {
+                        addLogEntry('Automatically checking job status...', 'info');
+                        document.getElementById('checkStatusBtn').click();
+                    }, 2000);
+                    
+                    // Save the job parameters to localstorage for reference
+                    try {
+                        localStorage.setItem(`jobParams_${data.correlationId}`, JSON.stringify(jobParams));
+                        localStorage.setItem('lastJobId', data.correlationId);
+                    } catch (e) {
+                        // Ignore localStorage errors
+                    }
+                } else {
+                    addLogEntry(`Error starting job: ${JSON.stringify(data)}`, 'error');
+                }
+            } catch (error) {
+                addLogEntry(`Error starting job: ${error.message}`, 'error');
+            }
+        });
+        
+        document.getElementById('stopJobBtn').addEventListener('click', async () => {
+            const executionName = executionNameInput.value.trim();
+            if (!executionName) {
+                alert('Please enter an execution name');
+                return;
+            }
+            
+            try {
+                const response = await fetch('https://template-doctor-standalone-nv.azurewebsites.net/api/aca-stop-job', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        executionName: executionName
+                    })
+                });
+                
+                const data = await response.json();
+                addLogEntry(`Stop job response: ${JSON.stringify(data)}`, 'info');
+            } catch (error) {
+                addLogEntry(`Error stopping job: ${error.message}`, 'error');
+            }
+        });
+        
+        document.getElementById('fetchLogsDirectlyBtn').addEventListener('click', async () => {
+            const executionName = executionNameInput.value.trim();
+            if (!executionName) {
+                alert('Please enter an execution name');
+                return;
+            }
+            
+            try {
+                addLogEntry('Fetching logs directly (without streaming)...', 'info');
+                
+                // Test with regular fetch to see if we can get any logs
+                const response = await fetch(`https://template-doctor-standalone-nv.azurewebsites.net/api/aca-job-logs/${executionName}`, {
+                    headers: {
+                        'Accept': 'application/json'  // Request JSON instead of SSE
+                    }
+                });
+                
+                if (response.ok) {
+                    try {
+                        const data = await response.json();
+                        addLogEntry(`Logs retrieved: ${JSON.stringify(data)}`, 'success');
+                    } catch (e) {
+                        // If not JSON, try text
+                        const text = await response.text();
+                        addLogEntry(`Response (text): ${text.substring(0, 500)}${text.length > 500 ? '...' : ''}`, 'info');
+                    }
+                } else {
+                    addLogEntry(`Failed to fetch logs: HTTP ${response.status} - ${response.statusText}`, 'error');
+                }
+            } catch (error) {
+                addLogEntry(`Error fetching logs: ${error.message}`, 'error');
+            }
+        });
+        
+        // Polling for logs as an alternative to SSE
+        document.getElementById('startPollingLogsBtn').addEventListener('click', () => {
+            const executionName = executionNameInput.value.trim();
+            if (!executionName) {
+                alert('Please enter an execution name');
+                return;
+            }
+            
+            // Clear any existing polling
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+            }
+            
+            // Reset timestamp to get all logs
+            lastLogTimestamp = null;
+            addLogEntry('Starting to poll for logs...', 'info');
+            
+            // Enable/disable buttons
+            startPollingBtn.disabled = true;
+            stopPollingBtn.disabled = false;
+            
+            // Start polling
+            pollForLogs(executionName);
+            pollingInterval = setInterval(() => pollForLogs(executionName), 2000);
+        });
+        
+        document.getElementById('stopPollingLogsBtn').addEventListener('click', () => {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+                addLogEntry('Stopped polling for logs', 'warning');
+                
+                // Enable/disable buttons
+                startPollingBtn.disabled = false;
+                stopPollingBtn.disabled = true;
+            }
+        });
+        
+        async function pollForLogs(executionName) {
+            try {
+                // Add a timestamp parameter to avoid caching and get only new logs
+                let url = `https://template-doctor-standalone-nv.azurewebsites.net/api/aca-job-logs/${executionName}?timestamp=${Date.now()}`;
+                
+                // If we have a lastLogTimestamp, add it to get only newer logs
+                if (lastLogTimestamp) {
+                    url += `&since=${lastLogTimestamp}`;
+                }
+                
+                addLogEntry(`[POLL] Requesting logs from: ${url}`, 'info');
+                
+                const response = await fetch(url, {
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    // First try to parse as JSON
+                    try {
+                        const data = await response.json();
+                        addLogEntry(`[POLL] Received JSON response`, 'info');
+                        
+                        // Check for different possible log structures
+                        let logs = [];
+                        
+                        if (data && Array.isArray(data)) {
+                            // Direct array of logs
+                            logs = data;
+                            addLogEntry(`[POLL] Found ${logs.length} log entries in direct array`, 'success');
+                        } else if (data && data.logs && Array.isArray(data.logs)) {
+                            logs = data.logs;
+                            addLogEntry(`[POLL] Found ${logs.length} log entries in 'logs' array`, 'success');
+                        } else if (data && data.messages && Array.isArray(data.messages)) {
+                            logs = data.messages;
+                            addLogEntry(`[POLL] Found ${logs.length} log entries in 'messages' array`, 'success');
+                        } else if (data && data.results && Array.isArray(data.results)) {
+                            logs = data.results;
+                            addLogEntry(`[POLL] Found ${logs.length} log entries in 'results' array`, 'success');
+                        } else {
+                            // No recognized array format, just show the whole object
+                            addLogEntry(`[POLL] Unrecognized log format: ${JSON.stringify(data)}`, 'warning');
+                            // Still update timestamp to avoid repeating the same data
+                            lastLogTimestamp = Date.now();
+                            return;
+                        }
+                        
+                        // If we have logs, update our UI
+                        if (logs.length > 0) {
+                            logs.forEach(log => {
+                                if (typeof log === 'string') {
+                                    addLogEntry(`[POLL] ${log}`, 'info');
+                                } else if (typeof log === 'object') {
+                                    // Try to extract message from object
+                                    const message = log.log || log.message || log.content || JSON.stringify(log);
+                                    addLogEntry(`[POLL] ${message}`, 'info');
+                                }
+                            });
+                            
+                            // Update the timestamp for next poll
+                            lastLogTimestamp = Date.now();
+                        } else {
+                            addLogEntry(`[POLL] No new logs found`, 'info');
+                        }
+                    } catch (jsonError) {
+                        // Not JSON, try as text
+                        const text = await response.text();
+                        
+                        // Check if it's SSE format (data: lines)
+                        if (text.includes('data:')) {
+                            // Parse SSE format
+                            const lines = text.split('\n');
+                            let logCount = 0;
+                            
+                            for (let i = 0; i < lines.length; i++) {
+                                const line = lines[i].trim();
+                                if (line.startsWith('data:')) {
+                                    logCount++;
+                                    try {
+                                        // Extract and parse the data
+                                        const data = line.substring(5).trim();
+                                        const parsedData = JSON.parse(data);
+                                        const logMessage = parsedData.log || parsedData.message || data;
+                                        addLogEntry(`[POLL-SSE] ${logMessage}`, 'info');
+                                    } catch (e) {
+                                        // Just use the raw data if parsing fails
+                                        addLogEntry(`[POLL-SSE] ${line.substring(5)}`, 'info');
+                                    }
+                                }
+                            }
+                            
+                            if (logCount > 0) {
+                                addLogEntry(`[POLL] Extracted ${logCount} messages from SSE format`, 'success');
+                                lastLogTimestamp = Date.now();
+                            } else {
+                                addLogEntry(`[POLL] No data events found in SSE response`, 'warning');
+                            }
+                        } else if (text && text.trim()) {
+                            // Some other text format - try to display meaningfully
+                            addLogEntry(`[POLL] Received text response (${text.length} chars)`, 'info');
+                            
+                            // Check if it might be a log lines format (one log per line)
+                            const lines = text.split('\n').filter(line => line.trim());
+                            if (lines.length > 0) {
+                                addLogEntry(`[POLL] Treating as ${lines.length} separate log lines`, 'info');
+                                lines.forEach(line => {
+                                    addLogEntry(`[POLL] ${line}`, 'info');
+                                });
+                                lastLogTimestamp = Date.now();
+                            } else {
+                                // Just one block of text
+                                const preview = text.length > 100 ? text.substring(0, 100) + '...' : text;
+                                addLogEntry(`[POLL] ${preview}`, 'info');
+                                lastLogTimestamp = Date.now();
+                            }
+                        } else {
+                            addLogEntry(`[POLL] Empty response`, 'warning');
+                        }
+                    }
+                } else if (response.status !== 304) { // Ignore 304 Not Modified
+                    addLogEntry(`[POLL] Failed: HTTP ${response.status} - ${response.statusText}`, 'error');
+                }
+            } catch (error) {
+                addLogEntry(`[POLL] Error: ${error.message}`, 'error');
+            }
+        }
+        
+        function addLogEntry(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logsContainer.appendChild(entry);
+            logsContainer.scrollTop = logsContainer.scrollHeight;
+        }
+    </script>
+</body>
+</html>

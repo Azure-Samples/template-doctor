@@ -16,7 +16,9 @@
         "start": "node --experimental-json-modules dist/cli.js",
         "test": "npm run -w packages/app test",
         "test:ui": "npm run -w packages/app test:ui",
-        "test:debug": "npm run -w packages/app test:debug"
+        "test:debug": "npm run -w packages/app test:debug",
+        "verify-aca": "node scripts/verify-aca-setup.js",
+        "inspect-aca-client": "node scripts/inspect-container-app-client.js"
     },
     "keywords": [
         "azd",
