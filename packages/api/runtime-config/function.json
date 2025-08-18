@@ -5,8 +5,8 @@
       "type": "httpTrigger",
       "direction": "in",
       "name": "req",
-      "methods": ["get", "options"],
-      "route": "runtime-config"
+  "methods": ["get", "options"],
+  "route": "client-settings"
     },
     {
       "type": "http",

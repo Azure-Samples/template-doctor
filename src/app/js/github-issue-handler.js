@@ -608,7 +608,7 @@ function testAzdProvision() {
   if (window.Notifications) {
     window.Notifications.confirm(
       'Test AZD Provision',
-      'This will run the full azd init/up/down workflow remotely in an isolated container and stream logs here. Proceed?',
+      'This will run azd up/down remotely in an isolated container and stream logs here. Proceed?',
       {
         onConfirm: () => runAzdProvisionTest(),
       },
@@ -616,7 +616,7 @@ function testAzdProvision() {
   } else {
     if (
       confirm(
-        'This will test AZD provisioning for the template by running init/up/down remotely. Proceed?',
+        'This would test AZD provisioning for the template. Since this is a frontend-only implementation, this will be simulated. Proceed?',
       )
     ) {
       runAzdProvisionTest();
@@ -627,7 +627,7 @@ function testAzdProvision() {
 /**
  * Run the AZD provision test
  */
-function runAzdProvisionTest() {
+function runAzdProvisionTest(action = 'up') {
   // Normalize incoming template identifiers to just the repo name (for azd -t)
   function normalizeTemplateToRepo(input) {
     if (!input || typeof input !== 'string') return '';
@@ -753,8 +753,8 @@ function runAzdProvisionTest() {
   let notification;
   if (window.Notifications) {
     notification = window.Notifications.loading(
-      'Starting AZD Provision Test',
-      `Starting init/up/down workflow for ${templateRepo}...`,
+      'Starting AZD Provision',
+  `Starting ${action.toUpperCase()} for ${templateRepo}…`,
     );
   }
 
@@ -765,29 +765,35 @@ function runAzdProvisionTest() {
     return;
   }
   console.log('[azd] apiBase:', apiBase);
-  // Kick off ACA Job via Function (public routes, now with /aca prefix)
-  const startUrl = joinUrl(apiBase, '/api/aca-start-job');
+  // Kick off ACA Job via Function with aca prefix
+  const startUrl = joinUrl(apiBase, '/api/aca-start-job?debug=1');
   appendLog(logEl, `[info] Calling start URL: ${startUrl}`);
   console.log('[azd] startUrl:', startUrl);
   appendLog(logEl, `[info] Requested template: ${templateRepo} (server will normalize)`);
   fetch(startUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ templateName: templateRepo })
+        body: JSON.stringify({ templateName: templateRepo, action })
       })
     .then(async (r) => {
       if (!r.ok) {
+        const corr = r.headers.get('x-correlation-id');
         let detail = '';
         try {
           const ct = r.headers.get('content-type') || '';
           if (ct.includes('application/json')) {
             const j = await r.json();
-            detail = j && (j.error || j.message) ? ` - ${j.error || j.message}` : '';
+            const msg = j && (j.error || j.message);
+            detail = msg ? ` - ${msg}` : '';
+            if (j && j.correlationId && !corr) {
+              detail += ` (cid=${j.correlationId})`;
+            }
           } else {
             const t = await r.text();
             detail = t ? ` - ${t.substring(0, 200)}` : '';
           }
         } catch {}
+        if (corr) detail += ` (cid=${corr})`;
         throw new Error(`Start failed: ${r.status}${detail}`);
       }
       const json = await r.json();

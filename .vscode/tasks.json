@@ -14,7 +14,7 @@
 				"src/frontend/tests/issue-labels.spec.js"
 			],
 			"problemMatcher": [
-				"$eslint - stylish"
+				"$eslint-stylish"
 			],
 			"group": "build"
 		},
@@ -127,7 +127,7 @@
 			"isBackground": true,
 			"dependsOn": "npm install (functions)",
 			"options": {
-				"cwd": "${workspaceFolder}/functions-aca"
+				"cwd": "${workspaceFolder}/packages/functions-aca"
 			}
 		},
 		{
@@ -135,7 +135,7 @@
 			"label": "npm install (functions)",
 			"command": "npm install",
 			"options": {
-				"cwd": "${workspaceFolder}/functions-aca"
+				"cwd": "${workspaceFolder}/packages/functions-aca"
 			}
 		},
 		{
@@ -144,8 +144,19 @@
 			"command": "npm prune --production",
 			"problemMatcher": [],
 			"options": {
-				"cwd": "${workspaceFolder}/functions-aca"
+				"cwd": "${workspaceFolder}/packages/functions-aca"
 			}
+		},
+		{
+			"label": "Start Azure Functions (functions-aca)",
+			"type": "shell",
+			"command": "npx",
+			"args": [
+				"func",
+				"start"
+			],
+			"isBackground": false,
+			"group": "build"
 		}
 	]
 }

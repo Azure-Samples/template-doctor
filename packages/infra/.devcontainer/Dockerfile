@@ -10,5 +10,11 @@ RUN curl -fsSL https://aka.ms/install-azd.sh | bash
 # Set working directory
 WORKDIR /app
 
+# Copy job scripts
+COPY start-azd-job.sh /usr/local/bin/start-azd-job.sh
+COPY entrypoint-wrapper.sh /usr/local/bin/entrypoint-wrapper.sh
+RUN chmod +x /usr/local/bin/start-azd-job.sh /usr/local/bin/entrypoint-wrapper.sh
+
 # Default command
-CMD ["/bin/bash"]
+ENTRYPOINT ["/usr/local/bin/entrypoint-wrapper.sh"]
+CMD []

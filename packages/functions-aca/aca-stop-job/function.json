@@ -6,7 +6,7 @@
       "direction": "in",
       "name": "req",
       "methods": ["post", "options"],
-      "route": "stop-job"
+      "route": "aca-stop-job"
     },
     {
       "type": "http",

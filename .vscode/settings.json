@@ -1,6 +1,6 @@
 {
-    "azureFunctions.projectSubpath": "functions-aca",
-    "azureFunctions.deploySubpath": "functions-aca",
+    "azureFunctions.projectSubpath": "packages/functions-aca",
+    "azureFunctions.deploySubpath": "packages/functions-aca",
     "azureFunctions.postDeployTask": "npm install (functions)",
     "azureFunctions.projectLanguage": "JavaScript",
     "azureFunctions.projectRuntime": "~4",

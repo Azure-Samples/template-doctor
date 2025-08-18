@@ -5,8 +5,8 @@
       "type": "httpTrigger",
       "direction": "in",
       "name": "req",
-      "methods": ["get", "options"],
-      "route": "aca-job-logs/{executionName}"
+      "methods": ["get", "post", "options"],
+      "route": "echo"
     },
     {
       "type": "http",

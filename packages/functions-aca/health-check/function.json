@@ -6,7 +6,7 @@
       "direction": "in",
       "name": "req",
       "methods": ["get", "options"],
-      "route": "aca-job-logs/{executionName}"
+      "route": "health-check"
     },
     {
       "type": "http",
