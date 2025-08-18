@@ -49,21 +49,8 @@ module.exports = async function (context, req) {
     // Get the client
     const client = await getContainerAppClient();
     
-    // Try different formats for the execution name
-    let jobNames = [];
-    
-    // Format 1: Original execution name (td-timestamp-template)
-    jobNames.push(executionName);
-    
-    // Format 2: Container App Job Name prefix (template-doctor-job-executionName)
-    if (!executionName.startsWith(containerAppJobName + '-')) {
-      jobNames.push(`${containerAppJobName}-${executionName}`);
-    }
-    
-    // Format 3: Container App Job with template-doctor-aca-job prefix
-    if (!executionName.startsWith('template-doctor-aca-job-')) {
-      jobNames.push(`template-doctor-aca-job-${executionName}`);
-    }
+    // Find the actual job execution name if we have it in memory
+    let actualJobExecutionName = null;
     
     // For debugging, if we have this in our global executionLogs, add that info
     let memoryInfo = null;
@@ -79,37 +66,92 @@ module.exports = async function (context, req) {
         latestLog: execInfo.logs && execInfo.logs.length > 0 ? 
           execInfo.logs[execInfo.logs.length - 1].message : null
       };
+      
+      if (execInfo.jobName) {
+        actualJobExecutionName = execInfo.jobName;
+        context.log.info(`Found actual job name in memory: ${actualJobExecutionName}`);
+      }
     }
     
-    // Try each job name format
+    // Use the list method to get all job executions
     const results = [];
-    
-    for (const jobName of jobNames) {
-      try {
-        context.log.info(`Trying to get status for job: ${jobName}`);
-        const execution = await client.containerJobExecutions.get(
-          resourceGroupName,
-          containerAppJobName,
-          jobName
-        );
-        
-        results.push({
-          name: jobName,
-          status: execution.properties.status,
-          startTime: execution.properties.startTime,
-          endTime: execution.properties.endTime,
-          provisioning: execution.properties.provisioningState,
-          found: true,
-          errorMsg: null
-        });
-      } catch (error) {
-        results.push({
-          name: jobName,
-          status: null,
-          found: false,
-          errorMsg: error.message
-        });
+    try {
+      // Get the jobs client - we'll be using list() method
+      const jobExecutionsClient = client.jobsExecutions || client.containerJobExecutions || client.jobs || null;
+      
+      if (!jobExecutionsClient || typeof jobExecutionsClient.list !== 'function') {
+        throw new Error('Could not find job executions client with list method');
       }
+      
+      // Get list of all job executions
+      const allExecutions = await jobExecutionsClient.list(
+        resourceGroupName,
+        containerAppJobName
+      );
+      
+      if (allExecutions && allExecutions.value && Array.isArray(allExecutions.value)) {
+        context.log.info(`Found ${allExecutions.value.length} total job executions`);
+        
+        // First try to find the execution using the actual name if we have it
+        if (actualJobExecutionName) {
+          const matchingExecution = allExecutions.value.find(e => e.name === actualJobExecutionName);
+          
+          if (matchingExecution) {
+            context.log.info(`Found job execution with name from memory: ${matchingExecution.name}`);
+            results.push({
+              name: matchingExecution.name,
+              status: matchingExecution.properties?.status || 'Unknown',
+              startTime: matchingExecution.properties?.startTime,
+              endTime: matchingExecution.properties?.endTime,
+              provisioning: matchingExecution.properties?.provisioningState,
+              found: true,
+              errorMsg: null
+            });
+          } else {
+            context.log.warn(`Could not find job execution with name from memory: ${actualJobExecutionName}`);
+          }
+        }
+        
+        // If we still don't have results, get the most recent job execution
+        if (results.length === 0) {
+          // Sort by start time (newest first)
+          allExecutions.value.sort((a, b) => {
+            const aTime = a.properties?.startTime ? new Date(a.properties.startTime).getTime() : 0;
+            const bTime = b.properties?.startTime ? new Date(b.properties.startTime).getTime() : 0;
+            return bTime - aTime;
+          });
+          
+          const mostRecent = allExecutions.value[0];
+          if (mostRecent) {
+            results.push({
+              name: mostRecent.name,
+              status: mostRecent.properties?.status || 'Unknown',
+              startTime: mostRecent.properties?.startTime,
+              endTime: mostRecent.properties?.endTime,
+              provisioning: mostRecent.properties?.provisioningState,
+              found: true,
+              isMostRecent: true,
+              errorMsg: null
+            });
+            
+            // Update global state with the actual job name for future reference
+            if (global.executionLogs && global.executionLogs[executionName]) {
+              global.executionLogs[executionName].jobName = mostRecent.name;
+              context.log.info(`Stored job name ${mostRecent.name} in memory for execution ${executionName}`);
+            }
+          }
+        }
+      } else {
+        context.log.warn('No job executions found or unexpected response format');
+      }
+    } catch (error) {
+      context.log.error(`Error getting job executions: ${error.message}`);
+      results.push({
+        name: 'error',
+        status: null,
+        found: false,
+        errorMsg: `Error: ${error.message}`
+      });
     }
     
     // Return the results
@@ -119,7 +161,6 @@ module.exports = async function (context, req) {
       body: {
         executionName,
         containerAppJobName,
-        jobNames,
         results,
         memoryInfo
       }
