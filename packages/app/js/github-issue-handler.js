@@ -682,7 +682,8 @@ function runAzdProvisionTest() {
 
   // Prefer upstream template name if provided in report data; otherwise use owner/repo from the report URL
   let templateName = null;
-  const upstreamFromReport = (window.reportData && (window.reportData.upstreamTemplate || window.reportData.upstream)) || '';
+  const upstreamFromReport =
+    (window.reportData && (window.reportData.upstreamTemplate || window.reportData.upstream)) || '';
   if (typeof upstreamFromReport === 'string' && upstreamFromReport.includes('/')) {
     templateName = upstreamFromReport.trim();
   } else if (owner && repo) {
@@ -690,7 +691,11 @@ function runAzdProvisionTest() {
   }
   if (!templateName) {
     const msg = '[error] Could not determine template name from repository URL.';
-    try { appendLog(document.getElementById('azd-provision-logs') || console, msg); } catch { console.error(msg); }
+    try {
+      appendLog(document.getElementById('azd-provision-logs') || console, msg);
+    } catch {
+      console.error(msg);
+    }
     return;
   }
   // Normalize to repo-only for azd init -t
@@ -718,7 +723,8 @@ function runAzdProvisionTest() {
   if (!logEl) {
     logEl = document.createElement('pre');
     logEl.id = 'azd-provision-logs';
-    logEl.style.cssText = 'max-height: 300px; overflow:auto; background:#0b0c0c; color:#d0d0d0; padding:20px; border-radius:6px 0 0 6px; font-size:12px; margin:10px 0 50px 0;';
+    logEl.style.cssText =
+      'max-height: 300px; overflow:auto; background:#0b0c0c; color:#d0d0d0; padding:20px; border-radius:6px 0 0 6px; font-size:12px; margin:10px 0 50px 0;';
     const header = document.querySelector('.report-actions') || document.body;
     header.parentNode.insertBefore(logEl, header.nextSibling);
     // Add controls row (Stop button)
@@ -728,7 +734,8 @@ function runAzdProvisionTest() {
     const stopBtn = document.createElement('button');
     stopBtn.id = 'azd-stop-btn';
     stopBtn.textContent = 'Stop Provision';
-    stopBtn.style.cssText = 'padding:6px 12px; background:#b10e1e; color:#fff; border:none; border-radius:6px; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,0.15); margin: 0 0 10px 20px';
+    stopBtn.style.cssText =
+      'padding:6px 12px; background:#b10e1e; color:#fff; border:none; border-radius:6px; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,0.15); margin: 0 0 10px 20px';
     stopBtn.disabled = true;
     controls.appendChild(stopBtn);
     logEl.parentNode.insertBefore(controls, logEl);
@@ -748,7 +755,11 @@ function runAzdProvisionTest() {
     }
   } catch {}
 
-  const baseUrl = window.location.origin + (window.location.pathname.includes('/index.html') ? window.location.pathname.replace('/index.html','') : window.location.pathname);
+  const baseUrl =
+    window.location.origin +
+    (window.location.pathname.includes('/index.html')
+      ? window.location.pathname.replace('/index.html', '')
+      : window.location.pathname);
 
   let notification;
   if (window.Notifications) {
@@ -771,10 +782,10 @@ function runAzdProvisionTest() {
   console.log('[azd] startUrl:', startUrl);
   appendLog(logEl, `[info] Requested template: ${templateRepo} (server will normalize)`);
   fetch(startUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ templateName: templateRepo })
-      })
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ templateName: templateRepo }),
+  })
     .then(async (r) => {
       if (!r.ok) {
         let detail = '';
@@ -802,16 +813,22 @@ function runAzdProvisionTest() {
       appendLog(logEl, `[info] Connecting logs stream: ${streamUrl}`);
       console.log('[azd] streamUrl:', streamUrl);
       const stopBtn = document.getElementById('azd-stop-btn');
-  let ev;
+      let ev;
       let pollTimer;
       let pollSince = '';
       let finished = false;
-  let currentExecution = executionName;
+      let currentExecution = executionName;
 
       function finalize(result) {
         finished = true;
-        if (ev) try { ev.close(); } catch {}
-        if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+        if (ev)
+          try {
+            ev.close();
+          } catch {}
+        if (pollTimer) {
+          clearTimeout(pollTimer);
+          pollTimer = null;
+        }
         if (stopBtn) stopBtn.disabled = true;
         if (!notification) return;
         if (result && result.succeeded) {
@@ -825,7 +842,8 @@ function runAzdProvisionTest() {
         const doPoll = async () => {
           if (finished) return;
           try {
-            const url = streamUrl + `?mode=poll${pollSince ? `&since=${encodeURIComponent(pollSince)}` : ''}`;
+            const url =
+              streamUrl + `?mode=poll${pollSince ? `&since=${encodeURIComponent(pollSince)}` : ''}`;
             const pr = await fetch(url, { headers: { Accept: 'application/json' } });
             if (!pr.ok) throw new Error(`poll ${pr.status}`);
             const data = await pr.json();
@@ -838,10 +856,15 @@ function runAzdProvisionTest() {
               const extras = [];
               if (det.provisioningState) extras.push(`prov=${det.provisioningState}`);
               if (det.status) extras.push(`status=${det.status}`);
-              if (typeof det.exitCode !== 'undefined' && det.exitCode !== null) extras.push(`exit=${det.exitCode}`);
-              appendLog(logEl, `[status] ${data.status}${extras.length ? ' (' + extras.join(', ') + ')' : ''}`);
+              if (typeof det.exitCode !== 'undefined' && det.exitCode !== null)
+                extras.push(`exit=${det.exitCode}`);
+              appendLog(
+                logEl,
+                `[status] ${data.status}${extras.length ? ' (' + extras.join(', ') + ')' : ''}`,
+              );
             }
-            if (data.done) return finalize({ succeeded: data.status === 'Succeeded', status: data.status });
+            if (data.done)
+              return finalize({ succeeded: data.status === 'Succeeded', status: data.status });
           } catch (e) {
             appendLog(logEl, `[error] poll: ${e.message}`);
           } finally {
@@ -858,7 +881,9 @@ function runAzdProvisionTest() {
           appendLog(logEl, `[warn] SSE unavailable, falling back to polling`);
           return startPolling();
         }
-        ev.addEventListener('open', () => { if (stopBtn) stopBtn.disabled = false; });
+        ev.addEventListener('open', () => {
+          if (stopBtn) stopBtn.disabled = false;
+        });
         ev.addEventListener('status', (e) => {
           try {
             const d = JSON.parse(e.data);
@@ -867,18 +892,26 @@ function runAzdProvisionTest() {
               const extras = [];
               if (det.provisioningState) extras.push(`prov=${det.provisioningState}`);
               if (det.status) extras.push(`status=${det.status}`);
-              if (typeof det.exitCode !== 'undefined' && det.exitCode !== null) extras.push(`exit=${det.exitCode}`);
-              appendLog(logEl, `[status] ${d.state}${extras.length ? ' (' + extras.join(', ') + ')' : ''}`);
+              if (typeof det.exitCode !== 'undefined' && det.exitCode !== null)
+                extras.push(`exit=${det.exitCode}`);
+              appendLog(
+                logEl,
+                `[status] ${d.state}${extras.length ? ' (' + extras.join(', ') + ')' : ''}`,
+              );
             } else {
               appendLog(logEl, `[status] ${d}`);
             }
           } catch {}
         });
-        ev.addEventListener('message', (e) => { appendLog(logEl, e.data); });
+        ev.addEventListener('message', (e) => {
+          appendLog(logEl, e.data);
+        });
         ev.addEventListener('error', () => {
           if (!finished) {
             appendLog(logEl, `[warn] Stream error, switching to polling`);
-            try { ev.close(); } catch {}
+            try {
+              ev.close();
+            } catch {}
             startPolling();
           }
         });
@@ -893,7 +926,10 @@ function runAzdProvisionTest() {
                 const durMs = Math.max(0, et - st);
                 const mins = Math.floor(durMs / 60000);
                 const secs = Math.floor((durMs % 60000) / 1000);
-                appendLog(logEl, `[summary] ${d.status} in ${mins}m ${secs}s${typeof exitCode === 'number' ? ` (exit=${exitCode})` : ''}`);
+                appendLog(
+                  logEl,
+                  `[summary] ${d.status} in ${mins}m ${secs}s${typeof exitCode === 'number' ? ` (exit=${exitCode})` : ''}`,
+                );
               }
             }
             finalize(d);
@@ -914,16 +950,24 @@ function runAzdProvisionTest() {
             fetch(stopUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ executionName: currentExecution })
-            }).then(async (r) => {
-              if (!r.ok) {
-                let msg = '';
-                try { const j = await r.json(); msg = j.error || ''; } catch {}
-                appendLog(logEl, `[warn] Stop request failed: ${r.status}${msg ? ' - ' + msg : ''}`);
-              } else {
-                appendLog(logEl, '[info] Stop requested');
-              }
-            }).catch(() => {});
+              body: JSON.stringify({ executionName: currentExecution }),
+            })
+              .then(async (r) => {
+                if (!r.ok) {
+                  let msg = '';
+                  try {
+                    const j = await r.json();
+                    msg = j.error || '';
+                  } catch {}
+                  appendLog(
+                    logEl,
+                    `[warn] Stop request failed: ${r.status}${msg ? ' - ' + msg : ''}`,
+                  );
+                } else {
+                  appendLog(logEl, '[info] Stop requested');
+                }
+              })
+              .catch(() => {});
           } catch {}
           finalize({ succeeded: false, status: 'Stopped' });
         };
@@ -931,15 +975,15 @@ function runAzdProvisionTest() {
 
       // Start with SSE, fallback to polling
       trySSE();
-  })
-  .catch((err) => {
+    })
+    .catch((err) => {
       appendLog(logEl, `[error] ${err.message}`);
       if (notification) notification.error('Error', err.message);
-  });
+    });
 }
 
 function appendLog(el, line) {
-  el.textContent += (line.endsWith('\n') ? line : line + '\n');
+  el.textContent += line.endsWith('\n') ? line : line + '\n';
   el.scrollTop = el.scrollHeight;
   // Also scroll the viewport so the console is fully visible: target Stop button + 200px
   try {

@@ -879,7 +879,8 @@ document.addEventListener('DOMContentLoaded', () => {
           }
 
           // Process with the obtained URL (original or forked)
-          const result = await appAnalyzer.analyzeTemplate(processedUrl, 'dod');
+          const defaultRuleSet = window.AppConfig?.customComplianceEnabled ? 'custom' : 'dod';
+          const result = await appAnalyzer.analyzeTemplate(processedUrl, defaultRuleSet);
 
           // Update item UI to show success
           itemElement.className = 'batch-item success';
@@ -975,7 +976,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 debug('app', `Error during retry fork check: ${forkError.message}`, forkError);
               }
 
-              const retryResult = await appAnalyzer.analyzeTemplate(processedUrl, 'dod');
+              const defaultRuleSet = window.AppConfig?.customComplianceEnabled ? 'custom' : 'dod';
+              const retryResult = await appAnalyzer.analyzeTemplate(processedUrl, defaultRuleSet);
 
               // Update item UI to show success
               itemElement.className = 'batch-item success';
@@ -2246,6 +2248,27 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
+    // If global config enforces custom compliance, set default ruleset and seed config
+    if (
+      (window.AppConfig?.customComplianceEnabled && ruleSet === 'dod') ||
+      (window.AppConfig?.customComplianceEnabled && !ruleSet)
+    ) {
+      ruleSet = 'custom';
+      try {
+        const current = JSON.parse(localStorage.getItem('td_custom_ruleset') || '{}');
+        if (window.AppConfig.customComplianceGistUrl) {
+          current.gistUrl = window.AppConfig.customComplianceGistUrl;
+        }
+        // Only set if empty to avoid clobbering user's pasted JSON; create a minimal valid config
+        if (!current.requiredFiles && !current.requiredFolders && !current.bicepChecks) {
+          current.requiredFiles = ['README.md'];
+          current.requiredFolders = [];
+          current.bicepChecks = { requiredResources: [] };
+        }
+        localStorage.setItem('td_custom_ruleset', JSON.stringify(current));
+      } catch (_) {}
+    }
+
     // Show ruleset configuration modal
     if (ruleSet === 'show-modal') {
       debug('app', 'Showing ruleset configuration modal');
@@ -2259,6 +2282,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (customConfig) {
         try {
           const parsedConfig = JSON.parse(customConfig);
+          // Ensure gistUrl is present from AppConfig if missing
+          if (!parsedConfig.gistUrl && window.AppConfig?.customComplianceGistUrl) {
+            parsedConfig.gistUrl = window.AppConfig.customComplianceGistUrl;
+            localStorage.setItem('td_custom_ruleset', JSON.stringify(parsedConfig));
+          }
           // Set the custom config in the analyzer
           if (appAnalyzer.ruleSetConfigs) {
             appAnalyzer.ruleSetConfigs.custom = parsedConfig;
@@ -2272,20 +2300,26 @@ document.addEventListener('DOMContentLoaded', () => {
               5000,
             );
           }
-          // Fall back to DoD ruleset
-          ruleSet = 'dod';
+          // Fall back to DoD ruleset unless global config enforces custom
+          if (!window.AppConfig?.customComplianceEnabled) {
+            ruleSet = 'dod';
+          }
         }
       } else {
-        debug('app', 'No custom ruleset configuration found, using default DoD');
-        if (window.NotificationSystem) {
-          window.NotificationSystem.showWarning(
-            'No Custom Configuration',
-            'No custom configuration found. Using default DoD ruleset instead.',
-            5000,
-          );
+        debug('app', 'No custom ruleset configuration found');
+        if (window.AppConfig?.customComplianceEnabled) {
+          // Keep ruleSet as custom; analyzer will use built-in custom config
+          debug('app', 'Global config enforces custom compliance; proceeding with default custom');
+        } else {
+          if (window.NotificationSystem) {
+            window.NotificationSystem.showWarning(
+              'No Custom Configuration',
+              'No custom configuration found. Using default DoD ruleset instead.',
+              5000,
+            );
+          }
+          ruleSet = 'dod';
         }
-        // Fall back to DoD ruleset
-        ruleSet = 'dod';
       }
     }
 

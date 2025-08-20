@@ -101,10 +101,14 @@ document.addEventListener('DOMContentLoaded', function () {
                                     style="opacity: 1 !important; visibility: visible !important; padding: 12px 24px !important; background-color: #2b3137 !important; color: white !important; border: none !important; border-radius: 4px !important; font-size: 1rem !important; font-weight: 500 !important; cursor: pointer !important; display: inline-flex !important; align-items: center !important; gap: 8px !important; min-width: 180px !important; justify-content: center !important; pointer-events: auto !important;">
                                 <i class="fab fa-github"></i> Create GitHub Issue
                             </button>
-                            <button id="testProvisionButton" class="btn"
-                                    style="opacity: 1 !important; visibility: visible !important; padding: 12px 24px !important; background-color: #0078d4 !important; color: white !important; border: none !important; border-radius: 4px !important; font-size: 1rem !important; font-weight: 500 !important; cursor: pointer !important; display: inline-flex !important; align-items: center !important; gap: 8px !important; min-width: 180px !important; justify-content: center !important; pointer-events: auto !important;">
-                                <i class="fas fa-rocket"></i> Test AZD Provision
-                            </button>
+              ${
+                (window.AppConfig?.deploymentTool || 'none') === 'azd'
+                  ? `<button id="testProvisionButton" class="btn"
+                  style="opacity: 1 !important; visibility: visible !important; padding: 12px 24px !important; background-color: #0078d4 !important; color: white !important; border: none !important; border-radius: 4px !important; font-size: 1rem !important; font-weight: 500 !important; cursor: pointer !important; display: inline-flex !important; align-items: center !important; gap: 8px !important; min-width: 180px !important; justify-content: center !important; pointer-events: auto !important;">
+                <i class="fas fa-rocket"></i> Test AZD Provision
+              </button>`
+                  : ''
+              }
                         </div>
                     </div>
                 `;
@@ -287,9 +291,11 @@ document.addEventListener('DOMContentLoaded', function () {
         totalPassed: compliant.length,
       };
 
-      // Include custom configuration if available
+      // Include custom configuration if available or enforced via AppConfig
       if (result.customConfig) {
         adaptedData.customConfig = result.customConfig;
+      } else if (adaptedData.ruleSet === 'custom' && window.AppConfig?.customComplianceGistUrl) {
+        adaptedData.customConfig = { gistUrl: window.AppConfig.customComplianceGistUrl };
       }
 
       return adaptedData;
@@ -415,8 +421,12 @@ document.addEventListener('DOMContentLoaded', function () {
         if (Array.isArray(window.templatesData)) {
           const match = window.templatesData.find((t) => {
             // Normalize possible trailing .git and case
-            const a = String(t.repoUrl || '').replace(/\.git$/, '').toLowerCase();
-            const b = String(repoUrl).replace(/\.git$/, '').toLowerCase();
+            const a = String(t.repoUrl || '')
+              .replace(/\.git$/, '')
+              .toLowerCase();
+            const b = String(repoUrl)
+              .replace(/\.git$/, '')
+              .toLowerCase();
             return a === b;
           });
           if (match && match.relativePath) {
@@ -485,15 +495,15 @@ document.addEventListener('DOMContentLoaded', function () {
       const height = 120;
       const padding = 12;
 
-  const times = points.map((p) => p.x.getTime());
-  const values = points.map((p) => p.y);
-  const minX = Math.min(...times);
-  const maxX = Math.max(...times);
-  // Compute y-bounds from data and clamp to [0,100]
-  let minY = Math.min(...values);
-  let maxY = Math.max(...values);
-  minY = Math.max(0, Math.min(100, minY));
-  maxY = Math.max(0, Math.min(100, maxY));
+      const times = points.map((p) => p.x.getTime());
+      const values = points.map((p) => p.y);
+      const minX = Math.min(...times);
+      const maxX = Math.max(...times);
+      // Compute y-bounds from data and clamp to [0,100]
+      let minY = Math.min(...values);
+      let maxY = Math.max(...values);
+      minY = Math.max(0, Math.min(100, minY));
+      maxY = Math.max(0, Math.min(100, maxY));
 
       const xScale = (t) => {
         if (maxX === minX) return padding;
@@ -508,7 +518,10 @@ document.addEventListener('DOMContentLoaded', function () {
       };
 
       const pathD = points
-        .map((p, i) => `${i === 0 ? 'M' : 'L'} ${xScale(p.x.getTime()).toFixed(2)} ${yScale(p.y).toFixed(2)}`)
+        .map(
+          (p, i) =>
+            `${i === 0 ? 'M' : 'L'} ${xScale(p.x.getTime()).toFixed(2)} ${yScale(p.y).toFixed(2)}`,
+        )
         .join(' ');
 
       const last = points[points.length - 1];
@@ -957,6 +970,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 alert('AZD provision testing is not available in this view');
               }
             });
+          } else {
+            // Ensure no stray AZD buttons if disabled via config
+            if ((window.AppConfig?.deploymentTool || 'none') !== 'azd') {
+              const stray = document.querySelector('#testProvisionButton');
+              if (stray && stray.parentNode) stray.parentNode.removeChild(stray);
+            }
           }
 
           // Log all interactive elements after setup

@@ -101,19 +101,21 @@ document.addEventListener('DOMContentLoaded', function () {
       githubButtonContainer.appendChild(githubBtnFallback);
       actionHeader.appendChild(githubButtonContainer);
 
-      // Test AZD button
-      const provisionButtonContainer = document.createElement('div');
-      provisionButtonContainer.style.cssText = 'position: relative; display: inline-block;';
+      // Test AZD button (only if AZD is the selected deployment tool)
+      if ((window.AppConfig?.deploymentTool || 'none') === 'azd') {
+        const provisionButtonContainer = document.createElement('div');
+        provisionButtonContainer.style.cssText = 'position: relative; display: inline-block;';
 
-      const provisionBtnFallback = document.createElement('button');
-      provisionBtnFallback.id = 'testProvisionButton-fallback';
-      provisionBtnFallback.className = 'btn';
-      provisionBtnFallback.style.cssText =
-        'opacity: 1 !important; visibility: visible !important; padding: 12px 24px; background-color: #0078d4; color: white; border: none; border-radius: 4px; font-size: 1rem; font-weight: 500; cursor: pointer !important; display: inline-flex !important; align-items: center; gap: 8px; min-width: 180px; justify-content: center;';
-      provisionBtnFallback.innerHTML = '<i class="fas fa-rocket"></i> Test AZD Provision';
+        const provisionBtnFallback = document.createElement('button');
+        provisionBtnFallback.id = 'testProvisionButton-fallback';
+        provisionBtnFallback.className = 'btn';
+        provisionBtnFallback.style.cssText =
+          'opacity: 1 !important; visibility: visible !important; padding: 12px 24px; background-color: #0078d4; color: white; border: none; border-radius: 4px; font-size: 1rem; font-weight: 500; cursor: pointer !important; display: inline-flex !important; align-items: center; gap: 8px; min-width: 180px; justify-content: center;';
+        provisionBtnFallback.innerHTML = '<i class="fas fa-rocket"></i> Test AZD Provision';
 
-      provisionButtonContainer.appendChild(provisionBtnFallback);
-      actionHeader.appendChild(provisionButtonContainer);
+        provisionButtonContainer.appendChild(provisionBtnFallback);
+        actionHeader.appendChild(provisionButtonContainer);
+      }
 
       // Insert the action header if it wasn't in the DOM already
       if (!existingActionHeader) {

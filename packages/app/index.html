@@ -12,7 +12,7 @@
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
     />
-  <link rel="icon" href="assets/images/logo.svg" type="image/svg+xml" />
+    <link rel="icon" href="assets/images/logo.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="css/style.css" />
     <link rel="stylesheet" href="css/templates.css" />
     <link rel="stylesheet" href="css/tooltips.css" />
@@ -21,9 +21,12 @@
     <link rel="stylesheet" href="css/action-buttons-fix.css" />
     <link rel="stylesheet" href="css/notifications.css" />
     <link rel="stylesheet" href="css/modal.css" />
+    <link rel="stylesheet" href="css/config-panel.css" />
     <script src="https://d3js.org/d3.v7.min.js"></script>
   </head>
   <body>
+    <!-- Optional runtime environment injection -->
+    <script src="env.js"></script>
     <header>
       <div class="container header-content">
         <div class="logo">
@@ -31,6 +34,9 @@
           <h1>Template Doctor</h1>
         </div>
         <div id="user-info" class="user-info">
+          <button id="open-config-panel" class="header-gear-btn" title="App configuration">
+            <i class="fas fa-gear"></i>
+          </button>
           <button id="login-button" class="login-button">
             <i class="fab fa-github"></i> Login with GitHub
           </button>
@@ -192,6 +198,65 @@
       </section>
     </main>
 
+    <!-- Config panel overlay and container -->
+    <div id="config-panel-overlay" class="config-panel-overlay"></div>
+    <aside
+      id="config-panel"
+      class="config-panel"
+      aria-hidden="true"
+      role="dialog"
+      aria-label="App configuration"
+    >
+      <div class="config-panel__header">
+        <h3 class="config-panel__title"><i class="fas fa-sliders"></i> App Configuration</h3>
+        <button
+          id="close-config-panel"
+          class="config-panel__close"
+          aria-label="Close configuration"
+        >
+          ×
+        </button>
+      </div>
+      <div class="config-panel__body">
+        <div class="config-section">
+          <h4>Current settings</h4>
+          <div id="config-kv" class="config-kv"></div>
+        </div>
+        <div class="config-section">
+          <h4>How to change configuration</h4>
+          <div class="config-note">
+            <p>
+              This app reads settings from <code>packages/app/config.json</code> at runtime. To
+              change values, edit that file and refresh the page. If hosted on GitHub Pages, push
+              the change to the repository and wait for the site to update.
+            </p>
+            <ul>
+              <li><strong>app.title</strong>: Header and page title branding</li>
+              <li><strong>app.ownerOrg</strong>: Footer organization text</li>
+              <li>
+                <strong>app.deploymentTool</strong>: Set <code>"azd"</code> to enable the Test AZD
+                button
+              </li>
+              <li>
+                <strong>app.customComplianceEnabled</strong>: Default to <code>custom</code> ruleset
+              </li>
+              <li>
+                <strong>app.customComplianceGistUrl</strong>: Gist URL linked in the dashboard when
+                using custom
+              </li>
+            </ul>
+            <p>See the README section “App configuration” for details and examples.</p>
+          </div>
+        </div>
+      </div>
+      <div class="config-panel__footer">
+        <button id="open-config-file" class="btn-ghost">
+          <i class="fas fa-file-code"></i> Open config.json
+        </button>
+        <button id="reload-app" class="btn-primary"><i class="fas fa-rotate"></i> Reload</button>
+      </div>
+    </aside>
+
     <footer class="site-footer">
       <div class="container footer-content">
         <div class="copyright">©2025 - DevDiv Microsoft</div>
@@ -212,6 +277,8 @@
 
     <!-- Debug console (press Alt+D to show) - Must load first for logging -->
     <script src="js/debug-console.js"></script>
+    <!-- Global App Config loader (branding + feature flags) -->
+    <script src="js/app-config.js"></script>
     <!-- Notification system -->
     <script src="js/notifications.js"></script>
     <!-- Notification system initialization -->
@@ -241,5 +308,6 @@
     <!-- Fallback scripts to ensure action buttons are visible -->
     <script src="js/action-buttons-fallback.js"></script>
     <script src="js/action-buttons-direct.js"></script>
+    <script src="js/config-panel.js"></script>
   </body>
 </html>

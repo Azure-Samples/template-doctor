@@ -1,3 +1,5 @@
+packages/app/env.js
+packages/app/env.json
 node_modules
 .env
 dist/

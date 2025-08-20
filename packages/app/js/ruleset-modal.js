@@ -97,6 +97,26 @@ function setupRulesetModalHandlers() {
   const tabBtns = modal.querySelectorAll('.tab-btn');
   const tabContents = modal.querySelectorAll('.tab-content');
 
+  // Apply global defaults if custom compliance is enabled
+  try {
+    if (window.AppConfig?.customComplianceEnabled) {
+      // preselect custom
+      const customRadio = rulesetForm.querySelector('input[type="radio"][value="custom"]');
+      const dodRadio = rulesetForm.querySelector('input[type="radio"][value="dod"]');
+      if (customRadio) customRadio.checked = true;
+      if (customConfigContainer) customConfigContainer.style.display = 'block';
+      // prefer gist tab if gist URL provided
+      if (window.AppConfig.customComplianceGistUrl && gistUrlInput) {
+        gistUrlInput.value = window.AppConfig.customComplianceGistUrl;
+        // activate gist tab
+        tabBtns.forEach((b) => b.classList.remove('active'));
+        tabContents.forEach((c) => c.classList.remove('active'));
+        modal.querySelector('.tab-btn[data-tab="gist"]').classList.add('active');
+        modal.querySelector('#gist-tab').classList.add('active');
+      }
+    }
+  } catch (_) {}
+
   // Close button handler
   if (closeBtn) {
     closeBtn.onclick = function () {

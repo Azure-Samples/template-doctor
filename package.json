@@ -16,7 +16,9 @@
         "start": "node --experimental-json-modules dist/cli.js",
         "test": "npm run -w packages/app test",
         "test:ui": "npm run -w packages/app test:ui",
-        "test:debug": "npm run -w packages/app test:debug"
+    "test:debug": "npm run -w packages/app test:debug",
+    "format": "npm run -w packages/app format",
+    "format:check": "npm run -w packages/app format:check"
     },
     "keywords": [
         "azd",

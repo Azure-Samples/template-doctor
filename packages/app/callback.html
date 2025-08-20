@@ -86,7 +86,12 @@
           const withoutFile = pathname.match(/\.[a-zA-Z0-9]+$/)
             ? pathname.substring(0, pathname.lastIndexOf('/'))
             : pathname;
-          const basePath = withoutFile === '/' ? '' : (withoutFile.endsWith('/') ? withoutFile.slice(0, -1) : withoutFile);
+          const basePath =
+            withoutFile === '/'
+              ? ''
+              : withoutFile.endsWith('/')
+                ? withoutFile.slice(0, -1)
+                : withoutFile;
           window.location.href = window.location.origin + basePath + '/index.html';
         }, 3000);
       }
@@ -97,12 +102,17 @@
         sessionStorage.setItem('gh_auth_state', state);
 
         // Redirect back to index.html (handle GitHub Pages base path)
-        (function(){
+        (function () {
           const pathname = window.location.pathname || '/';
           const withoutFile = pathname.match(/\.[a-zA-Z0-9]+$/)
             ? pathname.substring(0, pathname.lastIndexOf('/'))
             : pathname;
-          const basePath = withoutFile === '/' ? '' : (withoutFile.endsWith('/') ? withoutFile.slice(0, -1) : withoutFile);
+          const basePath =
+            withoutFile === '/'
+              ? ''
+              : withoutFile.endsWith('/')
+                ? withoutFile.slice(0, -1)
+                : withoutFile;
           window.location.href = window.location.origin + basePath + '/index.html';
         })();
       }
@@ -122,7 +132,12 @@
           const withoutFile = pathname.match(/\.[a-zA-Z0-9]+$/)
             ? pathname.substring(0, pathname.lastIndexOf('/'))
             : pathname;
-          const basePath = withoutFile === '/' ? '' : (withoutFile.endsWith('/') ? withoutFile.slice(0, -1) : withoutFile);
+          const basePath =
+            withoutFile === '/'
+              ? ''
+              : withoutFile.endsWith('/')
+                ? withoutFile.slice(0, -1)
+                : withoutFile;
           window.location.href = window.location.origin + basePath + '/index.html';
         }, 3000);
       }

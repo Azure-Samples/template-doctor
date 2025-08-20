@@ -1,10 +1,13 @@
 {
-  "githubOAuth": {
-    "clientId": "Ov23li2nstp4WdgRG6vZ",
-    "scope": "repo read:user"
-  },
   "backend": {
     "baseUrl": "",
     "functionKey": ""
+  },
+  "app": {
+    "title": "Template Doctor",
+    "ownerOrg": "DevDiv Microsoft",
+    "deploymentTool": "azd",
+    "customComplianceEnabled": false,
+    "customComplianceGistUrl": ""
   }
 }

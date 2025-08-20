@@ -93,6 +93,48 @@ npm run -w packages/functions-aca start
 
 Open http://localhost:8080 for the UI. The frontend expects the API at http://localhost:7071 by default.
 
+## App configuration
+
+The frontend reads non-sensitive settings from `packages/app/config.json` and exposes them as `window.AppConfig`.
+
+- app.title: Header/browser tab title branding.
+- app.ownerOrg: Footer organization text.
+- app.deploymentTool: Set to `"azd"` to show the "Test AZD Deployment" button; any other value hides it.
+- app.customComplianceEnabled: When `true`, defaults the ruleset to `custom` in the UI and analysis flows.
+- app.customComplianceGistUrl: A Gist URL surfaced in the dashboard when using the custom ruleset.
+
+Example snippet:
+
+{
+	"app": {
+		"title": "Template Doctor",
+		"ownerOrg": "DevDiv Microsoft",
+		"deploymentTool": "azd",
+		"customComplianceEnabled": true,
+		"customComplianceGistUrl": "https://gist.github.com/<user>/<id>"
+	}
+}
+
+Applying changes:
+
+- Local dev: edit `packages/app/config.json` and refresh the page.
+- Static hosting (e.g., GitHub Pages): commit/push and wait for the site to update.
+
+Tip: Click the gear icon in the app header to open the Configuration panel and view current settings.
+
+### Supplying secrets and runtime env (client-side)
+
+Never commit secrets or OAuth client IDs to the repository. Provide them at runtime instead:
+
+Options:
+
+- env.js (recommended for static hosting): Add a small script at deploy time to set globals.
+	- Example: `window.__RUNTIME_ENV = { GITHUB_OAUTH_CLIENT_ID: "<client-id>" };`
+	- Place the generated file at `packages/app/env.js` before publishing. The app loads it early.
+- env.json (optional, not versioned): Provide `packages/app/env.json` with `{ "githubOAuthClientId": "<client-id>" }` for local dev.
+
+The app reads in order: window.__RUNTIME_ENV → env.json. OAuth config is not supported in `config.json` and should not be stored there.
+
 ## Origin upstream requirement
 
 For provisioning templates with azd, the canonical upstream must be provided:

@@ -29,33 +29,52 @@ function getBasePath() {
  * Remember to register your OAuth app at: https://github.com/settings/applications/new
  * with callback URL set to your GitHub Pages URL
  */
-const AUTH_CONFIG = { 
+const AUTH_CONFIG = {
   clientId: '', // Provided via _site/config.json at deploy time
   redirectUri: window.location.origin + getBasePath() + '/callback.html',
   scope: 'public_repo read:user', // public_repo gives issue creation/assignment for public repos
   authUrl: 'https://github.com/login/oauth/authorize',
   tokenStorageKey: 'gh_access_token',
   userStorageKey: 'gh_user_info',
-}; 
+};
 
 // Load runtime config if present and merge into AUTH_CONFIG
 async function loadRuntimeAuthConfig() {
+  const basePath = getBasePath();
   try {
-    const basePath = getBasePath();
-    const res = await fetch(`${basePath}/config.json`, { cache: 'no-store' });
-    if (!res.ok) return;
-    const cfg = await res.json();
-    if (cfg?.githubOAuth?.clientId) {
-      AUTH_CONFIG.clientId = cfg.githubOAuth.clientId;
+    // 1) Global runtime env (injected by deploy): window.__RUNTIME_ENV
+    const env = window.__RUNTIME_ENV || window.AppEnv || {};
+    if (env.GITHUB_OAUTH_CLIENT_ID || env.githubOAuthClientId) {
+      AUTH_CONFIG.clientId = env.GITHUB_OAUTH_CLIENT_ID || env.githubOAuthClientId;
     }
-    if (cfg?.githubOAuth?.scope) {
-      AUTH_CONFIG.scope = cfg.githubOAuth.scope;
+
+    // 2) Optional env.json (not versioned) with { "githubOAuthClientId": "..." }
+    try {
+      const envRes = await fetch(`${basePath}/env.json`, { cache: 'no-store' });
+      if (envRes.ok) {
+        const envJson = await envRes.json();
+        if (
+          !AUTH_CONFIG.clientId &&
+          (envJson.githubOAuthClientId || envJson.GITHUB_OAUTH_CLIENT_ID)
+        ) {
+          AUTH_CONFIG.clientId = envJson.githubOAuthClientId || envJson.GITHUB_OAUTH_CLIENT_ID;
+        }
+      }
+    } catch (_) {
+      // optional
     }
-    if (cfg?.githubOAuth?.authUrl) {
-      AUTH_CONFIG.authUrl = cfg.githubOAuth.authUrl;
-    }
-    if (cfg?.githubOAuth?.redirectUri) {
-      AUTH_CONFIG.redirectUri = cfg.githubOAuth.redirectUri;
+
+    // 3) Back-compat: config.json (versioned) — avoid storing OAuth in repo; only used as last resort for clientId
+    try {
+      const res = await fetch(`${basePath}/config.json`, { cache: 'no-store' });
+      if (res.ok) {
+        const cfg = await res.json();
+        if (!AUTH_CONFIG.clientId && cfg?.githubOAuth?.clientId) {
+          AUTH_CONFIG.clientId = cfg.githubOAuth.clientId;
+        }
+      }
+    } catch (_) {
+      // ignore
     }
   } catch (_) {
     // Best-effort; keep defaults
@@ -114,19 +133,16 @@ class GitHubAuth {
     authUrl.searchParams.append('scope', AUTH_CONFIG.scope);
     authUrl.searchParams.append('state', this.generateState());
     if (!AUTH_CONFIG.clientId) {
-      // Ensure runtime config is loaded before proceeding
-      // This is synchronous if already loaded; otherwise fetch once
-      // We intentionally block the login flow to avoid a broken redirect
-      const notify = window.Notifications?.info?.bind(window.Notifications);
-      notify && notify('Preparing login…', 'Loading authentication configuration', 2000);
-      const error = window.Notifications?.error?.bind(window.Notifications);
-      error
-        ? error(
-            'Missing OAuth client ID',
-            'GitHub OAuth clientId is not configured. Set GH_OAUTH_CLIENT_ID secret and redeploy Pages.',
-            6000,
-          )
-        : alert('GitHub OAuth clientId is not configured. Please set GH_OAUTH_CLIENT_ID secret.');
+      // Do not use native alerts; surface via notification system only
+      const notifyInfo = window.Notifications?.info?.bind(window.Notifications);
+      const notifyError = window.Notifications?.error?.bind(window.Notifications);
+      notifyInfo && notifyInfo('Preparing login…', 'Loading authentication configuration', 1500);
+      notifyError &&
+        notifyError(
+          'Missing OAuth client ID',
+          'GitHub OAuth clientId is not configured. Provide it via window.__RUNTIME_ENV, env.json, or deployment env injection.',
+          7000,
+        );
       return;
     }
 
@@ -494,6 +510,10 @@ class GitHubAuth {
     const userAvatar = document.getElementById('user-avatar');
     const searchSection = document.getElementById('search-section');
     const welcomeSection = document.getElementById('welcome-section');
+    const configGearBtn = document.getElementById('open-config-panel');
+    const configPanel = document.getElementById('config-panel');
+    const configOverlay = document.getElementById('config-panel-overlay');
+    const scanModeToggle = document.querySelector('.scan-mode-toggle');
 
     if (this.accessToken && this.userInfo) {
       console.log('updateUI: User is authenticated, updating UI');
@@ -502,19 +522,26 @@ class GitHubAuth {
       if (userProfile) userProfile.style.display = 'flex';
       if (username) username.textContent = this.userInfo.name || this.userInfo.login;
       if (userAvatar) userAvatar.src = this.userInfo.avatarUrl;
+      if (configGearBtn) configGearBtn.style.display = 'inline-flex';
 
       // Show search section, hide welcome section
       if (searchSection) searchSection.style.display = 'block';
       if (welcomeSection) welcomeSection.style.display = 'none';
+      if (scanModeToggle) scanModeToggle.style.display = '';
     } else {
       console.log('updateUI: User is not authenticated, updating UI');
       // User is not authenticated
       if (loginButton) loginButton.style.display = 'flex';
       if (userProfile) userProfile.style.display = 'none';
+      if (configGearBtn) configGearBtn.style.display = 'none';
+      // Ensure config panel is closed if open
+      if (configPanel) configPanel.classList.remove('open');
+      if (configOverlay) configOverlay.classList.remove('visible');
 
       // Show welcome section, hide search section
       if (searchSection) searchSection.style.display = 'none';
       if (welcomeSection) welcomeSection.style.display = 'block';
+      if (scanModeToggle) scanModeToggle.style.display = 'none';
     }
   }
 

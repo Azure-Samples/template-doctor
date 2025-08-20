@@ -4,7 +4,7 @@
     "scope": "public_repo read:user"
   },
   "backend": {
-    "baseUrl": "", 
+    "baseUrl": "",
     "functionKey": ""
   }
 }

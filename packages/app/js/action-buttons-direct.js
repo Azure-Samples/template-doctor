@@ -83,16 +83,18 @@ window.addEventListener('load', function () {
     githubButton.innerHTML = '<i class="fab fa-github"></i> Create GitHub Issue';
     buttonsWrapper.appendChild(githubButton);
 
-    // Add test provision button
-    const provisionButton = document.createElement('button');
-    provisionButton.id = 'testProvisionButton-direct';
-    provisionButton.className = 'btn';
-    provisionButton.setAttribute(
-      'style',
-      'opacity: 1 !important; visibility: visible !important; padding: 12px 24px !important; background-color: #0078d4 !important; color: white !important; border: none !important; border-radius: 4px !important; font-size: 1rem !important; font-weight: 500 !important; cursor: pointer !important; display: inline-flex !important; align-items: center !important; gap: 8px !important; min-width: 180px !important; justify-content: center !important; pointer-events: auto !important;',
-    );
-    provisionButton.innerHTML = '<i class="fas fa-rocket"></i> Test AZD Provision';
-    buttonsWrapper.appendChild(provisionButton);
+    // Add test provision button only if AZD deployment tool is enabled
+    if ((window.AppConfig?.deploymentTool || 'none') === 'azd') {
+      const provisionButton = document.createElement('button');
+      provisionButton.id = 'testProvisionButton-direct';
+      provisionButton.className = 'btn';
+      provisionButton.setAttribute(
+        'style',
+        'opacity: 1 !important; visibility: visible !important; padding: 12px 24px !important; background-color: #0078d4 !important; color: white !important; border: none !important; border-radius: 4px !important; font-size: 1rem !important; font-weight: 500 !important; cursor: pointer !important; display: inline-flex !important; align-items: center !important; gap: 8px !important; min-width: 180px !important; justify-content: center !important; pointer-events: auto !important;',
+      );
+      provisionButton.innerHTML = '<i class="fas fa-rocket"></i> Test AZD Provision';
+      buttonsWrapper.appendChild(provisionButton);
+    }
 
     directButtonsContainer.appendChild(buttonsWrapper);
 
@@ -137,13 +139,16 @@ window.addEventListener('load', function () {
         }
       });
 
-    document.getElementById('testProvisionButton-direct').addEventListener('click', function () {
-      console.log('Test AZD Provision button clicked (direct)');
-      if (typeof window.testAzdProvision === 'function') {
-        window.testAzdProvision();
-      } else {
-        alert('AZD provision testing is not available in this view');
-      }
-    });
+    const azdBtn = document.getElementById('testProvisionButton-direct');
+    if (azdBtn) {
+      azdBtn.addEventListener('click', function () {
+        console.log('Test AZD Provision button clicked (direct)');
+        if (typeof window.testAzdProvision === 'function') {
+          window.testAzdProvision();
+        } else {
+          alert('AZD provision testing is not available in this view');
+        }
+      });
+    }
   }, 3000); // Wait 3 seconds after page load
 });
