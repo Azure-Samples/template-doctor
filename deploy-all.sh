@@ -171,8 +171,8 @@ if [[ "$SKIP_FUNCTION" != "true" ]]; then
     # Create a temp directory for packaging
     mkdir -p ./temp-deploy
     
-    # Copy all necessary files
-    cp -r host.json local.settings.json package.json lib aca-* ./temp-deploy/
+    # Copy all necessary files including node_modules
+    cp -r host.json local.settings.json package.json lib aca-* node_modules ./temp-deploy/
     
     # Remove any previous zip
     rm -f functions-aca.zip

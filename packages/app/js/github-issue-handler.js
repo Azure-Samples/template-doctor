@@ -608,7 +608,7 @@ function testAzdProvision() {
   if (window.Notifications) {
     window.Notifications.confirm(
       'Test AZD Provision',
-      'This will run azd init on the template repository in an Azure Container. Proceed?',
+      'This will clone the template repository in an Azure Container and analyze it. Proceed?',
       {
         onConfirm: () => runAzdProvisionTest(),
       },
@@ -616,7 +616,7 @@ function testAzdProvision() {
   } else {
     if (
       confirm(
-        'This will run azd init on the template repository in an Azure Container. Proceed?',
+        'This will clone the template repository in an Azure Container and analyze it. Proceed?',
       )
     ) {
       runAzdProvisionTest();
@@ -777,7 +777,12 @@ function runAzdProvisionTest() {
   fetch(startUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ templateName: templateRepo })
+        body: JSON.stringify({ 
+          templateName: templateRepo,
+          mode: "list", // Force list mode which only clones and doesn't run azd commands
+          action: "list", // Force list action
+          jobName: "template-doctor-aca-job-app" // Explicitly request the app-runner job
+        })
       })
     .then(async (r) => {
       if (!r.ok) {
@@ -829,8 +834,10 @@ function runAzdProvisionTest() {
         const doPoll = async () => {
           if (finished) return;
           try {
+            // Construct polling URL with mode=poll as a query parameter
             const url = streamUrl + `?mode=poll${pollSince ? `&since=${encodeURIComponent(pollSince)}` : ''}`;
-            appendLog(logEl, `[debug] Polling: ${url.slice(0, 100)}...`);
+            appendLog(logEl, `[debug] Polling full URL: ${url}`);
+            console.log('[detailed-debug] Polling full URL:', url);
             const pr = await fetch(url, { headers: { Accept: 'application/json' } });
             if (!pr.ok) throw new Error(`poll ${pr.status}`);
             const data = await pr.json();
@@ -975,8 +982,9 @@ function runAzdProvisionTest() {
         };
       }
 
-      // Start with SSE, fallback to polling
-      trySSE();
+      // Skip SSE and go straight to polling since SSE consistently fails
+      // trySSE();
+      startPolling();
   })
   .catch((err) => {
       appendLog(logEl, `[error] ${err.message}`);

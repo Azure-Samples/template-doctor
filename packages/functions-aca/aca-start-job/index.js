@@ -4,7 +4,7 @@ module.exports = async function (context, req) {
   function corsHeaders() {
     return {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       'Access-Control-Expose-Headers': 'X-Correlation-Id'
     };
@@ -16,9 +16,32 @@ module.exports = async function (context, req) {
   }
 
   try {
-    const { templateName, action } = req.body || {};
+    // Handle both query parameters (GET) and body (POST)
+    let templateName, action, mode;
+    
+    if (req.method === 'GET') {
+      // For GET, use query parameters
+      templateName = req.query.template;
+      action = req.query.action || req.query.name;
+      mode = req.query.mode;
+      
+      context.log.info(`Received GET request with query params: ${JSON.stringify(req.query)}`);
+    } else {
+      // For POST, use body
+      templateName = req.body?.templateName || req.body?.template;
+      action = req.body?.action || req.body?.name;
+      mode = req.body?.mode;
+      
+      context.log.info(`Received POST request with body: ${JSON.stringify(req.body)}`);
+    }
+    
     // Default action to "init" if not provided
     const jobAction = action || "init";
+    
+    // Make sure we handle the mode parameter properly
+    const jobMode = mode || "list";
+    
+    context.log.info(`Parameters: templateName=${templateName}, action=${jobAction}, mode=${jobMode}`);
     
     // If no template name, just keep the container alive without starting a job
     if (!templateName) {
@@ -91,10 +114,14 @@ module.exports = async function (context, req) {
 AZURE_SUBSCRIPTION_ID: ${process.env.AZURE_SUBSCRIPTION_ID ? 'present' : 'missing'}
 ACA_RESOURCE_GROUP: ${process.env.ACA_RESOURCE_GROUP || 'missing'}
 ACA_JOB_NAME: ${process.env.ACA_JOB_NAME || 'missing'}
+TEMPLATE_REPO_URL: ${normalizedTemplate ? normalizedTemplate : 'missing'}
+JOB_ACTION: ${jobAction}
+JOB_MODE: ${jobMode}
+FULL_ENV_DUMP: ${JSON.stringify(process.env)}
 `);
           
           // Start the container job
-          const jobResult = await startContainerJob(executionName, normalizedTemplate, jobAction);
+          const jobResult = await startContainerJob(executionName, normalizedTemplate, jobAction, jobMode);
           context.log.info(`Container job started: ${JSON.stringify(jobResult)}`);
           
           // Initialize global executionLogs if it doesn't exist

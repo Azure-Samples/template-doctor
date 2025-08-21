@@ -5,7 +5,7 @@
       "type": "httpTrigger",
       "direction": "in",
       "name": "req",
-      "methods": ["post", "options"],
+      "methods": ["get", "post", "options"],
       "route": "aca-start-job"
     },
     {

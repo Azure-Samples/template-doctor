@@ -11,7 +11,7 @@
 				"--",
 				"-g",
 				"GitHub issue creation labels and body metadata",
-				"src/frontend/tests/issue-labels.spec.js"
+				"packages/app/tests/issue-labels.spec.js"
 			],
 			"problemMatcher": [
 				"$eslint-stylish"
@@ -28,7 +28,7 @@
 				"--",
 				"-g",
 				"GitHub issue creation labels and body metadata",
-				"src/frontend/tests/issue-labels.spec.js"
+				"packages/app/tests/issue-labels.spec.js"
 			],
 			"problemMatcher": [
 				"$tsc"
@@ -45,7 +45,7 @@
 				"--",
 				"-g",
 				"GitHub issue creation labels and body metadata",
-				"src/frontend/tests/issue-labels.spec.js"
+				"packages/app/tests/issue-labels.spec.js"
 			],
 			"group": "build"
 		},
@@ -59,7 +59,7 @@
 				"--",
 				"-g",
 				"GitHub issue creation labels and body metadata",
-				"src/frontend/tests/issue-labels.spec.js"
+				"packages/app/tests/issue-labels.spec.js"
 			],
 			"group": "build"
 		},
@@ -73,7 +73,7 @@
 				"--",
 				"-g",
 				"GitHub issue creation labels and body metadata",
-				"src/frontend/tests/issue-labels.spec.js"
+				"packages/app/tests/issue-labels.spec.js"
 			],
 			"group": "build"
 		},
@@ -87,7 +87,7 @@
 				"--",
 				"-g",
 				"GitHub issue creation labels and body metadata",
-				"src/frontend/tests/issue-labels.spec.js"
+				"packages/app/tests/issue-labels.spec.js"
 			],
 			"group": "build"
 		},
@@ -101,7 +101,7 @@
 				"--",
 				"-g",
 				"GitHub issue creation labels and body metadata",
-				"src/frontend/tests/issue-labels.spec.js"
+				"packages/app/tests/issue-labels.spec.js"
 			],
 			"group": "build"
 		},
@@ -115,7 +115,7 @@
 				"--",
 				"-g",
 				"GitHub issue creation labels and body metadata",
-				"src/frontend/tests/issue-labels.spec.js"
+				"packages/app/tests/issue-labels.spec.js"
 			],
 			"group": "build"
 		},

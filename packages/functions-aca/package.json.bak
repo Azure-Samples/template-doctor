@@ -1,0 +1,20 @@
+{
+  "name": "template-doctor-aca-functions",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Standalone Azure Functions app for ACA job orchestration",
+  "scripts": {
+    "start": "func start",
+    "preinstall": "echo 'Installing packages in functions-aca directory'",
+    "postinstall": "echo 'Packages installed in functions-aca directory'"
+  },
+  "engines": {
+    "node": ">=16"
+  },
+  "dependencies": {
+    "@azure/arm-appcontainers": "^2.2.0",
+    "@azure/functions": "^3.5.1",
+    "@azure/identity": "^4.11.1",
+    "@azure/monitor-query": "^1.3.3"
+  }
+}

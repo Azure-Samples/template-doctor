@@ -1,0 +1,61 @@
+id: /subscriptions/3bcbef31-23b0-4d82-9ee4-192d70bd4a14/resourceGroups/template-doctor-rg/providers/Microsoft.App/jobs/template-doctor-aca-job-app
+identity:
+  principalId: 07fb7c5c-afc8-4c67-a3cf-66f3fda33a6a
+  tenantId: 72f988bf-86f1-41af-91ab-2d7cd011db47
+  type: SystemAssigned
+location: West Europe
+name: template-doctor-aca-job-app
+properties:
+  configuration:
+    dapr: null
+    eventTriggerConfig: null
+    identitySettings: []
+    manualTriggerConfig:
+      parallelism: 1
+      replicaCompletionCount: 1
+    registries:
+    - identity: system-environment
+      passwordSecretRef: ''
+      server: templatedoctorregistry-c7avf0fbb6b0dcbt.azurecr.io
+      username: ''
+    replicaRetryLimit: 0
+    replicaTimeout: 1800
+    scheduleTriggerConfig: null
+    secrets: null
+    triggerType: Manual
+  environmentId: /subscriptions/3bcbef31-23b0-4d82-9ee4-192d70bd4a14/resourceGroups/template-doctor-rg/providers/Microsoft.App/managedEnvironments/template-doctor-aca-env
+  eventStreamEndpoint: https://westeurope.azurecontainerapps.dev/subscriptions/3bcbef31-23b0-4d82-9ee4-192d70bd4a14/resourceGroups/template-doctor-rg/containerApps/template-doctor-aca-job-app/eventstream
+  provisioningState: Succeeded
+  runningStatus: Ready
+  template:
+    containers:
+    - env:
+      - name: CONTAINER_ROLE
+        value: app-runner
+      - name: APP_MODE
+        value: list
+      - name: AZURE_SUBSCRIPTION_ID
+        value: 3bcbef31-23b0-4d82-9ee4-192d70bd4a14
+      - name: TEMPLATE_REPO_URL
+        value: https://github.com/anfibiacreativa/todo-nodejs-mongo-swa
+      - name: TD_RUN_ID
+        value: bootstrap-20250819
+      image: templatedoctorregistry-c7avf0fbb6b0dcbt.azurecr.io/app-runner:20250819
+      imageType: ContainerImage
+      name: app-runner
+      resources:
+        cpu: 0.5
+        ephemeralStorage: ''
+        memory: 1Gi
+    initContainers: null
+    volumes: null
+  workloadProfileName: Consumption
+resourceGroup: template-doctor-rg
+systemData:
+  createdAt: '2025-08-19T09:34:44.2391268'
+  createdBy: nvenditto@microsoft.com
+  createdByType: User
+  lastModifiedAt: '2025-08-19T09:34:44.2391268'
+  lastModifiedBy: nvenditto@microsoft.com
+  lastModifiedByType: User
+type: Microsoft.App/jobs
