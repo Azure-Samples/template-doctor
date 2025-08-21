@@ -1,4 +1,7 @@
 #!/bin/bash
+echo "[DEPRECATED] Use ./scripts/run-app-job-and-stream.sh or ./scripts/inspect-app-runner.sh." >&2
+exit 1
+#!/bin/bash
 
 # Script to test if we can get more information about container crashes
 # This will start a job with a debug flag to capture more information

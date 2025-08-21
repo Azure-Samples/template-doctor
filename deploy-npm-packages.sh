@@ -1,4 +1,7 @@
 #!/bin/bash
+echo "[DEPRECATED] Use package.json scripts or dedicated scripts under ./scripts." >&2
+exit 1
+#!/bin/bash
 # This script sets up and deploys the Azure Container Apps integration for the Template Doctor
 
 # Navigate to the functions-aca directory

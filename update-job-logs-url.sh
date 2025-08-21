@@ -1,4 +1,10 @@
 #!/bin/bash
+set -euo pipefail
+# Deprecated wrapper. Please use the dashboard updater under ./scripts
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+echo "[DEPRECATED] Use ./scripts/update-dashboard-endpoints.sh (it also fixes job logs URLs)." >&2
+exec "$SCRIPT_DIR/scripts/update-dashboard-endpoints.sh" "$@"
+#!/bin/bash
 
 # Script to update the URL format in all dashboard HTML files
 # Changes from /api/aca-job-logs?runId=${runId} to /api/aca-job-logs/${runId}
