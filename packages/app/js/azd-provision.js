@@ -61,8 +61,10 @@ function runAzdProvisionTest() {
     name = name.replace(/\.git$/i, '');
     return name;
   }
-  // Hardcoded override for standalone Functions base (temporary until runtime-config is live)
-  const FORCED_BACKEND_BASE = 'https://template-doctor-standalone-nv.azurewebsites.net';
+  // Determine backend base URL via runtime config with safe fallback
+  const FORCED_BACKEND_BASE = (window.TemplateDoctorConfig && window.TemplateDoctorConfig.apiBase)
+    ? String(window.TemplateDoctorConfig.apiBase || '').trim()
+    : 'https://template-doctor-standalone-nv.azurewebsites.net';
   // Helper to fetch runtime config (cached)
   function getBasePath() {
     const pathname = window.location.pathname || '/';
