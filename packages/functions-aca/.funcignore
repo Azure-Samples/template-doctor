@@ -1,0 +1,17 @@
+# Exclude local/dev artifacts and test pages from deployment
+# Node modules are handled by the platform; we only ship production deps
+node_modules/
+
+# Local environment and archives
+.env
+*.zip
+*.bak
+
+# Dev/test HTML helpers not needed in Azure
+index.html
+log-stream-test.html
+test.html
+
+# Logs and temp files
+*.log
+.tmp/
