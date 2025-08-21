@@ -1,10 +1,15 @@
 {
+  // Preferred: set top-level apiBase used by the app to call Azure Functions
+  "apiBase": "https://<your-functions-app>.azurewebsites.net",
+  
+  // Optional: legacy shape still supported; will be mapped to apiBase/functionKey automatically
+  "backend": {
+    "baseUrl": "",
+    "functionKey": ""
+  },
+
   "githubOAuth": {
     "clientId": "<set in GitHub Secrets as GH_OAUTH_CLIENT_ID>",
     "scope": "public_repo read:user"
-  },
-  "backend": {
-    "baseUrl": "", 
-    "functionKey": ""
   }
 }

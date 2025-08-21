@@ -17,7 +17,15 @@
       .then((r) => (r.ok ? r.json() : null))
       .then((cfg) => {
         if (cfg && typeof cfg === 'object') {
-          window.TemplateDoctorConfig = Object.assign({}, DEFAULTS, cfg);
+          // Back-compat mapping: support both top-level { apiBase } and nested { backend: { baseUrl, functionKey } }
+          const mapped = { ...cfg };
+          if (!mapped.apiBase && cfg.backend && typeof cfg.backend.baseUrl === 'string') {
+            mapped.apiBase = cfg.backend.baseUrl;
+          }
+          if (cfg.backend && typeof cfg.backend.functionKey === 'string') {
+            mapped.functionKey = cfg.backend.functionKey;
+          }
+          window.TemplateDoctorConfig = Object.assign({}, DEFAULTS, mapped);
           console.log('[runtime-config] loaded config.json');
         } else {
           console.log('[runtime-config] no config.json found, using defaults');
