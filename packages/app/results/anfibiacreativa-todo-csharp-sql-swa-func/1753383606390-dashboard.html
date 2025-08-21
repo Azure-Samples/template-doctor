@@ -1493,7 +1493,7 @@
         function testAzdProvision() {
             const mcpUrl = new URL(window.location.href);
             const baseUrl = mcpUrl.origin;
-            const provisionUrl = `${baseUrl}/api/provision`;
+            const provisionUrl = `${baseUrl}/api/aca-start-job?mode=azd`;
             
             // Show loading state
             const testProvisionButton = document.getElementById('testProvisionButton');
@@ -1534,7 +1534,7 @@
         
         // Function to poll provision status
         function pollProvisionStatus(runId, baseUrl) {
-            const statusUrl = `${baseUrl}/api/provision-status?runId=${runId}`;
+            const statusUrl = `${baseUrl}/api/aca-job-logs/${runId}`;
             const testProvisionButton = document.getElementById('testProvisionButton');
             
             // Set a timer to check status every 10 seconds

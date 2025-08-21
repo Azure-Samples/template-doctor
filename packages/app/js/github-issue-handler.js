@@ -608,7 +608,7 @@ function testAzdProvision() {
   if (window.Notifications) {
     window.Notifications.confirm(
       'Test AZD Provision',
-      'This will run azd init on the template repository in an Azure Container. Proceed?',
+      'This will clone the template repository in an Azure Container and analyze it. Proceed?',
       {
         onConfirm: () => runAzdProvisionTest(),
       },
@@ -616,7 +616,7 @@ function testAzdProvision() {
   } else {
     if (
       confirm(
-        'This will run azd init on the template repository in an Azure Container. Proceed?',
+        'This will clone the template repository in an Azure Container and analyze it. Proceed?',
       )
     ) {
       runAzdProvisionTest();

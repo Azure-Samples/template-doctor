@@ -9,14 +9,14 @@ Thanks for your interest in contributing! This document explains how to propose 
 - Don’t introduce native browser dialogs; use the notification system
 
 ## Development Setup
-- Frontend lives in `src/frontend` (static site)
+- Frontend lives in `packages/app` (static site)
 - API lives in `api` (Azure Functions)
 - Local run:
   - API: `cd api && func start`
-  - Frontend: `cd src/frontend && python3 -m http.server 8080`
+  - Frontend: `cd packages/app && npm start` (serves http://localhost:8080)
 
 ## Testing
-- E2E tests use Playwright and live under `src/frontend/tests`.
+- E2E tests use Playwright and live under `packages/app/tests`.
 - Run all tests from the repository root:
 
 ```
@@ -27,11 +27,11 @@ npm test
 - A guard test fails if native `alert/confirm/prompt` are used—stick to the in-app notifications API.
 
 ## Code Style
-- Prettier is configured in `src/frontend`.
+- Prettier is configured in `packages/app`.
 - Before committing:
 
 ```
-cd src/frontend
+cd packages/app
 npm run format
 npm run format:check
 ```

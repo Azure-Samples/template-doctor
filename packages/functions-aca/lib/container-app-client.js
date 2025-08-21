@@ -93,9 +93,10 @@ function getJobClient(client, operation = null) {
  * @param {string} executionName The unique execution ID
  * @param {string} templateName The template name to run
  * @param {string} action The action to run (init, up, down)
+ * @param {string} mode The mode to run in (azd, list)
  * @returns {Promise<object>} The job details
  */
-async function startContainerJob(executionName, templateName, action = 'init') {
+async function startContainerJob(executionName, templateName, action = 'init', mode = 'list') {
   try {
     // Get environment variables
     const subscriptionId = process.env.AZURE_SUBSCRIPTION_ID;
@@ -105,6 +106,8 @@ async function startContainerJob(executionName, templateName, action = 'init') {
     if (!subscriptionId || !resourceGroupName) {
       throw new Error('Missing required environment variables: AZURE_SUBSCRIPTION_ID, ACA_RESOURCE_GROUP');
     }
+    
+    console.log(`Starting container job with execution name: ${executionName}, template: ${templateName}, action: ${action}, mode: ${mode}`);
     
     // Get the client
     const client = await getContainerAppClient();
@@ -121,6 +124,10 @@ async function startContainerJob(executionName, templateName, action = 'init') {
       properties: {
         environmentVariables: [
           { name: 'TEMPLATE_NAME', value: templateName },
+          // Add the expected environment variables for the container entrypoint script
+          { name: 'TEMPLATE_REPO_URL', value: `https://github.com/${templateName}.git` },
+          { name: 'AZD_TEMPLATE_NAME', value: templateName },
+          { name: 'APP_MODE', value: mode }, // Use the provided mode parameter
           { name: 'AZD_ACTION', value: action },
           { name: 'EXECUTION_ID', value: executionName },
           // Add the TD execution name as an environment variable
@@ -345,9 +352,10 @@ async function getContainerJobLogs(executionName) {
     
     // Since the SDK doesn't have a direct way to get logs, we'll use the Azure CLI via spawn
     // This is a more robust way to get logs compared to the previous approach
-    const util = require('util');
-    const { spawn } = require('child_process');
-    const containerName = 'template-doctor-aca-job'; // Use the container name from the job template
+  const util = require('util');
+  const { spawn } = require('child_process');
+  // Prefer explicit container name from env; default to app-runner (matches app-runner job)
+  const containerName = process.env.ACA_CONTAINER_NAME || 'app-runner';
     
     // Use our Azure CLI logging helper
     try {

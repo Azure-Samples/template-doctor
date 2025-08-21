@@ -1,23 +1,24 @@
 #!/bin/bash
 set -euo pipefail
 
-# This script builds and pushes the template-doctor ACA container image
-# with the updated code changes to handle the template name and action.
+# This script builds and pushes the app-runner container image to ACR
 
-# Navigate to the Dockerfile location
-cd "$(dirname "$0")/../packages/infra/.devcontainer"
+# Navigate to the Dockerfile location in containers/app-runner
+cd "$(dirname "$0")/../containers/app-runner"
 echo "Working directory: $(pwd)"
 
-# Set variables
-REGISTRY="templatedoctorregistry-c7avf0fbb6b0dcbt.azurecr.io"
-IMAGE_NAME="template-doctor-aca"
-TAG="latest"
+# Set variables (can be overridden via env)
+REGISTRY=${REGISTRY:-"templatedoctorregistry-c7avf0fbb6b0dcbt.azurecr.io"}
+IMAGE_NAME=${IMAGE_NAME:-"app-runner"}
+TAG=${TAG:-"latest"}
 
 echo "Building image for $REGISTRY/$IMAGE_NAME:$TAG"
 
-# Login to Azure (needed for ACR access)
-echo "Logging into Azure..."
-az login --interactive
+# Ensure Azure CLI is logged in
+if ! az account show > /dev/null 2>&1; then
+	echo "Please login to Azure (az login) before running this script."
+	exit 1
+fi
 
 # Login to ACR
 echo "Logging into ACR..."

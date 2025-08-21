@@ -249,3 +249,46 @@ Scenario: One-click issue creation with labels and automation handoff
 ## Out of Scope
 - Reporting across arbitrary data sources beyond template analysis.
 - Long-term result storage outside static artifacts without explicit design.
+
+## Appendix — Azure Container Apps Jobs Execution Layer
+
+This appendix describes the optional ACA Jobs execution layer used to run Template Doctor logic outside Functions. It provides two jobs: a baseline healthy runner and an app logic runner.
+
+Architecture
+- Managed Environment: `template-doctor-aca-env` (Resource Group: `template-doctor-rg`)
+- Container Registry: `templatedoctorregistry-c7avf0fbb6b0dcbt.azurecr.io`
+- Identities:
+  - Job creation uses `--registry-identity system-environment` for ACR pulls
+  - Jobs are `--mi-system-assigned` for runtime identity if needed
+
+Jobs
+- Baseline Healthy Job
+  - Name: `template-doctor-aca-job-healthy`
+  - Image: `healthy-runner:20250819`
+  - Purpose: always-healthy heartbeat for plumbing validation
+- App Runner Job
+  - Name: `template-doctor-aca-job-app`
+  - Image: `app-runner:20250819`
+  - Purpose: clone repo or `azd init`, optional `azd up/down` smoke
+  - YAML exported to: `containers/app-runner/aca-job.yaml`
+
+Environment Variables (app-runner)
+- `TEMPLATE_REPO_URL` (optional) — repo to analyze
+- `AZD_TEMPLATE_NAME` (optional) — azd template to init
+- `TD_RUN_ID` (optional) — run identifier
+- `AZD_ENV_NAME` (optional) — azd environment name
+- `APP_MODE` — `azd` (default) to run up/down, or `list` to only clone/list
+
+Operate
+- Start execution:
+  - `az containerapp job start -g template-doctor-rg -n template-doctor-aca-job-app`
+- Stream logs:
+  - `az containerapp job logs show -g template-doctor-rg -n template-doctor-aca-job-app --execution <exec> --container app-runner --follow --tail 50`
+- Helper script:
+  - `./scripts/run-app-job-and-stream.sh KEY=VALUE ...`
+
+Setup Requirements
+- ACR exists and is accessible by the ACA environment identity (acrpull).
+- ACA Managed Environment provisioned in the same resource group/region.
+- Azure CLI with `containerapp` extension installed.
+- Optional: assign additional Azure RBAC to the job identity if app logic needs access.

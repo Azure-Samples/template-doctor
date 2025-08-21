@@ -8,7 +8,7 @@ Template Doctor analyzes and validates Azure Developer CLI (azd) templates, prov
 	- Serves the dashboard and loads scan results from `packages/app/results/`
 - packages/api — Azure Functions (PR creation, OAuth helpers)
 - packages/functions-aca — Azure Functions to orchestrate Azure Container Apps (ACA) Jobs (start/stop/query logs)
-- packages/infra — Infrastructure (placeholder for Bicep/Terraform)
+- containers — Container images (e.g., app-runner); replaces deprecated packages/infra/.devcontainer
 - docs — Documentation for GitHub Action/App and usage
 
 Results live under `packages/app/results/`:
