@@ -21,9 +21,9 @@ Assign the Function App's managed identity these roles:
 Changes to roles can take 5–15 minutes to propagate. Restart the Function App after updating app settings.
 
 ## Endpoints
-- POST /api/start-job: { templateName: "owner/repo", action: "up" | "down" | "updown" }
-- GET /api/job-logs/{executionName}: SSE stream or polling JSON (mode=poll)
-- POST /api/stop-job: { executionName }
+- POST /api/aca-start-job: { templateName: "owner/repo", action?: "init" | "up" | "down" | "list", mode?: "list" | "azd" }
+- GET /api/aca-job-logs/{executionName}: SSE stream or polling JSON (add `?mode=poll` for JSON)
+- POST /api/aca-stop-job: { executionName, originalExecutionName? }
 
 ## Notes
 - `start-job` now tolerates missing environmentId on the job resource and proceeds without it.
