@@ -1,4 +1,7 @@
 #!/bin/bash
+echo "[DEPRECATED] Use the discrete scripts under ./scripts or your CI pipeline." >&2
+exit 1
+#!/bin/bash
 
 # Consolidated deployment script for Template Doctor
 # Deploys:

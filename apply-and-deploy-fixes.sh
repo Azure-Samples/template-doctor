@@ -1,4 +1,7 @@
 #!/bin/bash
+echo "[DEPRECATED] Use targeted scripts in ./scripts instead of this combined helper." >&2
+exit 1
+#!/bin/bash
 
 # This script applies the endpoint URL fixes and deploys the changes
 

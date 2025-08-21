@@ -1,4 +1,10 @@
 #!/bin/bash
+set -euo pipefail
+# Deprecated wrapper. The canonical script lives under ./scripts
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+echo "[DEPRECATED] Use ./scripts/update-all-dashboards.sh instead." >&2
+exec "$SCRIPT_DIR/scripts/update-all-dashboards.sh" "$@"
+#!/bin/bash
 
 # Script to update all dashboard HTML files to use the correct API endpoints
 # This script fixes the mismatch between frontend code and backend endpoints
