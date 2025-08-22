@@ -1,4 +1,5 @@
 name: Template Doctor Validation Workflow
+run-name: TDV ${{ inputs.run_id }}   # <--- NEW LINE
 on:
   workflow_dispatch:
     inputs:
@@ -10,7 +11,7 @@ on:
         required: false
       run_id:
         description: 'Unique ID for this validation run'
-        required: false
+        required: true
 
 permissions:
   contents: read

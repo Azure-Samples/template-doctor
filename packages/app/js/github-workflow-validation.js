@@ -145,6 +145,9 @@ async function runGithubWorkflowValidation(templateUrl, apiBase, onStatusChange)
   const progressElem = document.getElementById('githubValidationProgress').querySelector('.progress-bar-inner');
   const runValidationBtn = document.getElementById('runGithubValidationBtn');
   
+  // Variable to store full error data for later use
+  let fullErrorData = null;
+  
   // Reset and show loading state
   resultsElem.style.display = 'block';
   loadingElem.style.display = 'block';
@@ -162,6 +165,10 @@ async function runGithubWorkflowValidation(templateUrl, apiBase, onStatusChange)
 
   try {
     // Call the validate-template API to trigger the GitHub workflow
+    console.log(`Validating template URL: ${templateUrl}`);
+    console.log(`API endpoint: ${apiBase}/api/validate-template`);
+    console.log(`Request payload:`, {templateUrl: templateUrl});
+    
     const response = await fetch(`${apiBase}/api/validate-template`, {
       method: 'POST',
       headers: {
@@ -178,14 +185,28 @@ async function runGithubWorkflowValidation(templateUrl, apiBase, onStatusChange)
     if (!response.ok) {
       // Try to get error details from the response body
       let errorDetails = '';
+      let fullErrorData = null;
       try {
         const errorData = await responseClone.json();
+        fullErrorData = errorData; // Store the full error response
+        
         if (errorData && errorData.error) {
           errorDetails = errorData.error;
           if (errorData.details) {
             errorDetails += `: ${errorData.details}`;
           }
+          // Add repository information if available
+          if (errorData.repository) {
+            errorDetails += ` (Repository: ${errorData.repository})`;
+          }
+          // Add URL information if available
+          if (errorData.url) {
+            errorDetails += ` (URL: ${errorData.url})`;
+          }
         }
+        
+        // Log the full error data for debugging
+        console.log('Full API error response:', errorData);
       } catch (e) {
         // If response is not JSON, try to get the text
         try {
@@ -198,8 +219,14 @@ async function runGithubWorkflowValidation(templateUrl, apiBase, onStatusChange)
       throw new Error(`API error: ${response.status} - ${errorDetails || response.statusText}`);
     }
 
+    // Log the raw response for debugging
+    console.log('Validate Template API response status:', response.status);
+    
     const data = await response.json();
+    console.log('Validate Template API response data:', data);
+    
     const runId = data.runId;
+    console.log(`Validation run ID: ${runId}`);
 
     if (onStatusChange) {
       onStatusChange({
@@ -226,8 +253,16 @@ async function runGithubWorkflowValidation(templateUrl, apiBase, onStatusChange)
     
     // Try to get more detailed error information
     let errorDetails = error.message;
+    let errorJson = '';
     
-    // No need to parse the response again as we already handled it in the try block above
+    // Check if we have the full error data from the API
+    if (fullErrorData) {
+      try {
+        errorJson = JSON.stringify(fullErrorData, null, 2);
+      } catch (e) {
+        errorJson = 'Could not stringify error data';
+      }
+    }
     
     summaryElem.innerHTML = `
       <strong>Error:</strong> ${error.message}
@@ -236,6 +271,7 @@ async function runGithubWorkflowValidation(templateUrl, apiBase, onStatusChange)
         <details>
           <summary>Technical Details</summary>
           <pre style="white-space: pre-wrap; overflow-wrap: break-word;">${errorDetails}</pre>
+          ${errorJson ? `<p>Full error response:</p><pre style="white-space: pre-wrap; overflow-wrap: break-word;">${errorJson}</pre>` : ''}
         </details>
       </div>
     `;
