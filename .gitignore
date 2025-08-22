@@ -6,3 +6,7 @@ test-results/
 tests/*.sh
 
 playwright-report/
+
+# Local settings files with secrets
+local.settings.json
+**/local.settings.json

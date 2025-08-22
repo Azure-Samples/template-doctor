@@ -27,20 +27,22 @@ module.exports = async function (context, req) {
         // Parse request body
         const templateUrl = req.body?.templateUrl;
         if (!templateUrl) {
-            return {
+            context.res = {
                 status: 400,
                 headers: { 'Access-Control-Allow-Origin': '*' },
                 body: { error: "Missing required parameter: templateUrl" }
             };
+            return context.res;
         }
 
         // Validate the template URL is a GitHub repository
         if (!templateUrl.startsWith('https://github.com/')) {
-            return {
+            context.res = {
                 status: 400,
                 headers: { 'Access-Control-Allow-Origin': '*' },
                 body: { error: "Invalid templateUrl: must be a GitHub repository URL" }
             };
+            return context.res;
         }
 
         // Generate a unique run ID for tracking this validation
@@ -58,11 +60,12 @@ module.exports = async function (context, req) {
 
         if (!GITHUB_TOKEN) {
             context.log.error('GITHUB_TOKEN environment variable is not set');
-            return {
+            context.res = {
                 status: 500,
                 headers: { 'Access-Control-Allow-Origin': '*' },
                 body: { error: "Server configuration error: missing GitHub token" }
             };
+            return context.res;
         }
 
         // Trigger GitHub workflow using GitHub API
@@ -72,32 +75,51 @@ module.exports = async function (context, req) {
         context.log(`Template URL: ${templateUrl}`);
         context.log(`Callback URL: ${callbackUrl}`);
 
-        const response = await fetch(workflowDispatchUrl, {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/vnd.github.v3+json',
-                'Authorization': `token ${GITHUB_TOKEN}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                ref: 'main',
-                inputs: {
-                    target_validate_template_url: templateUrl,
-                    callback_url: callbackUrl,
-                    run_id: runId
-                }
-            })
-        });
+        try {
+            const response = await fetch(workflowDispatchUrl, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Authorization': `token ${GITHUB_TOKEN}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    ref: 'main',
+                    inputs: {
+                        target_validate_template_url: templateUrl,
+                        callback_url: callbackUrl,
+                        run_id: runId
+                    }
+                })
+            });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            context.log.error(`Error triggering workflow: ${response.status} ${errorText}`);
+            // Log the status code and response for debugging
+            context.log(`GitHub API Response Status: ${response.status}`);
+            
+            const responseText = await response.text();
+            context.log(`GitHub API Response Body: ${responseText || '(empty response)'}`);
+            
+            if (!response.ok) {
+                return {
+                    status: response.status,
+                    headers: { 'Access-Control-Allow-Origin': '*' },
+                    body: { 
+                        error: "Failed to trigger validation workflow",
+                        details: responseText || response.statusText,
+                        status: response.status,
+                        url: workflowDispatchUrl
+                    }
+                };
+            }
+        } catch (error) {
+            context.log.error(`Network error triggering workflow: ${error.message}`);
             return {
-                status: response.status,
+                status: 500,
                 headers: { 'Access-Control-Allow-Origin': '*' },
                 body: { 
-                    error: "Failed to trigger validation workflow",
-                    details: errorText
+                    error: "Network error triggering validation workflow",
+                    details: error.message,
+                    url: workflowDispatchUrl
                 }
             };
         }
@@ -115,6 +137,8 @@ module.exports = async function (context, req) {
                 message: "Template validation has been initiated. Check the status using the runId."
             }
         };
+        
+        return context.res;
     } catch (error) {
         context.log.error(`Error in validate-template function: ${error.message}`);
         context.log.error(error.stack);

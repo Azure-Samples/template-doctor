@@ -5,8 +5,8 @@
     "FUNCTIONS_WORKER_RUNTIME": "node",
     "GITHUB_CLIENT_ID": "",
     "GITHUB_CLIENT_SECRET": "",
-    "GITHUB_REPO_OWNER": "anfibiacreativa",
-    "GITHUB_REPO_NAME": "template-doctor",
+    "GITHUB_REPO_OWNER": "",
+    "GITHUB_REPO_NAME": "",
     "GITHUB_TOKEN": "",
     "GITHUB_REPOSITORY": "microsoft/template-doctor"
   },

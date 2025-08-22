@@ -172,8 +172,30 @@ async function runGithubWorkflowValidation(templateUrl, apiBase, onStatusChange)
       })
     });
 
+    // Store the response clone for error handling
+    const responseClone = response.clone();
+
     if (!response.ok) {
-      throw new Error(`API error: ${response.status} ${response.statusText}`);
+      // Try to get error details from the response body
+      let errorDetails = '';
+      try {
+        const errorData = await responseClone.json();
+        if (errorData && errorData.error) {
+          errorDetails = errorData.error;
+          if (errorData.details) {
+            errorDetails += `: ${errorData.details}`;
+          }
+        }
+      } catch (e) {
+        // If response is not JSON, try to get the text
+        try {
+          errorDetails = await response.text();
+        } catch (textError) {
+          errorDetails = response.statusText;
+        }
+      }
+      
+      throw new Error(`API error: ${response.status} - ${errorDetails || response.statusText}`);
     }
 
     const data = await response.json();
@@ -201,12 +223,28 @@ async function runGithubWorkflowValidation(templateUrl, apiBase, onStatusChange)
     
     const summaryElem = document.getElementById('githubValidationSummary');
     summaryElem.className = 'validation-summary failure';
-    summaryElem.innerHTML = `<strong>Error:</strong> ${error.message}`;
+    
+    // Try to get more detailed error information
+    let errorDetails = error.message;
+    
+    // No need to parse the response again as we already handled it in the try block above
+    
+    summaryElem.innerHTML = `
+      <strong>Error:</strong> ${error.message}
+      <div class="error-details" style="margin-top: 10px; font-size: 0.9em;">
+        <p>There was a problem triggering the validation workflow. Please try again later or contact support.</p>
+        <details>
+          <summary>Technical Details</summary>
+          <pre style="white-space: pre-wrap; overflow-wrap: break-word;">${errorDetails}</pre>
+        </details>
+      </div>
+    `;
     
     if (onStatusChange) {
       onStatusChange({
         status: 'error',
-        message: error.message
+        message: error.message,
+        details: errorDetails
       });
     }
     
