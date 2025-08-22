@@ -12,6 +12,9 @@ on:
       run_id:
         description: 'Unique ID for this validation run'
         required: true
+      customValidators:
+        description: 'Comma-separated list of custom validation rules'
+        required: false
 
 permissions:
   contents: read
@@ -27,29 +30,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 
+          fetch-depth: 0
 
-      - name: Parse git diff
+      - name: Parse input URL
         id: parse_git_diff
         run: |
-          repo_urls=$(echo ${{ github.event.inputs.target_validate_template_url }} | jq -Rsc '[split("\n") | .[]| select(.!="")]')            
+          repo_urls=$(echo "${{ github.event.inputs.target_validate_template_url }}" | jq -Rsc '[split("\n") | .[]| select(.!="")]')
           echo "$repo_urls"
           echo "repo_urls=$repo_urls" >> $GITHUB_OUTPUT
         shell: bash
         continue-on-error: true
 
   validation:
-    permissions:
-      contents: read
-      actions: read
-      id-token: write
     runs-on: ubuntu-22.04
     needs: parse-repo-url
     if: ${{ needs.parse-repo-url.outputs.repo_urls != '' }}
-    outputs:
-      resultFile: ${{ steps.validation.outputs.resultFile }}
-      resultSummary: ${{ steps.create_summary.outputs.summary }}
-      resultStatus: ${{ steps.check_result.outputs.RESULT }}
     strategy:
       matrix:
         repo_url: ${{ fromJson(needs.parse-repo-url.outputs.repo_urls) }}
@@ -59,7 +54,6 @@ jobs:
       AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
       AZURE_ENV_NAME: template-doctor-${{ github.run_id }}-${{ github.run_attempt }}
       AZURE_LOCATION: eastus
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -69,15 +63,16 @@ jobs:
       - name: Parse repo name
         id: parse_repo_name
         run: |
-          repo_name=$(echo ${{ matrix.repo_url }} | grep -oP '(?<=https:\/\/github\.com\/)[^\/]+\/[^\/]+')
-          echo "repo_name=$repo_name" >> $GITHUB_OUTPUT;
-          echo "repo_name_short=$(echo $repo_name | cut -d'/' -f2)" >> $GITHUB_OUTPUT;
+          repo_name=$(echo "${{ matrix.repo_url }}" | grep -oP '(?<=https:\/\/github\.com\/)[^\/]+\/[^\/]+')
+          echo "repo_name=$repo_name" >> $GITHUB_OUTPUT
+          echo "repo_name_short=$(echo $repo_name | cut -d'/' -f2)" >> $GITHUB_OUTPUT
         shell: bash
 
-      - name: Log validation information
+      - name: Log validation info
         run: |
           echo "Starting validation for template: ${{ matrix.repo_url }}"
-          echo "Run ID: ${{ github.event.inputs.run_id || github.run_id }}"
+          echo "Run ID: ${{ github.event.inputs.run_id }}"
+          echo "Custom validators: ${{ github.event.inputs.customValidators }}"
           echo "Environment name: ${{ env.AZURE_ENV_NAME }}"
           echo "Location: ${{ env.AZURE_LOCATION }}"
           echo "Callback URL: ${{ github.event.inputs.callback_url || 'None provided' }}"
@@ -85,20 +80,23 @@ jobs:
       - name: Clone repo
         working-directory: ${{ runner.temp }}
         run: |
-          git clone ${{ matrix.repo_url }} template
-
-          candidate_hooks_paths=("./template/hooks" "./template/infra/hooks" "./template/scripts" "./template/deploy/aca/scripts" "./template/deploy/aks/scripts" "./template/deploy/app-service/scripts")
-
+          git clone "${{ matrix.repo_url }}" template
+          candidate_hooks_paths=(
+            "./template/hooks"
+            "./template/infra/hooks"
+            "./template/scripts"
+            "./template/deploy/aca/scripts"
+            "./template/deploy/aks/scripts"
+            "./template/deploy/app-service/scripts"
+          )
           for hooks_path in "${candidate_hooks_paths[@]}"; do
             if [ -d "$hooks_path" ] && [ "$(ls -A $hooks_path/*.sh 2>/dev/null)" ]; then
               chmod +x $hooks_path/*.sh
               echo "Executable permissions set for .sh files in $hooks_path"
-            else
-              echo "No hooks directory or no .sh files found in $hooks_path"
             fi
           done
 
-      - name: Skip azd up for terraform template
+      - name: Check for Terraform
         id: check_terraform
         run: |
           if [[ -f "${{ runner.temp }}/template/infra/main.tf" ]]; then
@@ -111,64 +109,10 @@ jobs:
         uses: microsoft/template-validation-action@Latest
         with:
           workingDirectory: ${{ runner.temp }}/template
-          validators: azd-provision,ps-rule
         env:
           REPOSITORY_NAME: ${{ steps.parse_repo_name.outputs.repo_name }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VALIDATORS: "azd-provision,ps-rule"
-
-      - name: Read result.md
-        id: read_result
-        run: |
-          azd_up_failed=false
-          if grep -q ":x: <b>azd up</b>" "${{ steps.validation.outputs.resultFile }}"; then
-              azd_up_failed=true
-              echo "current_location=${{ env.AZURE_LOCATION }}" >> $GITHUB_ENV
-              rm -f ${{ steps.validation.outputs.resultFile }}
-          fi
-          echo "azd_up_failed=$azd_up_failed" >> $GITHUB_ENV
-        shell: bash
-
-      - name: Update Azure Location
-        if: env.azd_up_failed == 'true'
-        id: update_location
-        run: |
-          tried_locations="${{ env.tried_locations }}"
-          current_location="${{ env.AZURE_LOCATION}}"
-          candidate_locations=("swedencentral" "eastus2" "australiaeast")
-          new_location=""
-
-          for location in "${candidate_locations[@]}"; do
-            if [[ ! "$current_location" =~ "$location" ]]; then
-              new_location=$location
-              break
-            fi
-          done
-
-          if [ -z "$new_location" ]; then
-            echo "No new location found. All candidate locations have been tried."
-            echo "retry=false" >> $GITHUB_ENV
-          else
-            echo "AZURE_LOCATION=$new_location" >> $GITHUB_ENV
-            echo "AZURE_OPENAI_LOCATION=$new_location" >> $GITHUB_ENV
-            echo "AZURE_OPENAI_RESOURCE_LOCATION=$new_location" >> $GITHUB_ENV
-            echo "AZURE_OPENAI_SERVICE_LOCATION=$new_location" >> $GITHUB_ENV
-            echo "tried_locations=$tried_locations $current_location" >> $GITHUB_ENV
-            echo "retry=true" >> $GITHUB_ENV
-            echo "New location is $new_location"
-            new_env_name="${{ env.AZURE_ENV_NAME }}0"
-            echo "new_env_name is $new_env_name"
-            echo "AZURE_ENV_NAME=$new_env_name" >> $GITHUB_ENV
-          fi
-        shell: bash
-
-      - uses: microsoft/template-validation-action@Latest
-        if: env.retry == 'true'
-        with:
-          workingDirectory: ${{ runner.temp }}/template
-        env:
-          REPOSITORY_NAME: ${{ steps.parse_repo_name.outputs.repo_name }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VALIDATORS: ${{ github.event.inputs.customValidators || 'azd-provision,ps-rule' }}
 
       - name: Upload result
         uses: actions/upload-artifact@v4
@@ -176,46 +120,32 @@ jobs:
           name: ${{ steps.parse_repo_name.outputs.repo_name_short }}-validation-result
           path: ${{ steps.validation.outputs.resultFile }}
 
-      - id: check_result
+      - name: Check result
+        id: check_result
         run: |
           if grep -q "NON-CONFORMING" "${{ steps.validation.outputs.resultFile }}"; then
             echo "RESULT=FAILED" >> $GITHUB_OUTPUT
           else
             echo "RESULT=PASSED" >> $GITHUB_OUTPUT
           fi
-          
           SUMMARY=$(cat "${{ steps.validation.outputs.resultFile }}" | grep -E "## Summary|:white_check_mark:|:x:|:warning:" | head -10)
           echo "summary<<EOF" >> $GITHUB_OUTPUT
           echo "$SUMMARY" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
         shell: bash
 
-      - name: Create result summary
-        id: create_summary
-        run: |
-          FULL_RESULT=$(cat "${{ steps.validation.outputs.resultFile }}")
-          STATUS="${{ steps.check_result.outputs.RESULT }}"
-          
-          SUMMARY=$(echo "$FULL_RESULT" | grep -E "## Summary|:white_check_mark:|:x:|:warning:" | head -10)
-          echo "summary<<EOF" >> $GITHUB_OUTPUT
-          echo "$SUMMARY" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-        shell: bash 
-
-      - name: Send callback notification if URL provided
+      - name: Send callback if URL provided
         if: github.event.inputs.callback_url != ''
         run: |
           PAYLOAD=$(cat <<EOF
           {
-            "runId": "\${{ github.event.inputs.run_id || github.run_id }}",
-            "status": "\${{ steps.check_result.outputs.RESULT }}",
-            "templateUrl": "\${{ matrix.repo_url }}",
-            "summary": \${{ toJSON(steps.create_summary.outputs.summary) }},
-            "artifactUrl": "https://github.com/\${{ github.repository }}/actions/runs/\${{ github.run_id }}/artifacts"
+            "runId": "${{ github.event.inputs.run_id }}",
+            "status": "${{ steps.check_result.outputs.RESULT }}",
+            "templateUrl": "${{ matrix.repo_url }}",
+            "summary": ${{ toJSON(steps.check_result.outputs.summary) }},
+            "artifactUrl": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts"
           }
           EOF
           )
-
-          echo "Sending callback to \${{ github.event.inputs.callback_url }}"
-          echo "$PAYLOAD" | curl -X POST -H "Content-Type: application/json" -d @- "\${{ github.event.inputs.callback_url }}"
+          echo "$PAYLOAD" | curl -X POST -H "Content-Type: application/json" -d @- "${{ github.event.inputs.callback_url }}"
         shell: bash
