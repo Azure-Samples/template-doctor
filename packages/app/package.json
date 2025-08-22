@@ -8,7 +8,8 @@
     "test:debug": "playwright test --debug",
     "start": "python3 -m http.server 8080",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "build": "echo 'No build step required - static site'"
   },
   "devDependencies": {
     "prettier": "^3.6.2"
