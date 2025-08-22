@@ -1,5 +1,5 @@
 name: Template Doctor Validation Workflow
-run-name: TDV ${{ inputs.run_id }}   # <--- NEW LINE
+run-name: TDV ${{ inputs.run_id }}
 on:
   workflow_dispatch:
     inputs:
@@ -32,8 +32,6 @@ jobs:
       - name: Parse git diff
         id: parse_git_diff
         run: |
-          # Create empty list repo_urls
-          # Add input url string to repo_urls list
           repo_urls=$(echo ${{ github.event.inputs.target_validate_template_url }} | jq -Rsc '[split("\n") | .[]| select(.!="")]')            
           echo "$repo_urls"
           echo "repo_urls=$repo_urls" >> $GITHUB_OUTPUT
@@ -75,7 +73,7 @@ jobs:
           echo "repo_name=$repo_name" >> $GITHUB_OUTPUT;
           echo "repo_name_short=$(echo $repo_name | cut -d'/' -f2)" >> $GITHUB_OUTPUT;
         shell: bash
-      
+
       - name: Log validation information
         run: |
           echo "Starting validation for template: ${{ matrix.repo_url }}"
@@ -124,11 +122,9 @@ jobs:
         run: |
           azd_up_failed=false
           if grep -q ":x: <b>azd up</b>" "${{ steps.validation.outputs.resultFile }}"; then
-            #if grep -q "${{ env.AZURE_LOCATION }}" "${{ steps.validation.outputs.resultFile }}"; then
               azd_up_failed=true
               echo "current_location=${{ env.AZURE_LOCATION }}" >> $GITHUB_ENV
               rm -f ${{ steps.validation.outputs.resultFile }}
-            #fi
           fi
           echo "azd_up_failed=$azd_up_failed" >> $GITHUB_ENV
         shell: bash
@@ -180,8 +176,6 @@ jobs:
           name: ${{ steps.parse_repo_name.outputs.repo_name_short }}-validation-result
           path: ${{ steps.validation.outputs.resultFile }}
 
-          VALIDATORS: "azd-provision,ps-rule"
-
       - id: check_result
         run: |
           if grep -q "NON-CONFORMING" "${{ steps.validation.outputs.resultFile }}"; then
@@ -190,7 +184,6 @@ jobs:
             echo "RESULT=PASSED" >> $GITHUB_OUTPUT
           fi
           
-          # Create a summary for the callback
           SUMMARY=$(cat "${{ steps.validation.outputs.resultFile }}" | grep -E "## Summary|:white_check_mark:|:x:|:warning:" | head -10)
           echo "summary<<EOF" >> $GITHUB_OUTPUT
           echo "$SUMMARY" >> $GITHUB_OUTPUT
@@ -200,7 +193,6 @@ jobs:
       - name: Create result summary
         id: create_summary
         run: |
-          # Create a summary from the validation result
           FULL_RESULT=$(cat "${{ steps.validation.outputs.resultFile }}")
           STATUS="${{ steps.check_result.outputs.RESULT }}"
           
@@ -213,19 +205,17 @@ jobs:
       - name: Send callback notification if URL provided
         if: github.event.inputs.callback_url != ''
         run: |
-          # Send a callback to the provided URL with the validation results
           PAYLOAD=$(cat <<EOF
           {
-            "runId": "${{ github.event.inputs.run_id || github.run_id }}",
-            "status": "${{ steps.check_result.outputs.RESULT }}",
-            "templateUrl": "${{ matrix.repo_url }}",
-            "summary": ${{ toJSON(steps.create_summary.outputs.summary) }},
-            "artifactUrl": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts"
+            "runId": "\${{ github.event.inputs.run_id || github.run_id }}",
+            "status": "\${{ steps.check_result.outputs.RESULT }}",
+            "templateUrl": "\${{ matrix.repo_url }}",
+            "summary": \${{ toJSON(steps.create_summary.outputs.summary) }},
+            "artifactUrl": "https://github.com/\${{ github.repository }}/actions/runs/\${{ github.run_id }}/artifacts"
           }
           EOF
           )
-          
-          echo "Sending callback to ${{ github.event.inputs.callback_url }}"
-          echo "$PAYLOAD" | curl -X POST -H "Content-Type: application/json" -d @- "${{ github.event.inputs.callback_url }}"
-        shell: bash
 
+          echo "Sending callback to \${{ github.event.inputs.callback_url }}"
+          echo "$PAYLOAD" | curl -X POST -H "Content-Type: application/json" -d @- "\${{ github.event.inputs.callback_url }}"
+        shell: bash
