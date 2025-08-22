@@ -102,6 +102,41 @@ For provisioning templates with azd, the canonical upstream must be provided:
 
 This ensures the test/provision flow uses the correct azd template (no heuristics).
 
+## Endpoint routing and base URLs
+
+The app uses two different backends:
+
+- Azure Static Web Apps-managed API (SWA) at https://thankful-coast-0a7f3cb1e.2.azurestaticapps.net/api/
+	- Endpoints:
+		- `POST /api/github-oauth-token`
+		- `POST /api/add-template-pr`
+- Standalone Azure Functions App (azurewebsites.net) hosting ACA Job orchestrators:
+	- Base URL: https://template-doctor-standalone-nv.azurewebsites.net
+	- Endpoints:
+		- `POST /api/aca-start-job`
+		- `GET /api/aca-job-logs/{executionName}` (SSE or poll via `?mode=poll`)
+		- `POST /api/aca-stop-job`
+		- `POST /api/template-validation`
+		- `GET /api/template-validation-status`
+
+Frontend configuration:
+
+- The frontend reads `packages/app/config.json` at runtime. We set `backend.baseUrl` to the standalone Functions base so provisioning calls hit the correct host. You can override per environment by publishing an environment-specific `config.json` with:
+
+```
+{
+	"backend": {
+		"baseUrl": "https://<your-functions-app>.azurewebsites.net"
+	}
+}
+```
+
+Local dev:
+
+- Frontend: http://localhost:8080
+- SWA API proxy for OAuth: `http://localhost:7071/api/github-oauth-token` when running functions locally, otherwise `/api/github-oauth-token` via SWA.
+- ACA orchestrator functions: ensure `backend.baseUrl` points to your local or remote Functions app if testing ACA job flows.
+
 ## Contributing
 
 - Add/update tests for features and fixes. Frontend E2E tests live in the app package; run from root via `npm test`.
@@ -116,6 +151,7 @@ This ensures the test/provision flow uses the correct azd template (no heuristic
 - [GitHub Action](docs/GITHUB_ACTION.md)
 - [GitHub App](docs/GITHUB_APP.md)
 - [GitHub Pages Implementation](docs/github-pages-implementation.md)
+- [Template Validation Integration](docs/TEMPLATE_VALIDATION.md)
 
 ---
 

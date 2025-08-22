@@ -18,7 +18,15 @@ echo -e "${BLUE}======================================================${NC}"
 RESOURCE_GROUP="template-doctor-rg"
 CONTAINER_APP_NAME="template-doctor-aca-job"
 FUNCTION_APP_NAME="template-doctor-standalone-nv"
-FUNCTION_RESOURCE_GROUP="templatedoctorstandalone"
+FUNCTION_RESOURCE_GROUP="template-doctor-rg"
+
+# Resolve API base from environment or .env file; fallback to production host
+DEFAULT_API_BASE="https://template-doctor-standalone-nv.azurewebsites.net"
+if [ -f "$(dirname "$0")/../.env" ]; then
+  # shellcheck disable=SC2046
+  export $(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$(dirname "$0")/../.env" | xargs -I{} echo {}) >/dev/null 2>&1 || true
+fi
+API_BASE=${API_BASE:-$DEFAULT_API_BASE}
 
 # Test template values - modify as needed
 TEMPLATE_REPO_URL="https://github.com/anfibiacreativa/todo-nodejs-mongo-swa"

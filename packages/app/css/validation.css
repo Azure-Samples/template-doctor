@@ -1,0 +1,40 @@
+/* Styles for the validation section */
+.validation-container {
+  margin: 20px 0;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+}
+
+.validate-btn {
+  background-color: #6f42c1;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  margin-left: 8px;
+}
+
+.validate-btn:hover {
+  background-color: #5a32a3;
+}
+
+.validate-btn:active {
+  background-color: #4c2888;
+}
+
+.validation-error {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 15px;
+  border-radius: 4px;
+  margin: 15px 0;
+  border: 1px solid #f5c6cb;
+}
+
+#validation-container {
+  margin-bottom: 30px;
+}

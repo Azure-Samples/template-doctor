@@ -1,0 +1,14 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Start Azure Functions host (functions-aca) - cwd",
+			"type": "shell",
+			"command": "func",
+			"args": [
+				"start"
+			],
+			"group": "build"
+		}
+	]
+}

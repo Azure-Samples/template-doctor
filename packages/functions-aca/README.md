@@ -24,6 +24,8 @@ Changes to roles can take 5–15 minutes to propagate. Restart the Function App 
 - POST /api/aca-start-job: { templateName: "owner/repo", action?: "init" | "up" | "down" | "list", mode?: "list" | "azd" }
 - GET /api/aca-job-logs/{executionName}: SSE stream or polling JSON (add `?mode=poll` for JSON)
 - POST /api/aca-stop-job: { executionName, originalExecutionName? }
+- POST /api/template-validation: { templateName: "owner/repo", repoUrl?: "https://github.com/owner/repo", branch?: "main", callbackUrl?: "https://your-callback-url" }
+- GET /api/template-validation-status?id={correlationId}: Returns the status and results of a template validation job
 
 ## Notes
 - `start-job` now tolerates missing environmentId on the job resource and proceeds without it.

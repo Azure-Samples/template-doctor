@@ -17,8 +17,9 @@ TEMPLATE_BRANCH="main"
 RESOURCE_GROUP="template-doctor-rg"
 CONTAINER_APP_JOB="template-doctor-aca-job"
 
-# API endpoint
-API_URL="https://template-doctor-standalone-nv.azurewebsites.net/api/aca-start-job"
+# API endpoint (override with API_BASE env)
+API_BASE=${API_BASE:-"https://template-doctor-standalone-nv.azurewebsites.net"}
+API_URL="$API_BASE/api/aca-start-job"
 
 echo "Starting a new container job with minimal parameters..."
 echo "Timestamp: $TIMESTAMP"
@@ -97,14 +98,14 @@ if [ -n "$EXECUTION_NAME" ]; then
   
   # Check status
   echo "Checking status..."
-  STATUS_RESPONSE=$(curl -s "https://template-doctor-standalone-nv.azurewebsites.net/api/aca-job-status?executionName=$EXECUTION_NAME")
+  STATUS_RESPONSE=$(curl -s "$API_BASE/api/aca-job-status?executionName=$EXECUTION_NAME")
   echo "Status response:"
   echo "$STATUS_RESPONSE"
   echo ""
   
   # Check logs
   echo "Checking logs..."
-  LOGS_RESPONSE=$(curl -s -H "Accept: application/json" "https://template-doctor-standalone-nv.azurewebsites.net/api/aca-job-logs/$EXECUTION_NAME")
+  LOGS_RESPONSE=$(curl -s -H "Accept: application/json" "$API_BASE/api/aca-job-logs/$EXECUTION_NAME")
   echo "Logs response:"
   echo "$LOGS_RESPONSE"
   echo ""
@@ -115,7 +116,7 @@ if [ -n "$EXECUTION_NAME" ]; then
   
   # Check logs again
   echo "Checking logs again..."
-  LOGS_RESPONSE=$(curl -s -H "Accept: application/json" "https://template-doctor-standalone-nv.azurewebsites.net/api/aca-job-logs/$EXECUTION_NAME")
+  LOGS_RESPONSE=$(curl -s -H "Accept: application/json" "$API_BASE/api/aca-job-logs/$EXECUTION_NAME")
   echo "Logs response (2nd attempt):"
   echo "$LOGS_RESPONSE"
   echo ""

@@ -18,7 +18,7 @@
 
 ### Function App
 - **Name**: `template-doctor-standalone-nv`
-- **Resource Group**: `templatedoctorstandalone`
+- **Resource Group**: `template-doctor-rg`
 
 ## Important Deployment Notes
 

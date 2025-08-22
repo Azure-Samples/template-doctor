@@ -157,6 +157,16 @@
 			],
 			"isBackground": false,
 			"group": "build"
+		},
+		{
+			"label": "Start Azure Functions host (functions-aca)",
+			"type": "shell",
+			"command": "func",
+			"args": [
+				"start"
+			],
+			"isBackground": true,
+			"group": "build"
 		}
 	]
 }

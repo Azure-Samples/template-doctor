@@ -5,7 +5,8 @@
 (function () {
   const DEFAULTS = {
     // Keep a working default for now; override via config.json in production
-    apiBase: 'https://template-doctor-standalone-nv.azurewebsites.net',
+    // Prefer same-origin by default; override via config.json in production
+    apiBase: `${window.location.origin}`,
   };
 
   // Initialize with defaults so consumers have something synchronously

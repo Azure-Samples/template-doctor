@@ -59,7 +59,7 @@ az containerapp job update \
 # Set the ACA_CONTAINER_NAME environment variable on function app
 echo "Getting Function App name..."
 FUNCTION_APP=$(az functionapp list \
-  --resource-group "templatedoctorstandalone" \
+  --resource-group "template-doctor-rg" \
   --subscription "$AZURE_SUBSCRIPTION_ID" \
   --query "[0].name" -o tsv)
 
@@ -69,7 +69,7 @@ else
   echo "Setting environment variables on Function App: $FUNCTION_APP"
   az functionapp config appsettings set \
     --name "$FUNCTION_APP" \
-    --resource-group "templatedoctorstandalone" \
+    --resource-group "template-doctor-rg" \
     --subscription "$AZURE_SUBSCRIPTION_ID" \
     --settings \
       "ACA_CONTAINER_NAME=app-runner" \

@@ -2,7 +2,13 @@
 
 # Set your execution name here (from previous tests)
 EXECUTION_NAME="start-1755538421717-xkv1vx"
-BASE_URL="https://template-doctor-standalone-nv.azurewebsites.net"
+# Resolve API base via .env or environment, default to prod host
+DEFAULT_API_BASE="https://template-doctor-standalone-nv.azurewebsites.net"
+if [ -f "$(dirname "$0")/../.env" ]; then
+	# shellcheck disable=SC2046
+	export $(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$(dirname "$0")/../.env" | xargs -I{} echo {}) >/dev/null 2>&1 || true
+fi
+BASE_URL=${API_BASE:-$DEFAULT_API_BASE}
 
 echo "Testing job status..."
 curl -s "${BASE_URL}/api/aca-job-status?executionName=${EXECUTION_NAME}" | jq .

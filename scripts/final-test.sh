@@ -14,7 +14,14 @@ echo "Template name: $TEMPLATE_NAME"
 RESPONSE=$(curl -s -X POST \
   -H "Content-Type: application/json" \
   -d "{\"templateName\":\"$TEMPLATE_NAME\",\"executionName\":\"$EXECUTION_NAME\"}" \
-  https://template-doctor-standalone-nv.azurewebsites.net/api/aca-start-job)
+  # Resolve API base via .env or environment, default to prod host
+  DEFAULT_API_BASE="https://template-doctor-standalone-nv.azurewebsites.net"
+  if [ -f "$(dirname "$0")/../.env" ]; then
+    # shellcheck disable=SC2046
+    export $(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$(dirname "$0")/../.env" | xargs -I{} echo {}) >/dev/null 2>&1 || true
+  fi
+  API_BASE=${API_BASE:-$DEFAULT_API_BASE}
+  $API_BASE/api/aca-start-job)
 
 echo "Response from job start endpoint:"
 echo "$RESPONSE"
@@ -25,7 +32,7 @@ echo "Correlation ID: $CORRELATION_ID"
 
 # Immediately check logs
 echo -e "\nImmediately checking logs..."
-curl -N -H "Accept: text/event-stream" "https://template-doctor-standalone-nv.azurewebsites.net/api/aca-job-logs/$CORRELATION_ID" &
+curl -N -H "Accept: text/event-stream" "$API_BASE/api/aca-job-logs/$CORRELATION_ID" &
 LOG_PID=$!
 
 # Let it run for a few seconds
@@ -34,4 +41,4 @@ kill $LOG_PID
 
 # Check job status
 echo -e "\nChecking job status..."
-curl -s "https://template-doctor-standalone-nv.azurewebsites.net/api/aca-job-status?executionName=$CORRELATION_ID"
+curl -s "$API_BASE/api/aca-job-status?executionName=$CORRELATION_ID"

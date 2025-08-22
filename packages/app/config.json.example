@@ -1,6 +1,10 @@
 {
   // Preferred: set top-level apiBase used by the app to call Azure Functions
   "apiBase": "https://<your-functions-app>.azurewebsites.net",
+  "backend": {
+    "baseUrl": "https://<your-functions-app>.azurewebsites.net",
+    "functionKey": ""
+  },
   
   // Optional: legacy shape still supported; will be mapped to apiBase/functionKey automatically
   "backend": {

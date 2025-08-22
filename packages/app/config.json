@@ -4,7 +4,7 @@
     "scope": "repo read:user"
   },
   "backend": {
-    "baseUrl": "",
+  "baseUrl": "https://template-doctor-standalone-nv.azurewebsites.net",
     "functionKey": ""
   }
 }

@@ -1,22 +1,34 @@
 #!/bin/bash
 
+# API_BASE can be exported to point at a different Function App base URL, e.g. your staging slot.
+# Defaults to production host if not provided.
+
 # This script tests the updated container-app-client.js with the correct environment variables
 # It calls the ACA job start endpoint and checks job status with Azure CLI
 
 # Set the template name and execution name
 TEMPLATE_NAME="anfibiacreativa-todo-nodejs-mongo-coreconf"
 EXECUTION_NAME="updated-env-test-$(date +%s)"
-ACA_RESOURCE_GROUP="templatedoctorstandalone"
+ACA_RESOURCE_GROUP="template-doctor-rg"
 ACA_JOB_NAME="template-doctor-aca-job"
 
 echo "Starting job with execution name: $EXECUTION_NAME"
 echo "Template name: $TEMPLATE_NAME"
 
+# API base (override with API_BASE env); default to prod host
+# Resolve API base from environment or .env, default to production host
+DEFAULT_API_BASE="https://template-doctor-standalone-nv.azurewebsites.net"
+if [ -f "$(dirname "$0")/../.env" ]; then
+  # shellcheck disable=SC2046
+  export $(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$(dirname "$0")/../.env" | xargs -I{} echo {}) >/dev/null 2>&1 || true
+fi
+API_BASE=${API_BASE:-$DEFAULT_API_BASE}
+
 # Make the request to the deployed Azure Function
 RESPONSE=$(curl -s -X POST \
   -H "Content-Type: application/json" \
   -d "{\"templateName\":\"$TEMPLATE_NAME\",\"executionName\":\"$EXECUTION_NAME\"}" \
-  https://template-doctor-standalone-nv.azurewebsites.net/api/aca-start-job)
+  "$API_BASE/api/aca-start-job")
 
 echo "Response from job start endpoint:"
 echo "$RESPONSE"
@@ -60,4 +72,4 @@ if [ -n "$RECENT_EXECUTION" ]; then
 fi
 
 echo -e "\nNow you can check logs with:"
-echo "curl -N -H \"Accept: text/event-stream\" https://template-doctor-standalone-nv.azurewebsites.net/api/aca-job-logs/$CORRELATION_ID"
+echo "curl -N -H \"Accept: text/event-stream\" $API_BASE/api/aca-job-logs/$CORRELATION_ID"

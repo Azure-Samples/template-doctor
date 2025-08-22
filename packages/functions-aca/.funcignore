@@ -1,6 +1,7 @@
 # Exclude local/dev artifacts and test pages from deployment
-# Node modules are handled by the platform; we only ship production deps
-node_modules/
+## IMPORTANT: Do NOT ignore node_modules here.
+## We package production dependencies into the zip file using scripts/package-functions-aca.sh
+## Ignoring node_modules here can cause missing modules in certain deployment paths.
 
 # Local environment and archives
 .env

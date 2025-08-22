@@ -18,7 +18,14 @@ RESOURCE_GROUP="template-doctor-rg"
 CONTAINER_APP_JOB="template-doctor-aca-job"
 
 # API endpoint
-API_URL="https://template-doctor-standalone-nv.azurewebsites.net/api/aca-start-job"
+# Resolve API base from environment or .env, with production fallback
+DEFAULT_API_BASE="https://template-doctor-standalone-nv.azurewebsites.net"
+if [ -f "$(dirname "$0")/../.env" ]; then
+  # shellcheck disable=SC2046
+  export $(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$(dirname "$0")/../.env" | xargs -I{} echo {}) >/dev/null 2>&1 || true
+fi
+API_BASE=${API_BASE:-$DEFAULT_API_BASE}
+API_URL="$API_BASE/api/aca-start-job"
 
 echo "Starting a new container job with minimal parameters..."
 echo "Timestamp: $TIMESTAMP"
@@ -68,14 +75,14 @@ if [ -n "$EXECUTION_NAME" ]; then
   
   # Check status
   echo "Checking status..."
-  STATUS_RESPONSE=$(curl -s "https://template-doctor-standalone-nv.azurewebsites.net/api/aca-job-status?executionName=$EXECUTION_NAME")
+  STATUS_RESPONSE=$(curl -s "$API_BASE/api/aca-job-status?executionName=$EXECUTION_NAME")
   echo "Status response:"
   echo "$STATUS_RESPONSE"
   echo ""
   
   # Check logs
   echo "Checking logs..."
-  LOGS_RESPONSE=$(curl -s -H "Accept: application/json" "https://template-doctor-standalone-nv.azurewebsites.net/api/aca-job-logs/$EXECUTION_NAME")
+  LOGS_RESPONSE=$(curl -s -H "Accept: application/json" "$API_BASE/api/aca-job-logs/$EXECUTION_NAME")
   echo "Logs response:"
   echo "$LOGS_RESPONSE"
   echo ""

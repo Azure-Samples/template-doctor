@@ -1821,6 +1821,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="action-buttons">
                     <button class="view-report-btn">View Report</button>
                     <button class="rescan-btn">Rescan</button>
+                    <button class="validate-btn">Run Template Validation</button>
                 </div>
             `;
 
@@ -1887,6 +1888,60 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
 
+      // Add event listener for validation button
+      div.querySelector('.validate-btn').addEventListener('click', () => {
+        // Extract template URL from the repoUrl
+        const templateUrl = matchedTemplate.repoUrl;
+        
+        // Show validation UI in the analysis section
+        document.getElementById('search-section').style.display = 'none';
+        if (scannedTemplatesSection) scannedTemplatesSection.style.display = 'none';
+        analysisSection.style.display = 'block';
+        resultsContainer.style.display = 'none';
+        loadingContainer.style.display = 'none';
+        errorSection.style.display = 'none';
+        
+        // Set repo info
+        document.getElementById('repo-name').textContent =
+          matchedTemplate.repoUrl.split('github.com/')[1] || matchedTemplate.repoUrl;
+        document.getElementById('repo-url').textContent = matchedTemplate.repoUrl;
+        
+        // Create validation container if it doesn't exist
+        let validationContainer = document.getElementById('validation-container');
+        if (!validationContainer) {
+          validationContainer = document.createElement('div');
+          validationContainer.id = 'validation-container';
+          resultsContainer.parentNode.insertBefore(validationContainer, resultsContainer);
+        }
+        
+        validationContainer.style.display = 'block';
+        
+        // Initialize the validation UI
+        if (window.GitHubWorkflowValidation) {
+          window.GitHubWorkflowValidation.init(
+            'validation-container', 
+            templateUrl,
+            (status) => {
+              debug('app', 'Validation status update:', status);
+              // When validation completes, show the results container
+              if (status.status === 'completed') {
+                validationContainer.style.marginBottom = '30px';
+                resultsContainer.style.display = 'block';
+              }
+            }
+          );
+        } else {
+          validationContainer.innerHTML = `
+            <div class="validation-error">
+              <p>Validation module not loaded. Please refresh the page and try again.</p>
+            </div>
+          `;
+        }
+        
+        // Scroll to the validation container
+        validationContainer.scrollIntoView({ behavior: 'smooth' });
+      });
+
       searchResults.appendChild(div);
 
       // Scroll to the template card and highlight it
@@ -1920,6 +1975,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                             <div class="action-buttons">
                                 <button class="analyze-btn">Analyze Repository</button>
+                                <button class="validate-btn">Run Template Validation</button>
                             </div>
                         </div>
                     `;
@@ -1934,6 +1990,57 @@ document.addEventListener('DOMContentLoaded', () => {
               // Continue with original URL on error
               internalAnalyzeRepo(repoUrl, 'show-modal');
             }
+          });
+          
+          // Add event listener for validation button
+          searchResults.querySelector('.validate-btn').addEventListener('click', () => {
+            // Show validation UI in the analysis section
+            document.getElementById('search-section').style.display = 'none';
+            if (scannedTemplatesSection) scannedTemplatesSection.style.display = 'none';
+            analysisSection.style.display = 'block';
+            resultsContainer.style.display = 'none';
+            loadingContainer.style.display = 'none';
+            errorSection.style.display = 'none';
+            
+            // Set repo info
+            document.getElementById('repo-name').textContent = 
+              repoUrl.includes('github.com/') ? repoUrl.split('github.com/')[1] : repoUrl;
+            document.getElementById('repo-url').textContent = repoUrl;
+            
+            // Create validation container if it doesn't exist
+            let validationContainer = document.getElementById('validation-container');
+            if (!validationContainer) {
+              validationContainer = document.createElement('div');
+              validationContainer.id = 'validation-container';
+              resultsContainer.parentNode.insertBefore(validationContainer, resultsContainer);
+            }
+            
+            validationContainer.style.display = 'block';
+            
+            // Initialize the validation UI
+            if (window.GitHubWorkflowValidation) {
+              window.GitHubWorkflowValidation.init(
+                'validation-container', 
+                repoUrl,
+                (status) => {
+                  debug('app', 'Validation status update:', status);
+                  // When validation completes, show the results container
+                  if (status.status === 'completed') {
+                    validationContainer.style.marginBottom = '30px';
+                    resultsContainer.style.display = 'block';
+                  }
+                }
+              );
+            } else {
+              validationContainer.innerHTML = `
+                <div class="validation-error">
+                  <p>Validation module not loaded. Please refresh the page and try again.</p>
+                </div>
+              `;
+            }
+            
+            // Scroll to the validation container
+            validationContainer.scrollIntoView({ behavior: 'smooth' });
           });
         } else {
           searchResults.innerHTML = '<div>No repositories found.</div>';

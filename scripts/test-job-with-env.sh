@@ -12,7 +12,14 @@ TEMPLATE_NAME="todo-nodejs-mongo-swa"
 TEMPLATE_BRANCH="main"
 
 # API endpoint
-API_URL="https://template-doctor-standalone-nv.azurewebsites.net/api/aca-start-job"
+# Resolve API base via .env or environment, default to prod host
+DEFAULT_API_BASE="https://template-doctor-standalone-nv.azurewebsites.net"
+if [ -f "$(dirname "$0")/../.env" ]; then
+  # shellcheck disable=SC2046
+  export $(grep -E '^[A-Za-z_][A-Za-z0-9_]*=' "$(dirname "$0")/../.env" | xargs -I{} echo {}) >/dev/null 2>&1 || true
+fi
+API_BASE=${API_BASE:-$DEFAULT_API_BASE}
+API_URL="$API_BASE/api/aca-start-job"
 
 echo "Starting a new container job with more detailed parameters..."
 echo "Timestamp: $TIMESTAMP"
@@ -65,13 +72,13 @@ if [ -n "$EXECUTION_NAME" ]; then
   echo "Execution Name: $EXECUTION_NAME"
   echo ""
   echo "To check status:"
-  echo "curl https://template-doctor-standalone-nv.azurewebsites.net/api/aca-job-status?executionName=$EXECUTION_NAME"
+  echo "curl $API_BASE/api/aca-job-status?executionName=$EXECUTION_NAME"
   echo ""
   echo "To stream logs:"
-  echo "curl -N -H \"Accept: text/event-stream\" https://template-doctor-standalone-nv.azurewebsites.net/api/aca-job-logs/$EXECUTION_NAME"
+  echo "curl -N -H \"Accept: text/event-stream\" $API_BASE/api/aca-job-logs/$EXECUTION_NAME"
   echo ""
   echo "To fetch logs directly:"
-  echo "curl -H \"Accept: application/json\" https://template-doctor-standalone-nv.azurewebsites.net/api/aca-job-logs/$EXECUTION_NAME"
+  echo "curl -H \"Accept: application/json\" $API_BASE/api/aca-job-logs/$EXECUTION_NAME"
 else
   echo "Failed to start job or get execution name."
   echo "Please check the response for details."
