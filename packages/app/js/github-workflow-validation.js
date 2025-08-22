@@ -1,5 +1,5 @@
 /**
- * Front-end component to validate templates using the new workflow
+ * Front-end component to validate templates using the GitHub workflow via SWA API
  * This file should be included in the frontend
  */
 
@@ -235,9 +235,6 @@ async function pollGithubWorkflowStatus(runId, templateUrl, apiBase, onStatusCha
   const maxAttempts = 60; // Maximum polling attempts (30 minutes at 30-second intervals)
   const statusMessageElem = loadingElem.querySelector('.status-message');
   
-  // In a real implementation, we would have a DB or storage to check status
-  // For now, we'll simulate polling with increasing progress
-  
   while (!complete && attempts < maxAttempts) {
     try {
       // Wait before polling (except for the first attempt)
@@ -245,7 +242,7 @@ async function pollGithubWorkflowStatus(runId, templateUrl, apiBase, onStatusCha
         await new Promise(resolve => setTimeout(resolve, 30000)); // 30-second polling interval
       }
       
-      // Update progress animation - simulate progress
+      // Update progress animation
       progress = Math.min(progress + 5, 90);
       progressElem.style.width = `${progress}%`;
       
@@ -263,14 +260,24 @@ async function pollGithubWorkflowStatus(runId, templateUrl, apiBase, onStatusCha
         });
       }
       
-      // In a real implementation, we would query a status endpoint
-      // For demonstration, we'll mock completion after a number of attempts
-      if (attempts > 10) {  // Mock completion after ~5 minutes
-        // This would be replaced with actual API call in production:
-        // const response = await fetch(`${apiBase}/api/validation-status?runId=${runId}`);
-        // const statusData = await response.json();
-        
-        // Mock successful completion
+      // Call the validation-status API to check the current status
+      const statusResponse = await fetch(`${apiBase}/api/validation-status?runId=${runId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!statusResponse.ok) {
+        console.warn(`Status check failed: ${statusResponse.status} ${statusResponse.statusText}`);
+        attempts++;
+        continue;
+      }
+      
+      const statusData = await statusResponse.json();
+      
+      // Check if the validation is complete
+      if (statusData.status === 'completed') {
         complete = true;
         progressElem.style.width = '100%';
         
@@ -281,13 +288,12 @@ async function pollGithubWorkflowStatus(runId, templateUrl, apiBase, onStatusCha
         const summaryElem = document.getElementById('githubValidationSummary');
         const detailsElem = document.getElementById('githubValidationDetails');
         
-        // Mock success result
-        const mockSuccess = Math.random() > 0.3; // 70% chance of success for demo
-        if (mockSuccess) {
+        // Display results based on the conclusion
+        if (statusData.conclusion === 'success') {
           summaryElem.className = 'validation-summary success';
           summaryElem.innerHTML = `
             <strong>Success!</strong> The template passed validation checks.
-            <p><a href="https://github.com/microsoft/template-doctor/actions" target="_blank">View workflow run on GitHub</a></p>
+            <p><a href="${statusData.runUrl}" target="_blank">View workflow run on GitHub</a></p>
           `;
           
           if (onStatusChange) {
@@ -302,21 +308,30 @@ async function pollGithubWorkflowStatus(runId, templateUrl, apiBase, onStatusCha
           summaryElem.className = 'validation-summary failure';
           summaryElem.innerHTML = `
             <strong>Validation Failed</strong> The template has issues that need to be addressed.
-            <p><a href="https://github.com/microsoft/template-doctor/actions" target="_blank">View workflow run on GitHub</a></p>
+            <p><a href="${statusData.runUrl}" target="_blank">View workflow run on GitHub</a></p>
           `;
           
-          detailsElem.innerHTML = `
-## Summary
-
-:white_check_mark: <b>metadata</b>: All metadata tests passed
-:x: <b>azd up</b>: Failed to provision with azd up
-:warning: <b>ps-rule</b>: 3 issues found in PS Rule validation
-
-### Issues Found:
-- Missing SUPPORT.md file
-- azd.yaml is missing required fields
-- Environment variables not properly documented
-          `;
+          // Format details if available
+          if (statusData.results && statusData.results.details) {
+            let detailsContent = "## Validation Results\n\n";
+            
+            statusData.results.details.forEach(detail => {
+              const icon = detail.status === 'pass' ? '✅' : detail.status === 'fail' ? '❌' : '⚠️';
+              detailsContent += `${icon} **${detail.category}**: ${detail.message}\n`;
+              
+              if (detail.issues && detail.issues.length > 0) {
+                detailsContent += "\n### Issues Found:\n";
+                detail.issues.forEach(issue => {
+                  detailsContent += `- ${issue}\n`;
+                });
+                detailsContent += "\n";
+              }
+            });
+            
+            detailsElem.innerHTML = detailsContent;
+          } else {
+            detailsElem.innerHTML = "No detailed results available.";
+          }
           
           if (onStatusChange) {
             onStatusChange({

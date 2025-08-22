@@ -12,7 +12,8 @@
   "node-fetch": "^2.6.7",
   "@azure/identity": "^4.0.0",
   "@azure/arm-appcontainers": "^2.2.0",
-  "@azure/monitor-query": "^1.2.0"
+  "@azure/monitor-query": "^1.2.0",
+  "uuid": "^9.0.0"
   },
   "engines": {
     "node": ">=16"
