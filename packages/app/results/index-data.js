@@ -1,10 +1,14 @@
-window.templatesData = [
-  {
-    "timestamp": "2025-07-25T10:14:02.435Z",
-    "dashboardPath": "1753438442443-dashboard.html",
-    "dataPath": "1753438442443-data.js",
-    "repoUrl": "https://github.com/Azure-Samples/get-started-with-ai-agents",
-  "originUpstream": "Azure-Samples/get-started-with-ai-agents",
+// Only authenticated users should see this data
+(function() {
+  // Only populate the data if the user is authenticated
+  if (window.GitHubAuth && window.GitHubAuth.isAuthenticated()) {
+    window.templatesData = [
+      {
+        "timestamp": "2025-07-25T10:14:02.435Z",
+        "dashboardPath": "1753438442443-dashboard.html",
+        "dataPath": "1753438442443-data.js",
+        "repoUrl": "https://github.com/Azure-Samples/get-started-with-ai-agents",
+      "originUpstream": "Azure-Samples/get-started-with-ai-agents",
     "ruleSet": "partner",
     "compliance": {
       "percentage": 56,
@@ -75,3 +79,8 @@ window.templatesData = [
     "relativePath": "todo-nodejs-mongo-swa/1753423566922-dashboard.html"
   }
 ];
+  } else {
+    // If not authenticated, set an empty array
+    window.templatesData = [];
+  }
+})();

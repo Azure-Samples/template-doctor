@@ -1109,6 +1109,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- Scanned Templates Functionality ---
   function loadScannedTemplates() {
+    // First check if user is authenticated
+    if (!window.GitHubAuth || !window.GitHubAuth.isAuthenticated()) {
+      debug('app', 'User is not authenticated, not loading scanned templates');
+      scannedTemplates = [];
+      return false;
+    }
+    
     // Check if window.templatesData exists (loaded from results/index-data.js)
     if (window.templatesData) {
       debug('app', 'Loading scanned templates from index-data.js', window.templatesData.length);
@@ -1189,6 +1196,15 @@ document.addEventListener('DOMContentLoaded', () => {
     createScannedTemplatesSection();
 
     if (!templateGrid) return;
+    
+    // Check if user is authenticated
+    if (!window.GitHubAuth || !window.GitHubAuth.isAuthenticated()) {
+      templateGrid.innerHTML = '<div class="no-templates">Please sign in to view scanned templates.</div>';
+      // Hide pagination
+      const pagination = scannedTemplatesSection.querySelector('.pagination');
+      if (pagination) pagination.style.display = 'none';
+      return;
+    }
 
     if (scannedTemplates.length === 0) {
       templateGrid.innerHTML = '<div class="no-templates">No scanned templates found.</div>';
@@ -2832,6 +2848,24 @@ document.addEventListener('DOMContentLoaded', () => {
       loadScannedTemplates();
     });
   }
+  
+  // Listen for authentication state changes
+  document.addEventListener('auth-state-changed', function(event) {
+    debug('app', 'Auth state changed event received', event.detail);
+    if (event.detail.authenticated) {
+      // User authenticated, load templates data
+      loadScannedTemplates();
+    } else {
+      // User logged out, clear templates data
+      scannedTemplates = [];
+      if (templateGrid) {
+        templateGrid.innerHTML = '<div class="no-templates">Please sign in to view scanned templates.</div>';
+      }
+      // Hide pagination
+      const pagination = scannedTemplatesSection?.querySelector('.pagination');
+      if (pagination) pagination.style.display = 'none';
+    }
+  });
 
   debug('app', 'Application initialized');
 });

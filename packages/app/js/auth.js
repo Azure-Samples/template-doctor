@@ -506,6 +506,9 @@ class GitHubAuth {
       // Show search section, hide welcome section
       if (searchSection) searchSection.style.display = 'block';
       if (welcomeSection) welcomeSection.style.display = 'none';
+      
+      // Dispatch auth-state-changed event with authenticated=true
+      document.dispatchEvent(new CustomEvent('auth-state-changed', { detail: { authenticated: true } }));
     } else {
       console.log('updateUI: User is not authenticated, updating UI');
       // User is not authenticated
@@ -515,6 +518,9 @@ class GitHubAuth {
       // Show welcome section, hide search section
       if (searchSection) searchSection.style.display = 'none';
       if (welcomeSection) welcomeSection.style.display = 'block';
+      
+      // Dispatch auth-state-changed event with authenticated=false
+      document.dispatchEvent(new CustomEvent('auth-state-changed', { detail: { authenticated: false } }));
     }
   }
 
