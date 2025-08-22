@@ -1,12 +1,37 @@
-import { randomUUID } from 'crypto';
+const crypto = require('crypto');
 
-export default async function (context, req) {
+module.exports = async function (context, req) {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    context.res = {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      }
+    };
+    return;
+  }
+  
   try {
-    const templateUrl = req.body?.templateUrl;
-    if (!templateUrl) {
-      context.res = { status: 400, body: { error: "templateUrl is required" } };
+    const { targetRepoUrl, callbackUrl } = req.body || {};
+    
+    context.log('validate-template triggered with:');
+    context.log(`targetRepoUrl: ${targetRepoUrl}`);
+    context.log(`callbackUrl: ${callbackUrl || 'not provided'}`);
+    
+    if (!targetRepoUrl) {
+      context.log.warn('Missing required parameter: targetRepoUrl');
+      context.res = { 
+        status: 400, 
+        headers: { 'Access-Control-Allow-Origin': '*' },
+        body: { error: "targetRepoUrl is required" } 
+      };
       return;
     }
+
+    const runId = crypto.randomUUID();
 
     const owner = "Template-Doctor";
     const repo = "template-doctor";
@@ -14,46 +39,47 @@ export default async function (context, req) {
     const token = process.env.GH_WORKFLOW_TOKEN;
     if (!token) throw new Error("Missing GH_WORKFLOW_TOKEN app setting");
 
-    const runId = randomUUID(); // generate unique ID for this run
-    const callbackUrl = req.body?.callbackUrl || "";
+    const ghUrl = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${encodeURIComponent(workflowFile)}/dispatches`;
 
-    // Trigger the workflow via GitHub API
-    const triggerRes = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${encodeURIComponent(workflowFile)}/dispatches`,
-      {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Accept": "application/vnd.github+json",
-          "X-GitHub-Api-Version": "2022-11-28",
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          ref: "main",
-          inputs: {
-            target_validate_template_url: templateUrl,
-            run_id: runId,
-            callback_url: callbackUrl,
-            customValidators: "azd-provision,ps-rule"
-          }
-        })
+    const payload = {
+      ref: "main",
+      inputs: {
+        target_validate_template_url: targetRepoUrl,
+        callback_url: callbackUrl || "",
+        run_id: runId,
+        customValidators: "azd-provision,ps-rule"
       }
-    );
+    };
 
-    if (!triggerRes.ok) {
-      const txt = await triggerRes.text().catch(() => "");
-      throw new Error(`Failed to trigger workflow: ${triggerRes.status} ${triggerRes.statusText} ${txt}`);
+    context.log("Dispatching workflow", ghUrl, payload);
+
+    const dispatchRes = await fetch(ghUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!dispatchRes.ok) {
+      const errText = await dispatchRes.text();
+      throw new Error(`GitHub dispatch failed: ${dispatchRes.status} ${dispatchRes.statusText} - ${errText}`);
     }
 
     context.res = {
       status: 200,
-      body: {
-        message: "Workflow triggered successfully",
-        runId
-      }
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: { runId, message: "Workflow triggered successfully" }
     };
   } catch (err) {
-    context.log.error(err);
-    context.res = { status: 500, body: { error: err.message } };
+    context.log.error("validate-template error:", err);
+    context.res = { 
+      status: 500, 
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: { error: err.message } 
+    };
   }
 }

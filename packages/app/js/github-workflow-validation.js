@@ -167,7 +167,7 @@ async function runGithubWorkflowValidation(templateUrl, apiBase, onStatusChange)
     // Call the validate-template API to trigger the GitHub workflow
     console.log(`Validating template URL: ${templateUrl}`);
     console.log(`API endpoint: ${apiBase}/api/validate-template`);
-    console.log(`Request payload:`, {templateUrl: templateUrl});
+    console.log(`Request payload:`, {targetRepoUrl: templateUrl});
     
     const response = await fetch(`${apiBase}/api/validate-template`, {
       method: 'POST',
@@ -175,7 +175,7 @@ async function runGithubWorkflowValidation(templateUrl, apiBase, onStatusChange)
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        templateUrl: templateUrl
+        targetRepoUrl: templateUrl
       })
     });
 
