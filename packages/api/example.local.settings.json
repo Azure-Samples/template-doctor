@@ -3,10 +3,10 @@
   "Values": {
     "AzureWebJobsStorage": "",
     "FUNCTIONS_WORKER_RUNTIME": "node",
-    "GITHUB_CLIENT_ID": "Ov23li2nstp4WdgRG6vZ",
-    "GITHUB_CLIENT_SECRET": "af4282913ea6ceda1eae45f3f38f9dd637005d7e",
-    "GITHUB_REPO_OWNER": "anfibiacreativa",
-    "GITHUB_REPO_NAME": "template-doctor"
+    "GITHUB_CLIENT_ID": "",
+    "GITHUB_CLIENT_SECRET": "",
+    "GITHUB_REPO_OWNER": "",
+    "GITHUB_REPO_NAME": ""
   },
   "Host": {
     "LocalHttpPort": 7071,

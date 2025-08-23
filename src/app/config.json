@@ -1,6 +1,6 @@
 {
   "githubOAuth": {
-    "clientId": "Ov23li2nstp4WdgRG6vZ",
+    "clientId": "",
     "scope": "repo read:user"
   },
   "backend": {
