@@ -73,9 +73,9 @@ class TemplateAnalyzer {
         this.ruleSetConfigs.docs = await docsResponse.json();
       }
       // Convert pattern strings to RegExp objects for workflow files
-      if (this.ruleSetConfigs.dod.requiredWorkflowFiles) {
-        this.ruleSetConfigs.dod.requiredWorkflowFiles =
-          this.ruleSetConfigs.dod.requiredWorkflowFiles.map((item) => ({
+      if (this.ruleSetConfigs.docs.requiredWorkflowFiles) {
+        this.ruleSetConfigs.docs.requiredWorkflowFiles =
+          this.ruleSetConfigs.docs.requiredWorkflowFiles.map((item) => ({
             pattern: new RegExp(item.pattern, 'i'),
             message: item.message,
           }));
