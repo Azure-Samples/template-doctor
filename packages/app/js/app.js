@@ -1222,7 +1222,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // Get ruleset information from template, default to "DoD" if not available
       const ruleSet = template.ruleSet || 'dod';
       const ruleSetDisplay =
-        ruleSet === 'dod' ? 'DoD' : ruleSet === 'partner' ? 'Partner' : 'Custom';
+        ruleSet === 'dod' ? 'DoD' : ruleSet === 'partner' ? 'Partner' : ruleSet === 'docs' ? 'Docs' : 'Custom';
 
       // Check for gistUrl in custom rulesets
       let gistUrl = '';
@@ -2307,7 +2307,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Notify user that analysis is starting
     if (window.NotificationSystem) {
       const ruleSetDisplayName =
-        ruleSet === 'dod' ? 'DoD' : ruleSet === 'partner' ? 'Partner' : 'Custom';
+        ruleSet === 'dod' ? 'DoD' : ruleSet === 'partner' ? 'Partner' : ruleSet === 'docs' ? 'Docs' : 'Custom';
       window.NotificationSystem.showInfo(
         'Analysis Started',
         `Analyzing repository: ${repoName} with ${ruleSetDisplayName} ruleset`,

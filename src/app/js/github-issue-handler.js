@@ -222,7 +222,7 @@ async function processIssueCreation(github) {
 
     // Add configuration and severity breakdown
     const ruleSet = window.reportData.ruleSet || 'dod';
-    const ruleSetDisplay = ruleSet === 'dod' ? 'DoD' : ruleSet === 'partner' ? 'Partner' : 'Custom';
+    const ruleSetDisplay = ruleSet === 'dod' ? 'DoD' : ruleSet === 'partner' ? 'Partner' : ruleSet === 'docs' ? 'Docs' : 'Custom';
     const customGistUrl =
       ruleSet === 'custom' &&
       window.reportData.customConfig &&
