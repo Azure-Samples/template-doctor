@@ -581,30 +581,20 @@ class TemplateAnalyzer {
     if (!expected) return;
 
     // Compare exact match by default; normalize if case-insensitive comparison desired
-    try {
-      if (String(defaultBranch) !== String(expected)) {
-        issues.push({
-          id: `default-branch-not-${expected}`,
-          severity: 'error',
-          message: `Default branch must be '${expected}'. Current default branch is '${defaultBranch}'.`,
-          error: `Default branch is '${defaultBranch}', expected '${expected}'`,
-        });
-      } else {
-        compliant.push({
-          id: `default-branch-is-${expected}`,
-          category: 'branch',
-          message: `Default branch is '${expected}'`,
-          details: { defaultBranch },
-        });
-      }
-    } catch (err) {
-      console.error('Error evaluating default branch rule:', err);
-      // If something unexpected happens, treat as a warning rather than crashing the analyzer
+    const normalize = (s) => String(s).trim();
+    if (normalize(defaultBranch) !== normalize(expected)) { 
       issues.push({
-        id: 'default-branch-check-failed',
-        severity: 'warning',
-        message: 'Default branch check failed to run',
-        error: err instanceof Error ? err.message : String(err),
+        id: `default-branch-not-${expected}`,
+        severity: 'error',
+        message: `Default branch must be '${expected}'. Current default branch is '${defaultBranch}'.`,
+        error: `Default branch is '${defaultBranch}', expected '${expected}'`,
+      });
+    } else {
+      compliant.push({
+        id: `default-branch-is-${expected}`,
+        category: 'branch',
+        message: `Default branch is '${expected}'`,
+        details: { defaultBranch },
       });
     }
   }
