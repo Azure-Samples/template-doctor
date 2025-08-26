@@ -115,7 +115,12 @@ module.exports = async function (context, req) {
         context.log.error(`Stack: ${error.stack}`);
         
         // Even on error, return a valid response to avoid breaking the client
-        // This ensures we don't return a 500 status
+        // This ensures we don't return a 500 status which could cause the UI to show an error
+        // Instead, we return a 200 with an "in_progress" status so the UI will continue to poll
+        // This is better UX because:
+        // 1. Many errors are transient and the next poll might succeed
+        // 2. The GitHub workflow may still be running despite our API having issues
+        // 3. If the validation never completes, the UI will eventually timeout and show a timeout message
         const runId = req.query.runId || 'unknown';
         
         context.log.warn(`Returning fallback status for runId ${runId} due to error`);
