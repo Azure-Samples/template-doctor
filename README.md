@@ -1,6 +1,12 @@
 # Template Doctor (Monorepo)
 
-Template Doctor analyzes and validates Azure Developer CLI (azd) templates, provides a web UI, and automates PR updates with scan results. This repository is structured as a monorepo with independent deployable packages.
+Template Doctor analyzes and validates Azure Developer CLI (azd) templates## Authentication
+
+For GitHub OAuth authentication, you need to:
+
+1. Create a GitHub OAuth app with appropriate callback URL
+2. Configure environment variables or config.json settings
+3. See [OAuth Setup Guide](docs/oauth-setup.md) for detailed instructionsdes a web UI, and automates PR updates with scan results. This repository is structured as a monorepo with independent deployable packages.
 
 ## Monorepo layout
 

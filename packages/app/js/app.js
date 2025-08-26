@@ -3,6 +3,7 @@
 
 // Configuration for organizations that might require forking
 // Create a robust stub implementation for web-fragments
+// The real implementation can't be loaded directly via ES modules in the browser
 // due to bare import specifiers like "htmlrewriter" that aren't supported
 const webFragments = {
   // Main initialization function
@@ -69,6 +70,7 @@ async function loadWebFragments() {
   }
 }
 */
+
 const ORGANIZATIONS_CONFIG = {
   requireConfirmationForFork: true,
   organizationsToFork: ['Azure', 'Azure-Samples', 'Microsoft'],

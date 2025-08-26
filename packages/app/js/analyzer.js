@@ -19,7 +19,7 @@ class TemplateAnalyzer {
   async loadRuleSetConfigs() {
     try {
       // Load DoD (default) config
-      const dodResponse = await fetch('/configs/dod-config.json');
+      const dodResponse = await fetch('./configs/dod-config.json');
       if (!dodResponse.ok) {
         throw new Error(`Failed to load DoD config: ${dodResponse.status}`);
       }
@@ -35,7 +35,7 @@ class TemplateAnalyzer {
       }
 
       // Load Partner config
-      const partnerResponse = await fetch('/configs/partner-config.json');
+      const partnerResponse = await fetch('./configs/partner-config.json');
       if (!partnerResponse.ok) {
         throw new Error(`Failed to load Partner config: ${partnerResponse.status}`);
       }
@@ -51,7 +51,7 @@ class TemplateAnalyzer {
       }
 
       // Load Custom config - this will be overridden if the user provides a custom config
-      const customResponse = await fetch('/configs/custom-config.json');
+      const customResponse = await fetch('./configs/custom-config.json');
       if (!customResponse.ok) {
         throw new Error(`Failed to load Custom config: ${customResponse.status}`);
       }

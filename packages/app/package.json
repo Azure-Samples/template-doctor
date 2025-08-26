@@ -13,5 +13,8 @@
   },
   "devDependencies": {
     "prettier": "^3.6.2"
+  },
+  "dependencies": {
+    "web-fragments": "^0.7.2"
   }
 }
