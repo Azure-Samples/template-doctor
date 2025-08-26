@@ -1,15 +1,37 @@
 // Config loader for Template Doctor
 // Loads configuration from multiple sources and consolidates them
 
+/**
+ * Configuration can be loaded from multiple sources:
+ * 1. config.json file in the app directory
+ * 2. Environment variables via the runtime-config API
+ * 
+ * For local development, the port for the Azure Functions API can be configured:
+ * - Set window.LOCAL_FUNCTIONS_PORT in JavaScript
+ * - Add ?funcPort=xxxx to the URL query parameters
+ */
+
 // Load environment variables if they exist
 async function loadEnvironmentVariables() {
   // For client-side code, we can't directly access process.env
   // We'll use a server-side endpoint to get environment variables
   try {
     const isLocalhost = window.location.hostname === 'localhost';
+    
+    // Allow port override via window.LOCAL_FUNCTIONS_PORT or ?funcPort=xxxx
+    let localPort = 7071; // Default Azure Functions port
+    if (window.LOCAL_FUNCTIONS_PORT) {
+      localPort = window.LOCAL_FUNCTIONS_PORT;
+    } else {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.has('funcPort')) {
+        localPort = urlParams.get('funcPort');
+      }
+    }
+    
     // Use local Functions port in pure localhost dev, otherwise use SWA-managed /api proxy
     const configUrl = isLocalhost
-      ? 'http://localhost:7071/api/runtime-config'
+      ? `http://localhost:${localPort}/api/runtime-config`
       : '/api/runtime-config';
     
     const response = await fetch(configUrl);
