@@ -3,5 +3,13 @@
   "requiredFolders": ["infra"],
   "readmeRequirements": {
     "requiredHeadings": ["Getting Started"]
+  },
+  "bicepChecks": {
+    "requiredResources": [],
+    "securityBestPractices": {
+      "preferManagedIdentity": true,
+      "detectInsecureAuth": true,
+      "checkAnonymousAccess": true
+    }
   }
 }
