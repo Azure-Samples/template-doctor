@@ -314,7 +314,7 @@ document.addEventListener('DOMContentLoaded', function () {
         data.compliance.compliant.find((item) => item.category === 'meta')?.details?.ruleSet ||
         'dod';
       const ruleSetDisplay =
-        ruleSet === 'dod' ? 'DoD' : ruleSet === 'partner' ? 'Partner' : 'Custom';
+        ruleSet === 'dod' ? 'DoD' : ruleSet === 'partner' ? 'Partner' : ruleSet === 'docs' ? 'Docs' : 'Custom';
 
       // Check for Gist URL in custom configuration
       const gistUrl = data.customConfig?.gistUrl;

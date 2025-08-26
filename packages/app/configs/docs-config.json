@@ -1,0 +1,23 @@
+{
+  "githubRepositoryConfiguration": {
+    "defaultBranch": {
+      "mustBe": "main",
+      "policy": "MUST",
+      "description": "Default branch MUST be 'main'."
+    }
+  },
+  "requiredFiles": [],
+  "requiredFolders": [],
+  "readmeRequirements": {
+    "requiredHeadings": []
+  },
+  "requiredWorkflowFiles": [],
+  "bicepChecks": {
+    "requiredResources": [
+      
+    ]
+  },
+  "azureYamlRules": {
+    "mustDefineServices": false
+  }
+}

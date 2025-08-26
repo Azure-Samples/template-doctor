@@ -41,6 +41,13 @@ function initRulesetModal() {
                     </div>
                     <div class="form-group">
                         <label>
+                            <input type="radio" name="ruleset" value="docs">
+                            <strong>Documentation</strong>
+                        </label>
+                        <p class="ruleset-description">A ruleset focused on https://aka.ms/samples guidance.</p>
+                    </div>
+                    <div class="form-group">
+                        <label>
                             <input type="radio" name="ruleset" value="custom">
                             <strong>Custom</strong>
                         </label>
