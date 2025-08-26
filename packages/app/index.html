@@ -22,6 +22,7 @@
     <link rel="stylesheet" href="css/notifications.css" />
     <link rel="stylesheet" href="css/modal.css" />
     <link rel="stylesheet" href="css/validate-button.css" />
+    <link rel="stylesheet" href="css/web-fragments.css" />
     <script src="https://d3js.org/d3.v7.min.js"></script>
   </head>
   <body>
@@ -244,9 +245,13 @@
     <!-- Runtime configuration -->
     <script src="js/runtime-config.js"></script>
     <!-- Main application logic -->
-    <script src="js/app.js"></script>
+    <script type="module" src="js/app.js"></script>
     <!-- Fallback scripts to ensure action buttons are visible -->
     <script src="js/action-buttons-fallback.js"></script>
     <script src="js/action-buttons-direct.js"></script>
+    <!-- Web Fragments Container -->
+    <div id="web-fragments-container" class="web-fragments-container">
+      <web-fragment-host fragment-id="vscodedevazure" class="vscode-fragment"></web-fragment-host>
+    </div>
   </body>
 </html>

@@ -1,0 +1,24 @@
+.web-fragments-container {
+    width: 100%;
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+
+.vscode-fragment {
+    display: block;
+    width: 100%;
+    min-height: 50px;
+}
+
+.web-fragment-placeholder {
+    font-family: 'Inter', sans-serif;
+    color: #666;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    padding: 15px;
+    text-align: center;
+}
+
+.web-fragment-placeholder p {
+    margin: 5px 0;
+}

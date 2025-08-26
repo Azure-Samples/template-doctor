@@ -2,6 +2,73 @@
 // Wires up authentication, search, analysis, and dashboard rendering
 
 // Configuration for organizations that might require forking
+// Create a robust stub implementation for web-fragments
+// due to bare import specifiers like "htmlrewriter" that aren't supported
+const webFragments = {
+  // Main initialization function
+  initializeWebFragments: function() {
+    console.log('Web fragments initialization skipped - using stub implementation');
+    
+    // Initialize the web fragment host if it exists in the DOM
+    this.initializeFragmentHost();
+    
+    return true;
+  },
+  
+  // Helper to initialize fragment host elements in the DOM
+  initializeFragmentHost: function() {
+    // Find any web-fragment-host elements in the document
+    const hostElements = document.querySelectorAll('web-fragment-host');
+    if (hostElements.length > 0) {
+      console.log(`Found ${hostElements.length} web-fragment-host elements`);
+      
+      // For each host element, set up minimal functionality
+      hostElements.forEach((host, index) => {
+        const fragmentId = host.getAttribute('fragment-id');
+        if (fragmentId) {
+          console.log(`Setting up fragment host for ID: ${fragmentId}`);
+          
+          // Add a placeholder message
+          const placeholder = document.createElement('div');
+          placeholder.className = 'web-fragment-placeholder';
+          placeholder.innerHTML = `
+            <div style="padding: 10px; border: 1px dashed #ccc; margin: 5px; text-align: center;">
+              <p>Web Fragment placeholder for "${fragmentId}"</p>
+              <p><small>Using stub implementation</small></p>
+            </div>
+          `;
+          
+          // Replace or append to the host
+          host.innerHTML = '';
+          host.appendChild(placeholder);
+        }
+      });
+    }
+  }
+};
+
+// Initialize web fragments immediately
+webFragments.initializeWebFragments();
+
+// If web-fragments is needed in the future, uncomment this code:
+/*
+async function loadWebFragments() {
+  try {
+    // Correct relative path from js directory to node_modules
+    const webFragments = await import('../node_modules/web-fragments/dist/index.js');
+    if (webFragments && webFragments.initializeWebFragments) {
+      webFragments.initializeWebFragments();
+      console.log('Web fragments initialized successfully');
+    } else {
+      console.error('Web fragments module loaded but initializeWebFragments not found');
+    }
+    return webFragments;
+  } catch (error) {
+    console.error('Failed to load web-fragments module:', error);
+    return null;
+  }
+}
+*/
 const ORGANIZATIONS_CONFIG = {
   requireConfirmationForFork: true,
   organizationsToFork: ['Azure', 'Azure-Samples', 'Microsoft'],
