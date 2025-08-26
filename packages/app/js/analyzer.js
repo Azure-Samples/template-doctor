@@ -7,7 +7,6 @@ class TemplateAnalyzer {
       dod: {}, // Will be loaded when needed
       partner: {},
       custom: {},
-      docs: {}
     };
 
     // Load rule set configurations
@@ -20,7 +19,7 @@ class TemplateAnalyzer {
   async loadRuleSetConfigs() {
     try {
       // Load DoD (default) config
-      const dodResponse = await fetch('/configs/dod-config.json');
+      const dodResponse = await fetch('./configs/dod-config.json');
       if (!dodResponse.ok) {
         throw new Error(`Failed to load DoD config: ${dodResponse.status}`);
       }
@@ -36,7 +35,7 @@ class TemplateAnalyzer {
       }
 
       // Load Partner config
-      const partnerResponse = await fetch('/configs/partner-config.json');
+      const partnerResponse = await fetch('./configs/partner-config.json');
       if (!partnerResponse.ok) {
         throw new Error(`Failed to load Partner config: ${partnerResponse.status}`);
       }
@@ -52,7 +51,7 @@ class TemplateAnalyzer {
       }
 
       // Load Custom config - this will be overridden if the user provides a custom config
-      const customResponse = await fetch('/configs/custom-config.json');
+      const customResponse = await fetch('./configs/custom-config.json');
       if (!customResponse.ok) {
         throw new Error(`Failed to load Custom config: ${customResponse.status}`);
       }
@@ -62,20 +61,6 @@ class TemplateAnalyzer {
       if (this.ruleSetConfigs.custom.requiredWorkflowFiles) {
         this.ruleSetConfigs.custom.requiredWorkflowFiles =
           this.ruleSetConfigs.custom.requiredWorkflowFiles.map((item) => ({
-            pattern: new RegExp(item.pattern, 'i'),
-            message: item.message,
-          }));
-      }
-
-      // Load docs config
-      const docsResponse = await fetch('/configs/docs-config.json');
-      if (docsResponse.ok) {
-        this.ruleSetConfigs.docs = await docsResponse.json();
-      }
-      // Convert pattern strings to RegExp objects for workflow files
-      if (this.ruleSetConfigs.docs.requiredWorkflowFiles) {
-        this.ruleSetConfigs.docs.requiredWorkflowFiles =
-          this.ruleSetConfigs.docs.requiredWorkflowFiles.map((item) => ({
             pattern: new RegExp(item.pattern, 'i'),
             message: item.message,
           }));
@@ -127,8 +112,6 @@ class TemplateAnalyzer {
         return this.ruleSetConfigs.partner;
       case 'custom':
         return this.ruleSetConfigs.custom;
-      case 'docs':
-        return this.ruleSetConfigs.docs;
       case 'dod':
       default:
         return this.ruleSetConfigs.dod;
@@ -302,12 +285,6 @@ class TemplateAnalyzer {
       // Start analyzing
       const issues = [];
       const compliant = [];
-
-      // Run repository-level configuration validations early (docs-config rules)
-      // Only run docs-specific repo validations when the docs ruleset is selected
-      if (ruleSet === 'docs') {
-        this.validateRepoConfiguration(config, repoInfo, defaultBranch, issues, compliant);
-      }
 
       // Normalize file paths for case-insensitive comparison
       const normalized = files.map((f) => f.toLowerCase());
@@ -564,66 +541,6 @@ class TemplateAnalyzer {
     } catch (error) {
       console.error('Error analyzing template:', error);
       throw new Error(`Failed to analyze repository: ${error.message}`);
-    }
-  }
-
-  /**
-   * Evaluate the default branch rule from docs-config.json
-   * @param {Object} config - The configuration object
-   * @param {Object} repoInfo - The repository information object
-   * @param {string} defaultBranch - The default branch of the repository
-   * @param {Array} issues - The issues array to populate with any issues found
-   * @param {Array} compliant - The compliant array to populate with any compliant items
-   */
-  evaluateDefaultBranchRule(config, repoInfo, defaultBranch, issues, compliant) {
-    // Guard: only run if docs-config defines a default branch requirement
-    const expected = config?.githubRepositoryConfiguration?.defaultBranch?.mustBe;
-    if (!expected) return;
-
-    // Compare exact match by default; normalize if case-insensitive comparison desired
-    const normalize = (s) => String(s).trim();
-    if (normalize(defaultBranch) !== normalize(expected)) { 
-      issues.push({
-        id: `default-branch-not-${expected}`,
-        severity: 'error',
-        message: `Default branch must be '${expected}'. Current default branch is '${defaultBranch}'.`,
-        error: `Default branch is '${defaultBranch}', expected '${expected}'`,
-      });
-    } else {
-      compliant.push({
-        id: `default-branch-is-${expected}`,
-        category: 'branch',
-        message: `Default branch is '${expected}'`,
-        details: { defaultBranch },
-      });
-    }
-  }
-
-  /**
-   * Run all repository configuration validations together. Keep this minimal so future config checks can be added cleanly.
-   * @param {Object} config
-   * @param {Object} repoInfo
-   * @param {string} defaultBranch
-   * @param {Array} issues
-   * @param {Array} compliant
-   */
-  validateRepoConfiguration(config, repoInfo, defaultBranch, issues, compliant) {
-    try {
-      // Run the existing default branch rule (docs-config defaultBranch.mustBe)
-      this.evaluateDefaultBranchRule(config, repoInfo, defaultBranch, issues, compliant);
-
-      // Future repo-level validations (webhooks, deploy keys, actions permissions, branch protection, etc.)
-      // can be added here as additional helper calls such as:
-      // this.evaluateWebhooksRule(config, repoInfo, issues);
-      // this.evaluateDeployKeysRule(config, repoInfo, issues);
-    } catch (err) {
-      console.error('Error validating repository configuration:', err);
-      issues.push({
-        id: 'repo-configuration-validation-failed',
-        severity: 'warning',
-        message: 'Repository configuration validation failed',
-        error: err instanceof Error ? err.message : String(err),
-      });
     }
   }
 }
