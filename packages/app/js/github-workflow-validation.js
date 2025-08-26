@@ -191,7 +191,12 @@ async function runGithubWorkflowValidation(templateUrl, apiBase, onStatusChange,
         targetRepoUrl: templateUrl
       })
     })
-    .then(response => response.json())
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status} - ${response.statusText}`);
+      }
+      return response.json();
+    })
     .then(data => {
       console.log('Real workflow triggered with runId:', data.runId);
       console.log('GitHub Actions URL:', `https://github.com/microsoft/template-doctor/actions/runs/${data.runId}`);
@@ -207,9 +212,43 @@ async function runGithubWorkflowValidation(templateUrl, apiBase, onStatusChange,
           console.log('Updated workflow link to real run:', workflowLink.href);
         }
       }, 4500);
+      
+      // Show a subtle notification to the user that the real workflow was triggered
+      if (window.NotificationSystem) {
+        window.NotificationSystem.showInfo(
+          'Background Workflow',
+          'A real validation workflow was also triggered in the background.',
+          5000
+        );
+      }
     })
     .catch(error => {
       console.error('Error triggering real workflow:', error);
+      
+      // Provide user feedback about the background workflow failure
+      if (window.NotificationSystem) {
+        window.NotificationSystem.showWarning(
+          'Background Workflow',
+          `Note: The real validation workflow couldn't be triggered in the background: ${error.message}`,
+          8000
+        );
+      } else {
+        // Fallback if notification system is not available
+        // Add a warning message to the validation results that will be shown
+        setTimeout(() => {
+          const summaryElem = document.getElementById('githubValidationSummary');
+          if (summaryElem) {
+            const warningDiv = document.createElement('div');
+            warningDiv.className = 'background-workflow-warning';
+            warningDiv.innerHTML = `
+              <p style="color: #856404; background-color: #fff3cd; padding: 10px; border-radius: 4px; margin-top: 10px; border: 1px solid #ffeeba;">
+                <strong>Note:</strong> Demo mode is active, but the real background validation couldn't be triggered: ${error.message}
+              </p>
+            `;
+            summaryElem.appendChild(warningDiv);
+          }
+        }, 4500);
+      }
     });
     
     // Show successful results after 4 seconds
