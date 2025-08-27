@@ -9,6 +9,43 @@ For GitHub OAuth authentication, you need to:
 2. Configure environment variables or config.json settings
 3. See [OAuth Setup Guide](docs/oauth-setup.md) for detailed instructionsdes a web UI, and automates PR updates with scan results. This repository is structured as a monorepo with independent deployable packages.
 
+
+- Add/update tests for features and fixes. Frontend E2E tests live in the app package; run from root via `npm test`.
+- Avoid native browser dialogs; use notifications to keep tests stable.
+- Format code before committing (packages may include prettier configs and scripts).
+- Don't commit generated artifacts like `node_modules/` or large reports.
+- Update docs and workflows when changing paths or behavior.
+
+## Security Analysis Features
+
+Template Doctor now includes enhanced security analysis for Bicep files:
+
+1. **Managed Identity Detection**: Identifies when Managed Identity is properly used in Azure resources.
+2. **Insecure Authentication Detection**: Identifies and flags insecure authentication methods like:
+   - Connection strings with embedded credentials
+   - Access keys
+   - SAS tokens
+   - Storage account keys
+   - KeyVault secrets accessed without Managed Identity
+
+3. **Anonymous Access Detection**: Identifies Azure resources that typically require authentication but may be configured for anonymous access.
+
+These security checks can be enabled/disabled in each rule set configuration by setting the `bicepChecks.securityBestPractices` properties:
+
+```json
+"bicepChecks": {
+  "requiredResources": [...],
+  "securityBestPractices": {
+    "preferManagedIdentity": true,
+    "detectInsecureAuth": true,
+    "checkAnonymousAccess": true
+  }
+}
+```
+
+## Documentation
+
+Template Doctor provides a web UI and automates PR updates with scan results. This repository is structured as a monorepo with independent deployable packages.
 ## Monorepo layout
 
 - packages/app — Static web app (frontend UI)
@@ -123,6 +160,7 @@ This ensures the test/provision flow uses the correct azd template (no heuristic
 - [GitHub Action](docs/GITHUB_ACTION.md)
 - [GitHub App](docs/GITHUB_APP.md)
 - [GitHub Pages Implementation](docs/github-pages-implementation.md)
+- [Security Analysis Features](docs/SECURITY_ANALYSIS.md)
 
 ---
 

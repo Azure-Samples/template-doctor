@@ -13,9 +13,12 @@
   },
   "requiredWorkflowFiles": [],
   "bicepChecks": {
-    "requiredResources": [
-      
-    ]
+    "requiredResources": [],
+    "securityBestPractices": {
+      "preferManagedIdentity": true,
+      "detectInsecureAuth": true,
+      "checkAnonymousAccess": true
+    }
   },
   "azureYamlRules": {
     "mustDefineServices": false

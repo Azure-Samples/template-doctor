@@ -15,7 +15,12 @@
     }
   },
   "bicepChecks": {
-    "requiredResources": ["Microsoft.Resources/resourceGroups", "Microsoft.KeyVault/vaults"]
+    "requiredResources": ["Microsoft.Resources/resourceGroups", "Microsoft.KeyVault/vaults"],
+    "securityBestPractices": {
+      "preferManagedIdentity": true,
+      "detectInsecureAuth": true,
+      "checkAnonymousAccess": true
+    }
   },
   "azureYamlRules": {
     "mustDefineServices": true

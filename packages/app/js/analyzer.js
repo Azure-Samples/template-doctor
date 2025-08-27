@@ -1,4 +1,13 @@
 // Template Analyzer - Core logic from analyzeTemplate.ts adapted for browser
+// 
+// Security Best Practices:
+// The analyzer now includes enhanced security checks for Azure Bicep files:
+// 1. Detection of Managed Identity usage - Identifies when Managed Identity is correctly used
+// 2. Detection of insecure authentication methods - Identifies connection strings, access keys, SAS tokens, etc.
+// 3. Detection of resources with potentially anonymous access - Identifies Azure resources that should have auth
+//
+// These checks can be enabled/disabled in the configuration files using the securityBestPractices settings
+// in the bicepChecks section. See the config files for examples.
 
 class TemplateAnalyzer {
   constructor() {
@@ -432,6 +441,9 @@ class TemplateAnalyzer {
                 foundResources.push(resource);
               }
             }
+            
+            // Check for authentication methods and recommend Managed Identity when appropriate
+            this.analyzeAuthenticationMethods(content, file, issues, compliant);
           } catch (err) {
             console.error(`Failed to read Bicep file: ${file}`);
             issues.push({
@@ -543,6 +555,266 @@ class TemplateAnalyzer {
       throw new Error(`Failed to analyze repository: ${error.message}`);
     }
   }
+
+  /**
+   * Evaluate the default branch rule from docs-config.json
+   * @param {Object} config - The configuration object
+   * @param {Object} repoInfo - The repository information object
+   * @param {string} defaultBranch - The default branch of the repository
+   * @param {Array} issues - The issues array to populate with any issues found
+   * @param {Array} compliant - The compliant array to populate with any compliant items
+   */
+  evaluateDefaultBranchRule(config, repoInfo, defaultBranch, issues, compliant) {
+    // Guard: only run if docs-config defines a default branch requirement
+    const expected = config?.githubRepositoryConfiguration?.defaultBranch?.mustBe;
+    if (!expected) return;
+
+    // Compare exact match by default; normalize if case-insensitive comparison desired
+    const normalize = (s) => String(s).trim();
+    if (normalize(defaultBranch) !== normalize(expected)) { 
+      issues.push({
+        id: `default-branch-not-${expected}`,
+        severity: 'error',
+        message: `Default branch must be '${expected}'. Current default branch is '${defaultBranch}'.`,
+        error: `Default branch is '${defaultBranch}', expected '${expected}'`,
+      });
+    } else {
+      compliant.push({
+        id: `default-branch-is-${expected}`,
+        category: 'branch',
+        message: `Default branch is '${expected}'`,
+        details: { defaultBranch },
+      });
+    }
+  }
+
+  /**
+   * Analyze authentication methods in Bicep files
+   * @param {string} content - The Bicep file content
+   * @param {string} file - The file path
+   * @param {Array} issues - The issues array to populate with any issues found
+   * @param {Array} compliant - The compliant array to populate with any compliant items
+   */
+  analyzeAuthenticationMethods(content, file, issues, compliant) {
+    // Skip if security checks are not enabled in config
+    const config = this.getConfig();
+    const securityChecks = config.bicepChecks?.securityBestPractices;
+    if (!securityChecks) {
+      return;
+    }
+    
+    // Check for Managed Identity
+    const hasManagedIdentity = this.checkForManagedIdentity(content);
+    
+    // Check for other authentication methods
+    const authMethods = this.detectAuthenticationMethods(content);
+    
+    if (hasManagedIdentity) {
+      compliant.push({
+        id: `bicep-uses-managed-identity-${file}`,
+        category: 'bicepSecurity',
+        message: `Good practice: ${file} uses Managed Identity for Azure authentication`,
+        details: {
+          file: file,
+          authMethod: 'ManagedIdentity'
+        },
+      });
+    }
+    
+    // If other authentication methods are found, suggest using Managed Identity instead
+    if (securityChecks.detectInsecureAuth && authMethods.length > 0) {
+      const authMethodsList = authMethods.join(', ');
+      
+      issues.push({
+        id: `bicep-alternative-auth-${file}`,
+        severity: 'warning',
+        message: `Security recommendation: Replace ${authMethodsList} with Managed Identity in ${file}`,
+        error: `File ${file} uses ${authMethodsList} for authentication instead of Managed Identity`,
+        recommendation: `Consider replacing ${authMethodsList} with Managed Identity for better security.`
+      });
+    }
+    
+    // If no authentication method is found, check if there are any resources that typically need auth
+    if (securityChecks.checkAnonymousAccess && !hasManagedIdentity && authMethods.length === 0) {
+      const resourcesRequiringAuth = this.detectResourcesRequiringAuth(content);
+      
+      if (resourcesRequiringAuth.length > 0) {
+        const resourcesList = resourcesRequiringAuth.join(', ');
+        
+        issues.push({
+          id: `bicep-missing-auth-${file}`,
+          severity: 'warning',
+          message: `Security recommendation: Add Managed Identity for ${resourcesList} in ${file}`,
+          error: `File ${file} may have resources (${resourcesList}) with anonymous access or missing authentication`,
+          recommendation: `Configure Managed Identity for secure access to these resources.`
+        });
+      }
+    }
+  }
+  
+  /**
+   * Check if the Bicep file uses Managed Identity
+   * @param {string} content - The Bicep file content
+   * @returns {boolean} - Whether Managed Identity is used
+   */
+  checkForManagedIdentity(content) {
+    // Common patterns for Managed Identity in Bicep files
+    const patterns = [
+      /identity:\s*\{\s*type:\s*['"]SystemAssigned['"]/i,
+      /identity:\s*\{\s*type:\s*['"]UserAssigned['"]/i,
+      /identity:\s*\{\s*type:\s*['"]SystemAssigned,UserAssigned['"]/i,
+      /['"]identity['"]\s*:\s*\{\s*['"]type['"]\s*:\s*['"]SystemAssigned['"]/i,
+      /['"]identity['"]\s*:\s*\{\s*['"]type['"]\s*:\s*['"]UserAssigned['"]/i,
+      /['"]identity['"]\s*:\s*\{\s*['"]type['"]\s*:\s*['"]SystemAssigned,UserAssigned['"]/i,
+      /managedIdentities:\s*\{\s*systemAssigned:\s*true/i,
+      /managedIdentities:\s*\{\s*userAssignedResourceIds:/i
+    ];
+    
+    return patterns.some(pattern => pattern.test(content));
+  }
+  
+  /**
+   * Detect other authentication methods in Bicep files
+   * @param {string} content - The Bicep file content
+   * @returns {string[]} - Array of detected authentication methods
+   * 
+   * This method looks for various authentication patterns in Bicep templates that could be
+   * replaced with Managed Identity for better security. It detects:
+   * 1. Connection strings (potentially containing credentials)
+   * 2. Access keys
+   * 3. KeyVault secrets referenced without using Managed Identity
+   * 4. SAS tokens
+   * 5. Storage account keys
+   * 6. Connection strings with explicit credentials
+   * 
+   * When these patterns are found, the analyzer will recommend replacing them with
+   * Managed Identity for improved security.
+   */
+  detectAuthenticationMethods(content) {
+    const authMethods = [];
+    
+    // Check for connection strings
+    if (/connectionString/i.test(content) || /['"]ConnectionString['"]/i.test(content)) {
+      authMethods.push('Connection String');
+    }
+    
+    // Check for access keys
+    if (/accessKey/i.test(content) || /['"]accessKey['"]/i.test(content) || 
+        /primaryKey/i.test(content) || /['"]primaryKey['"]/i.test(content) ||
+        /secondaryKey/i.test(content) || /['"]secondaryKey['"]/i.test(content)) {
+      authMethods.push('Access Key');
+    }
+    
+    // Check for secrets
+    // Find resource blocks that reference KeyVault secrets
+    const resourceBlocks = content.match(/resource\s+\w+\s+'[^']*'\s*{[^}]*}/gis) || [];
+    let keyVaultSecretWithoutMI = false;
+    for (const block of resourceBlocks) {
+      if (/keyVault.*\/secrets\//i.test(block) || /['"]secretUri['"]/i.test(block)) {
+        // Check if this block has an identity property
+        if (!/identity\s*:/i.test(block) && !/identity\s*{/i.test(block)) {
+          keyVaultSecretWithoutMI = true;
+          break;
+        }
+      }
+    }
+    if (keyVaultSecretWithoutMI) {
+      authMethods.push('KeyVault Secret without Managed Identity');
+    }
+    
+    // Check for SAS tokens
+    if (/sasToken/i.test(content) || /['"]sasToken['"]/i.test(content) || 
+        /sharedAccessSignature/i.test(content) || /SharedAccessKey/i.test(content)) {
+      authMethods.push('SAS Token');
+    }
+    
+    // Check for Storage Account Keys
+    if (/storageAccountKey/i.test(content) || /['"]storageAccountKey['"]/i.test(content)) {
+      authMethods.push('Storage Account Key');
+    }
+    
+    // Check for connection strings with credentials
+    if (/AccountKey=/i.test(content) || /Password=/i.test(content) || 
+        /UserName=/i.test(content) || /AccountEndpoint=/i.test(content)) {
+      authMethods.push('Connection String with credentials');
+    }
+    
+    return authMethods;
+  }
+  
+  /**
+   * Detect resources that typically require authentication
+   * @param {string} content - The Bicep file content
+   * @returns {string[]} - Array of resources that typically require authentication
+   * 
+   * This method identifies Azure resources in Bicep templates that typically
+   * should use some form of authentication - preferably Managed Identity.
+   * When such resources are found but no authentication method is detected,
+   * the analyzer will suggest adding Managed Identity to avoid potential
+   * anonymous access security risks.
+   * 
+   * This is particularly important for resources like Key Vault, Storage Accounts,
+   * Cosmos DB, SQL Server, and other services that should never be exposed without
+   * proper authentication.
+   */
+  detectResourcesRequiringAuth(content) {
+    const resources = [];
+    
+    // Common Azure resources that typically require authentication
+    const resourcePatterns = [
+      { pattern: /Microsoft\.Storage\/storageAccounts/i, name: 'Storage Account' },
+      { pattern: /Microsoft\.KeyVault\/vaults/i, name: 'Key Vault' },
+      { pattern: /Microsoft\.DocumentDB\/databaseAccounts/i, name: 'Cosmos DB' },
+      { pattern: /Microsoft\.Sql\/servers/i, name: 'SQL Server' },
+      { pattern: /Microsoft\.Web\/sites/i, name: 'App Service' },
+      { pattern: /Microsoft\.ContainerRegistry\/registries/i, name: 'Container Registry' },
+      { pattern: /Microsoft\.ServiceBus\/namespaces/i, name: 'Service Bus' },
+      { pattern: /Microsoft\.EventHub\/namespaces/i, name: 'Event Hub' },
+      { pattern: /Microsoft\.ApiManagement\/service/i, name: 'API Management' },
+      { pattern: /Microsoft\.CognitiveServices\/accounts/i, name: 'Cognitive Services' },
+      { pattern: /Microsoft\.ContainerService\/managedClusters/i, name: 'AKS Cluster' },
+      { pattern: /Microsoft\.Cache\/Redis/i, name: 'Redis Cache' },
+      { pattern: /Microsoft\.Search\/searchServices/i, name: 'Search Service' },
+      { pattern: /Microsoft\.OperationalInsights\/workspaces/i, name: 'Log Analytics' }
+    ];
+    
+    for (const { pattern, name } of resourcePatterns) {
+      if (pattern.test(content)) {
+        resources.push(name);
+      }
+    }
+    
+    return resources;
+  }
+
+  /**
+   * Run all repository configuration validations together. Keep this minimal so future config checks can be added cleanly.
+   * @param {Object} config
+   * @param {Object} repoInfo
+   * @param {string} defaultBranch
+   * @param {Array} issues
+   * @param {Array} compliant
+   */
+  validateRepoConfiguration(config, repoInfo, defaultBranch, issues, compliant) {
+    try {
+      // Run the existing default branch rule (docs-config defaultBranch.mustBe)
+      this.evaluateDefaultBranchRule(config, repoInfo, defaultBranch, issues, compliant);
+
+      // Future repo-level validations (webhooks, deploy keys, actions permissions, branch protection, etc.)
+      // can be added here as additional helper calls such as:
+      // this.evaluateWebhooksRule(config, repoInfo, issues);
+      // this.evaluateDeployKeysRule(config, repoInfo, issues);
+    } catch (err) {
+      console.error('Error validating repository configuration:', err);
+      issues.push({
+        id: 'repo-configuration-validation-failed',
+        severity: 'warning',
+        message: 'Repository configuration validation failed',
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
 }
 
 // Function to initialize the analyzer
