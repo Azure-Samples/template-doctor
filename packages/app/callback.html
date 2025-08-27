@@ -50,6 +50,10 @@
       .error {
         color: #d83b01;
       }
+      .info {
+        color: #666;
+        font-size: 0.9em;
+      }
     </style>
   </head>
   <body>
@@ -58,11 +62,42 @@
       <div id="loading">
         <div class="spinner"></div>
         <p>Processing authentication...</p>
+        <p class="info" id="process-info">Validating authorization code...</p>
       </div>
       <div id="error-message" style="display: none" class="error"></div>
     </div>
 
+    <!-- Runtime configuration -->
+    <script src="js/runtime-config.js"></script>
+    <!-- Configuration loader -->
+    <script src="js/config-loader.js"></script>
+
     <script>
+      // Compute the site base path to support GitHub Pages project sites
+      function getBasePath() {
+        const pathname = window.location.pathname || '/';
+        const withoutFile = pathname.match(/\.[a-zA-Z0-9]+$/)
+          ? pathname.substring(0, pathname.lastIndexOf('/'))
+          : pathname;
+        return withoutFile === '/' ? '' : (withoutFile.endsWith('/') ? withoutFile.slice(0, -1) : withoutFile);
+      }
+
+      // Load configuration
+      async function loadConfig() {
+        try {
+          // Use ConfigLoader if available
+          if (window.ConfigLoader && window.ConfigLoader.loadConfig) {
+            const config = await window.ConfigLoader.loadConfig();
+            console.log('Configuration loaded', Object.keys(config));
+            return config;
+          }
+          return {}; // Default empty config
+        } catch (error) {
+          console.error('Error loading config:', error);
+          return {};
+        }
+      }
+
       // Parse the URL parameters
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get('code');
@@ -70,62 +105,75 @@
       const error = urlParams.get('error');
       const errorDescription = urlParams.get('error_description');
 
-      // Show error if present
-      if (error) {
+      // Main processing function
+      async function processCallback() {
+        // Load configuration first
+        const config = await loadConfig();
+        document.getElementById('process-info').textContent = 'Configuration loaded, processing...';
+        
+        // Show error if present
+        if (error) {
+          document.getElementById('loading').style.display = 'none';
+          const errorElement = document.getElementById('error-message');
+          errorElement.textContent = `Error: ${error}${errorDescription ? ' - ' + errorDescription : ''}`;
+          errorElement.style.display = 'block';
+
+          // Store error in session storage to show on main page
+          sessionStorage.setItem('auth_error', errorDescription || error);
+
+          // Redirect back to main page after 3 seconds
+          setTimeout(() => {
+            const basePath = getBasePath();
+            window.location.href = window.location.origin + basePath + '/index.html';
+          }, 3000);
+        }
+        // Process code
+        else if (code && state) {
+          document.getElementById('process-info').textContent = 'Authorization code received, redirecting...';
+          
+          // Send code and state back to index page and redirect
+          sessionStorage.setItem('gh_auth_code', code);
+          sessionStorage.setItem('gh_auth_state', state);
+
+          // Redirect back to index.html (handle GitHub Pages base path)
+          const basePath = getBasePath();
+          window.location.href = window.location.origin + basePath + '/index.html';
+        }
+        // No code or error
+        else {
+          document.getElementById('loading').style.display = 'none';
+          const errorElement = document.getElementById('error-message');
+          errorElement.textContent = 'Error: No authorization code received from GitHub.';
+          errorElement.style.display = 'block';
+
+          // Store error
+          sessionStorage.setItem('auth_error', 'No authorization code received from GitHub.');
+
+          // Redirect back to main page after 3 seconds
+          setTimeout(() => {
+            const basePath = getBasePath();
+            window.location.href = window.location.origin + basePath + '/index.html';
+          }, 3000);
+        }
+      }
+
+      // Start processing
+      processCallback().catch(err => {
+        console.error('Error during callback processing:', err);
         document.getElementById('loading').style.display = 'none';
         const errorElement = document.getElementById('error-message');
-        errorElement.textContent = `Error: ${error}${errorDescription ? ' - ' + errorDescription : ''}`;
+        errorElement.textContent = `Error during authentication: ${err.message}`;
         errorElement.style.display = 'block';
-
-        // Store error in session storage to show on main page
-        sessionStorage.setItem('auth_error', errorDescription || error);
-
-        // Redirect back to main page after 3 seconds
-        setTimeout(() => {
-          const pathname = window.location.pathname || '/';
-          const withoutFile = pathname.match(/\.[a-zA-Z0-9]+$/)
-            ? pathname.substring(0, pathname.lastIndexOf('/'))
-            : pathname;
-          const basePath = withoutFile === '/' ? '' : (withoutFile.endsWith('/') ? withoutFile.slice(0, -1) : withoutFile);
-          window.location.href = window.location.origin + basePath + '/index.html';
-        }, 3000);
-      }
-      // Process code
-      else if (code && state) {
-        // Send code and state back to index page and redirect
-        sessionStorage.setItem('gh_auth_code', code);
-        sessionStorage.setItem('gh_auth_state', state);
-
-        // Redirect back to index.html (handle GitHub Pages base path)
-        (function(){
-          const pathname = window.location.pathname || '/';
-          const withoutFile = pathname.match(/\.[a-zA-Z0-9]+$/)
-            ? pathname.substring(0, pathname.lastIndexOf('/'))
-            : pathname;
-          const basePath = withoutFile === '/' ? '' : (withoutFile.endsWith('/') ? withoutFile.slice(0, -1) : withoutFile);
-          window.location.href = window.location.origin + basePath + '/index.html';
-        })();
-      }
-      // No code or error
-      else {
-        document.getElementById('loading').style.display = 'none';
-        const errorElement = document.getElementById('error-message');
-        errorElement.textContent = 'Error: No authorization code received from GitHub.';
-        errorElement.style.display = 'block';
-
+        
         // Store error
-        sessionStorage.setItem('auth_error', 'No authorization code received from GitHub.');
-
-        // Redirect back to main page after 3 seconds
+        sessionStorage.setItem('auth_error', `Error during callback processing: ${err.message}`);
+        
+        // Redirect back to main page after 5 seconds
         setTimeout(() => {
-          const pathname = window.location.pathname || '/';
-          const withoutFile = pathname.match(/\.[a-zA-Z0-9]+$/)
-            ? pathname.substring(0, pathname.lastIndexOf('/'))
-            : pathname;
-          const basePath = withoutFile === '/' ? '' : (withoutFile.endsWith('/') ? withoutFile.slice(0, -1) : withoutFile);
+          const basePath = getBasePath();
           window.location.href = window.location.origin + basePath + '/index.html';
-        }, 3000);
-      }
+        }, 5000);
+      });
     </script>
   </body>
 </html>

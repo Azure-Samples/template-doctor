@@ -1,7 +1,7 @@
 {
   "githubOAuth": {
-    "clientId": "Ov23li2nstp4WdgRG6vZ",
-    "scope": "repo read:user"
+    "scope": "repo read:user",
+    "redirectUri": "http://localhost:8080/callback.html"
   },
   "backend": {
     "baseUrl": "",

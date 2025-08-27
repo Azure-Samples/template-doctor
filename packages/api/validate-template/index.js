@@ -47,7 +47,7 @@ module.exports = async function (context, req) {
         target_validate_template_url: targetRepoUrl,
         callback_url: callbackUrl || "",
         run_id: runId,
-        customValidators: "azd-provision,ps-rule"
+        customValidators: "azd-up,azd-down"  // Only run azd-up and azd-down validators
       }
     };
 
