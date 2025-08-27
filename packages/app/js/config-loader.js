@@ -31,8 +31,10 @@ async function loadEnvironmentVariables() {
     
     // Use local Functions port in pure localhost dev, otherwise use SWA-managed /api proxy
     const configUrl = isLocalhost
-      ? `http://localhost:${localPort}/api/runtime-config`
-      : '/api/runtime-config';
+      ? `http://localhost:${localPort}/api/client-settings`
+      : '/api/client-settings';
+    
+    console.log('Fetching environment config from:', configUrl);
     
     const response = await fetch(configUrl);
     if (!response.ok) {

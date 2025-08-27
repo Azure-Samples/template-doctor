@@ -123,10 +123,10 @@ class GitHubAuth {
       error
         ? error(
             'Missing OAuth client ID',
-            'GitHub OAuth clientId is not configured. Set GH_OAUTH_CLIENT_ID secret and redeploy Pages.',
+            'GitHub OAuth clientId is not configured. Set GITHUB_CLIENT_ID environment variable in your .env file.',
             6000,
           )
-        : alert('GitHub OAuth clientId is not configured. Please set GH_OAUTH_CLIENT_ID secret.');
+        : alert('GitHub OAuth clientId is not configured. Please set GITHUB_CLIENT_ID in your .env file.');
       return;
     }
 

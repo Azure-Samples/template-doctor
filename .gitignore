@@ -1,5 +1,6 @@
 node_modules
 .env
+.env.consolidated
 dist/
 
 test-results/
@@ -14,3 +15,5 @@ playwright-report/
 # Local settings files with secrets
 local.settings.json
 **/local.settings.json
+
+__azurite*
