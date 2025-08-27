@@ -729,8 +729,19 @@ class TemplateAnalyzer {
     }
     
     // Check for secrets
-    if ((/keyVault.*\/secrets\//i.test(content) || /['"]secretUri['"]/i.test(content)) && 
-        !/identity/i.test(content)) {
+    // Find resource blocks that reference KeyVault secrets
+    const resourceBlocks = content.match(/resource\s+\w+\s+'[^']*'\s*{[^}]*}/gis) || [];
+    let keyVaultSecretWithoutMI = false;
+    for (const block of resourceBlocks) {
+      if (/keyVault.*\/secrets\//i.test(block) || /['"]secretUri['"]/i.test(block)) {
+        // Check if this block has an identity property
+        if (!/identity\s*:/i.test(block) && !/identity\s*{/i.test(block)) {
+          keyVaultSecretWithoutMI = true;
+          break;
+        }
+      }
+    }
+    if (keyVaultSecretWithoutMI) {
       authMethods.push('KeyVault Secret without Managed Identity');
     }
     
