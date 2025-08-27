@@ -1,7 +1,18 @@
 // Only authenticated users should see this data
 (function() {
+  console.log('[index-data] Loading template data, authentication check:',
+              window.GitHubAuth ? 'GitHubAuth exists' : 'GitHubAuth missing',
+              window.GitHubAuth?.isAuthenticated ? 'Auth method exists' : 'Auth method missing',
+              window.GitHubAuth?.isAuthenticated ? 'Auth state: ' + window.GitHubAuth.isAuthenticated() : 'Cannot check auth state');
+              
   // Only populate the data if the user is authenticated
-  if (window.GitHubAuth && window.GitHubAuth.isAuthenticated()) {
+  if (!window.templatesData) {
+    // Initialize templatesData if it doesn't exist yet
+    window.templatesData = [];
+  }
+  
+  if (window.GitHubAuth && window.GitHubAuth.isAuthenticated && window.GitHubAuth.isAuthenticated()) {
+    console.log('[index-data] User is authenticated, populating template data');
     window.templatesData = [
       {
         "timestamp": "2025-07-25T10:14:02.435Z",
@@ -81,6 +92,8 @@
 ];
   } else {
     // If not authenticated, set an empty array
+    console.log('[index-data] User is not authenticated, setting empty template data');
     window.templatesData = [];
   }
+  console.log('[index-data] Template data loaded, entries:', window.templatesData.length);
 })();

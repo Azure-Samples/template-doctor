@@ -38,9 +38,50 @@ const AUTH_CONFIG = {
   userStorageKey: 'gh_user_info',
 }; 
 
+// Log the redirectUri to help debug
+console.log('AUTH_CONFIG.redirectUri:', AUTH_CONFIG.redirectUri);
+console.log('window.location.origin:', window.location.origin);
+console.log('getBasePath():', getBasePath());
+
 // Load runtime config if present and merge into AUTH_CONFIG
 async function loadRuntimeAuthConfig() {
   try {
+    // Use the ConfigLoader if available
+    if (window.ConfigLoader && window.ConfigLoader.loadConfig) {
+      const config = await window.ConfigLoader.loadConfig();
+      
+      // Apply GitHub OAuth settings
+      if (config.githubOAuth) {
+        if (config.githubOAuth.clientId) {
+          AUTH_CONFIG.clientId = config.githubOAuth.clientId;
+        }
+        if (config.githubOAuth.scope) {
+          AUTH_CONFIG.scope = config.githubOAuth.scope;
+        }
+        if (config.githubOAuth.authUrl) {
+          AUTH_CONFIG.authUrl = config.githubOAuth.authUrl;
+        }
+        if (config.githubOAuth.redirectUri) {
+          AUTH_CONFIG.redirectUri = config.githubOAuth.redirectUri;
+        }
+      }
+      
+      // Also check for environment variables directly
+      if (config.GITHUB_CLIENT_ID) {
+        AUTH_CONFIG.clientId = config.GITHUB_CLIENT_ID;
+      }
+      
+      console.log('Updated AUTH_CONFIG:', {
+        clientId: AUTH_CONFIG.clientId ? 'Set' : 'Not set',
+        redirectUri: AUTH_CONFIG.redirectUri,
+        scope: AUTH_CONFIG.scope,
+        authUrl: AUTH_CONFIG.authUrl
+      });
+      
+      return;
+    }
+    
+    // Fallback to original method if ConfigLoader not available
     const basePath = getBasePath();
     const res = await fetch(`${basePath}/config.json`, { cache: 'no-store' });
     if (!res.ok) return;
@@ -57,7 +98,8 @@ async function loadRuntimeAuthConfig() {
     if (cfg?.githubOAuth?.redirectUri) {
       AUTH_CONFIG.redirectUri = cfg.githubOAuth.redirectUri;
     }
-  } catch (_) {
+  } catch (error) {
+    console.error('Error loading runtime config:', error);
     // Best-effort; keep defaults
   }
 }
@@ -104,6 +146,7 @@ class GitHubAuth {
    */
   login() {
     console.log('Starting login flow with scopes:', AUTH_CONFIG.scope);
+    console.log('Configured redirectUri:', AUTH_CONFIG.redirectUri);
 
     // Try to clear any existing GitHub session cookies
     this.clearGitHubCookies();
@@ -113,6 +156,12 @@ class GitHubAuth {
     authUrl.searchParams.append('redirect_uri', AUTH_CONFIG.redirectUri);
     authUrl.searchParams.append('scope', AUTH_CONFIG.scope);
     authUrl.searchParams.append('state', this.generateState());
+    
+    console.log('Full auth URL:', authUrl.toString());
+    console.log('redirect_uri parameter:', authUrl.searchParams.get('redirect_uri'));
+    console.log('redirect_uri encoded:', encodeURIComponent(AUTH_CONFIG.redirectUri));
+    console.log('redirect_uri raw:', AUTH_CONFIG.redirectUri);
+    
     if (!AUTH_CONFIG.clientId) {
       // Ensure runtime config is loaded before proceeding
       // This is synchronous if already loaded; otherwise fetch once
@@ -508,7 +557,12 @@ class GitHubAuth {
       if (welcomeSection) welcomeSection.style.display = 'none';
       
       // Dispatch auth-state-changed event with authenticated=true
-      document.dispatchEvent(new CustomEvent('auth-state-changed', { detail: { authenticated: true } }));
+      document.dispatchEvent(new CustomEvent('auth-state-changed', { 
+        detail: { authenticated: true },
+        bubbles: true,
+        cancelable: true
+      }));
+      console.log('updateUI: Dispatched auth-state-changed event with authenticated=true');
     } else {
       console.log('updateUI: User is not authenticated, updating UI');
       // User is not authenticated
@@ -520,7 +574,12 @@ class GitHubAuth {
       if (welcomeSection) welcomeSection.style.display = 'block';
       
       // Dispatch auth-state-changed event with authenticated=false
-      document.dispatchEvent(new CustomEvent('auth-state-changed', { detail: { authenticated: false } }));
+      document.dispatchEvent(new CustomEvent('auth-state-changed', { 
+        detail: { authenticated: false },
+        bubbles: true,
+        cancelable: true
+      }));
+      console.log('updateUI: Dispatched auth-state-changed event with authenticated=false');
     }
   }
 
@@ -652,7 +711,9 @@ class GitHubAuth {
    * @returns {boolean} True if authenticated, false otherwise
    */
   isAuthenticated() {
-    return !!this.accessToken;
+    const authenticated = !!this.accessToken;
+    console.log('isAuthenticated check - token exists:', authenticated);
+    return authenticated;
   }
 }
 

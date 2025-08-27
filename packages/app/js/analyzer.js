@@ -16,7 +16,6 @@ class TemplateAnalyzer {
       dod: {}, // Will be loaded when needed
       partner: {},
       custom: {},
-      docs: {}
     };
 
     // Load rule set configurations
@@ -29,7 +28,7 @@ class TemplateAnalyzer {
   async loadRuleSetConfigs() {
     try {
       // Load DoD (default) config
-      const dodResponse = await fetch('/configs/dod-config.json');
+      const dodResponse = await fetch('./configs/dod-config.json');
       if (!dodResponse.ok) {
         throw new Error(`Failed to load DoD config: ${dodResponse.status}`);
       }
@@ -45,7 +44,7 @@ class TemplateAnalyzer {
       }
 
       // Load Partner config
-      const partnerResponse = await fetch('/configs/partner-config.json');
+      const partnerResponse = await fetch('./configs/partner-config.json');
       if (!partnerResponse.ok) {
         throw new Error(`Failed to load Partner config: ${partnerResponse.status}`);
       }
@@ -61,7 +60,7 @@ class TemplateAnalyzer {
       }
 
       // Load Custom config - this will be overridden if the user provides a custom config
-      const customResponse = await fetch('/configs/custom-config.json');
+      const customResponse = await fetch('./configs/custom-config.json');
       if (!customResponse.ok) {
         throw new Error(`Failed to load Custom config: ${customResponse.status}`);
       }
@@ -71,20 +70,6 @@ class TemplateAnalyzer {
       if (this.ruleSetConfigs.custom.requiredWorkflowFiles) {
         this.ruleSetConfigs.custom.requiredWorkflowFiles =
           this.ruleSetConfigs.custom.requiredWorkflowFiles.map((item) => ({
-            pattern: new RegExp(item.pattern, 'i'),
-            message: item.message,
-          }));
-      }
-
-      // Load docs config
-      const docsResponse = await fetch('/configs/docs-config.json');
-      if (docsResponse.ok) {
-        this.ruleSetConfigs.docs = await docsResponse.json();
-      }
-      // Convert pattern strings to RegExp objects for workflow files
-      if (this.ruleSetConfigs.docs.requiredWorkflowFiles) {
-        this.ruleSetConfigs.docs.requiredWorkflowFiles =
-          this.ruleSetConfigs.docs.requiredWorkflowFiles.map((item) => ({
             pattern: new RegExp(item.pattern, 'i'),
             message: item.message,
           }));
@@ -136,8 +121,6 @@ class TemplateAnalyzer {
         return this.ruleSetConfigs.partner;
       case 'custom':
         return this.ruleSetConfigs.custom;
-      case 'docs':
-        return this.ruleSetConfigs.docs;
       case 'dod':
       default:
         return this.ruleSetConfigs.dod;
@@ -311,12 +294,6 @@ class TemplateAnalyzer {
       // Start analyzing
       const issues = [];
       const compliant = [];
-
-      // Run repository-level configuration validations early (docs-config rules)
-      // Only run docs-specific repo validations when the docs ruleset is selected
-      if (ruleSet === 'docs') {
-        this.validateRepoConfiguration(config, repoInfo, defaultBranch, issues, compliant);
-      }
 
       // Normalize file paths for case-insensitive comparison
       const normalized = files.map((f) => f.toLowerCase());
@@ -837,6 +814,7 @@ class TemplateAnalyzer {
       });
     }
   }
+
 }
 
 // Function to initialize the analyzer
