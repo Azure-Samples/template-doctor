@@ -39,7 +39,9 @@ module.exports = async function (context, req) {
     const client_id = process.env.GITHUB_CLIENT_ID;
     const client_secret = process.env.GITHUB_CLIENT_SECRET;
 
-    context.log(`GitHub credentials: client_id=${client_id ? 'exists' : 'missing'}, client_secret=${client_secret ? 'exists' : 'missing'}`);
+    if (process.env.NODE_ENV === 'development') {
+        context.log(`GitHub credentials: client_id=${client_id ? 'exists' : 'missing'}, client_secret=${client_secret ? 'exists' : 'missing'}`);
+    }
 
     if (!client_id || !client_secret) {
         context.res.status = 500;
