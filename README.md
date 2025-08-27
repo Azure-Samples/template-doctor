@@ -35,8 +35,9 @@ These security checks can be enabled/disabled in each rule set configuration by 
 }
 ```
 
-## Documentations a web UI, and automates PR updates with scan results. This repository is structured as a monorepo with independent deployable packages.
+## Documentation
 
+Template Doctor provides a web UI and automates PR updates with scan results. This repository is structured as a monorepo with independent deployable packages.
 ## Monorepo layout
 
 - packages/app — Static web app (frontend UI)
