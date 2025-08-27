@@ -51,7 +51,6 @@ module.exports = async function (context, req) {
 
     try {
         context.log('Making token exchange request to GitHub');
-        context.log(`Using code: ${code.slice(0, 5)}... (truncated)`);
         
         const response = await fetch('https://github.com/login/oauth/access_token', {
             method: 'POST',
