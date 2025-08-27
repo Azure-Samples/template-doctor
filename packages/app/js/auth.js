@@ -61,7 +61,8 @@ async function loadRuntimeAuthConfig() {
         if (config.githubOAuth.authUrl) {
           AUTH_CONFIG.authUrl = config.githubOAuth.authUrl;
         }
-        if (config.githubOAuth.redirectUri) {
+        // Only use redirectUri from config if it's not empty
+        if (config.githubOAuth.redirectUri && config.githubOAuth.redirectUri.trim() !== '') {
           AUTH_CONFIG.redirectUri = config.githubOAuth.redirectUri;
         }
       }
@@ -95,7 +96,8 @@ async function loadRuntimeAuthConfig() {
     if (cfg?.githubOAuth?.authUrl) {
       AUTH_CONFIG.authUrl = cfg.githubOAuth.authUrl;
     }
-    if (cfg?.githubOAuth?.redirectUri) {
+    // Only use redirectUri from config if it's not empty
+    if (cfg?.githubOAuth?.redirectUri && cfg.githubOAuth.redirectUri.trim() !== '') {
       AUTH_CONFIG.redirectUri = cfg.githubOAuth.redirectUri;
     }
   } catch (error) {
@@ -172,10 +174,10 @@ class GitHubAuth {
       error
         ? error(
             'Missing OAuth client ID',
-            'GitHub OAuth clientId is not configured. Set GH_OAUTH_CLIENT_ID secret and redeploy Pages.',
+            'GitHub OAuth clientId is not configured. Set GITHUB_CLIENT_ID environment variable in your .env file.',
             6000,
           )
-        : alert('GitHub OAuth clientId is not configured. Please set GH_OAUTH_CLIENT_ID secret.');
+        : alert('GitHub OAuth clientId is not configured. Please set GITHUB_CLIENT_ID in your .env file.');
       return;
     }
 
@@ -327,6 +329,23 @@ class GitHubAuth {
               // Try parsing as JSON to see the raw response structure
               const rawJson = JSON.parse(rawText);
               debug('exchangeCodeForToken', 'Raw token exchange response as JSON:', rawJson);
+              
+              // Check for and handle specific error cases
+              if (rawJson.error) {
+                console.error('OAuth error:', rawJson.error, rawJson.error_description);
+                const errorMsg = `${rawJson.error}: ${rawJson.error_description || 'Unknown error'}`;
+                
+                // Show a user-friendly notification if available
+                const errorNotify = window.Notifications?.error?.bind(window.Notifications);
+                if (errorNotify) {
+                  errorNotify('GitHub OAuth Error', errorMsg, 10000);
+                } else {
+                  alert(`GitHub OAuth Error: ${errorMsg}`);
+                }
+                
+                throw new Error(errorMsg);
+              }
+              
               if (rawJson.scope) {
                 debug('exchangeCodeForToken', 'Token scopes from response:', rawJson.scope);
               }

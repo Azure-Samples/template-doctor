@@ -8,14 +8,16 @@ const fetch = require('node-fetch');
 module.exports = async function (context, req) {
     context.log('GitHub OAuth token exchange function triggered');
     
-    // Enable CORS
-    context.res = {
-        headers: {
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type"
-        }
+    // Set up CORS headers - explicitly allow the development origin
+    const headers = {
+        "Access-Control-Allow-Origin": "http://localhost:8080",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Access-Control-Allow-Credentials": "true"
     };
+    
+    // Set CORS headers for all responses
+    context.res = { headers };
     
     // Handle OPTIONS requests for CORS preflight
     if (req.method === 'OPTIONS') {
@@ -28,10 +30,8 @@ module.exports = async function (context, req) {
     context.log(`Authorization code received: ${code ? 'yes' : 'no'}`);
     
     if (!code) {
-        context.res = {
-            status: 400,
-            body: { error: 'Missing code' }
-        };
+        context.res.status = 400;
+        context.res.body = { error: 'Missing code' };
         return;
     }
 
@@ -39,15 +39,19 @@ module.exports = async function (context, req) {
     const client_id = process.env.GITHUB_CLIENT_ID;
     const client_secret = process.env.GITHUB_CLIENT_SECRET;
 
+    if (process.env.NODE_ENV === 'development') {
+        context.log(`GitHub credentials: client_id=${client_id ? 'exists' : 'missing'}, client_secret=${client_secret ? 'exists' : 'missing'}`);
+    }
+
     if (!client_id || !client_secret) {
-        context.res = {
-            status: 500,
-            body: { error: 'Missing GitHub OAuth credentials in environment variables' }
-        };
+        context.res.status = 500;
+        context.res.body = { error: 'Missing GitHub OAuth credentials in environment variables' };
         return;
     }
 
     try {
+        context.log('Making token exchange request to GitHub');
+        
         const response = await fetch('https://github.com/login/oauth/access_token', {
             method: 'POST',
             headers: {
@@ -60,24 +64,23 @@ module.exports = async function (context, req) {
                 code
             })
         });
+        
         const data = await response.json();
+        context.log('GitHub response status:', response.status);
+        // Avoid logging full GitHub response data to prevent leaking sensitive info
+        
         if (data.error) {
-            context.res = {
-                status: 400,
-                body: { error: data.error_description || 'OAuth error' }
-            };
+            context.log('Error from GitHub:', data.error, data.error_description);
+            context.res.status = 400;
+            context.res.body = { error: data.error_description || 'OAuth error' };
             return;
         }
         context.log('Token exchange successful, received access_token');
-        context.res = {
-            status: 200,
-            body: { access_token: data.access_token }
-        };
+        context.res.status = 200;
+        context.res.body = { access_token: data.access_token };
     } catch (err) {
         context.log.error('Error during token exchange:', err);
-        context.res = {
-            status: 500,
-            body: { error: err.message }
-        };
+        context.res.status = 500;
+        context.res.body = { error: err.message };
     }
 };
