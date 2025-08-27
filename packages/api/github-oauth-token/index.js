@@ -68,7 +68,7 @@ module.exports = async function (context, req) {
         
         const data = await response.json();
         context.log('GitHub response status:', response.status);
-        context.log('GitHub response data:', JSON.stringify(data));
+        // Avoid logging full GitHub response data to prevent leaking sensitive info
         
         if (data.error) {
             context.log('Error from GitHub:', data.error, data.error_description);
