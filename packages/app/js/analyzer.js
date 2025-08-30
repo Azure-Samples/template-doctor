@@ -15,6 +15,7 @@ class TemplateAnalyzer {
     this.ruleSetConfigs = {
       dod: {}, // Will be loaded when needed
       partner: {},
+      docs: [],
       custom: {},
     };
 
@@ -58,6 +59,9 @@ class TemplateAnalyzer {
             message: item.message,
           }));
       }
+
+      // Load Docs config
+      this.ruleSetConfigs.docs = await TemplateAnalyzerDocs.prototype.getConfig();
 
       // Load Custom config - this will be overridden if the user provides a custom config
       const customResponse = await fetch('./configs/custom-config.json');
@@ -112,7 +116,7 @@ class TemplateAnalyzer {
 
   /**
    * Get the appropriate configuration based on the selected rule set
-   * @param {string} ruleSet - The rule set to use: "dod", "partner", or "custom"
+   * @param {string} ruleSet - The rule set to use: "dod", "partner", "docs",or "custom"
    * @returns {Object} - The configuration for the selected rule set
    */
   getConfig(ruleSet = 'dod') {
@@ -127,6 +131,8 @@ class TemplateAnalyzer {
         return this.ruleSetConfigs.partner;
       case 'custom':
         return this.ruleSetConfigs.custom;
+      case 'docs':
+        return this.ruleSetConfigs.docs;
       case 'dod':
       default:
         return this.ruleSetConfigs.dod;
@@ -262,7 +268,7 @@ class TemplateAnalyzer {
   /**
    * Analyze a GitHub repository against a rule set
    * @param {string} repoUrl - The GitHub repository URL
-   * @param {string} ruleSet - The rule set to use: "dod", "partner", or "custom"
+   * @param {string} ruleSet - The rule set to use: "dod", "partner", "docs", or "custom"
    * @returns {Promise<Object>} - The analysis result
    */
   async analyzeTemplate(repoUrl, ruleSet = 'dod') {
@@ -306,6 +312,12 @@ class TemplateAnalyzer {
       // Start analyzing
       const issues = [];
       const compliant = [];
+
+      // Run repository-level configuration validations early (docs-config rules)
+      // Only run docs-specific repo validations when the docs ruleset is selected
+      if (ruleSet === 'docs') {
+        TemplateAnalyzerDocs.prototype.validateRepoConfiguration(config, repoInfo, defaultBranch, files, issues, compliant);
+      }
 
       // Normalize file paths for case-insensitive comparison
       const normalized = files.map((f) => f.toLowerCase());
