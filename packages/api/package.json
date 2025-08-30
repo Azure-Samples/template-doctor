@@ -7,11 +7,12 @@
     "test": "echo \"No tests yet\""
   },
   "dependencies": {
-    "@azure/functions": "^3.5.0",
-    "@octokit/rest": "^22.0.0",
-    "@azure/identity": "^4.0.0",
     "@azure/arm-appcontainers": "^2.2.0",
+    "@azure/functions": "^3.5.0",
+    "@azure/identity": "^4.0.0",
     "@azure/monitor-query": "^1.2.0",
+    "@octokit/rest": "^22.0.0",
+    "node-fetch": "^3.3.2",
     "uuid": "^9.0.0"
   },
   "engines": {
