@@ -62,7 +62,9 @@ module.exports = async function (context, req) {
         // GitHub repository configuration
         const owner = process.env.GITHUB_REPO_OWNER || user.login;  // Use authenticated user as owner by default
         const repo = process.env.GITHUB_REPO_NAME || 'template-doctor';  // Set your default repository name
-        const baseBranch = 'main';  // Default base branch
+    let baseBranch = 'main';  // Default base branch
+    // Track the actual source branch we branched from (may be default branch if 'main' doesn't exist)
+    let sourceBranch = baseBranch;
         
         // Check if repository exists and is accessible
         try {
@@ -100,7 +102,7 @@ module.exports = async function (context, req) {
             });
             baseCommitSha = refData.object.sha;
             context.log(`Found base branch: ${baseBranch}, SHA: ${baseCommitSha}`);
-        } catch (branchError) {
+    } catch (branchError) {
             // Try default branch if specified branch doesn't exist
             context.log.error(`Branch ${baseBranch} not found: ${branchError.message}`);
             
@@ -119,6 +121,8 @@ module.exports = async function (context, req) {
                 ref: `heads/${defaultBranch}`
             });
             baseCommitSha = defaultRefData.object.sha;
+            sourceBranch = defaultBranch;
+            baseBranch = defaultBranch;
             context.log(`Using default branch: ${defaultBranch}, SHA: ${baseCommitSha}`);
         }
         
@@ -186,6 +190,63 @@ module.exports = async function (context, req) {
             branch: branchName
         });
         context.log(`Created dashboard file: ${folderPath}/${dashboardFileName}`);
+
+        // Create or update latest.json (used by frontend to find current data file)
+        let latestSha = undefined;
+        try {
+            const { data: latestFile } = await octokit.repos.getContent({
+                owner,
+                repo,
+                path: `${folderPath}/latest.json`,
+                ref: sourceBranch
+            });
+            latestSha = latestFile && latestFile.sha ? latestFile.sha : undefined;
+        } catch (e) {
+            context.log(`latest.json not found for ${folderPath}, will create new one.`);
+        }
+        const latestJsonObj = createLatestJson(templateData, dataFileName, dashboardFileName);
+        const latestJsonContent = JSON.stringify(latestJsonObj, null, 2);
+        await octokit.repos.createOrUpdateFileContents({
+            owner,
+            repo,
+            path: `${folderPath}/latest.json`,
+            message: `Update latest.json for template: ${repoIdentifier}`,
+            content: Buffer.from(latestJsonContent).toString('base64'),
+            branch: branchName,
+            sha: latestSha
+        });
+        context.log(`Created/Updated latest.json: ${folderPath}/latest.json`);
+
+        // Create or update history.json (append this run)
+        let historyArray = [];
+        let historySha = undefined;
+        try {
+            const { data: historyFile } = await octokit.repos.getContent({
+                owner,
+                repo,
+                path: `${folderPath}/history.json`,
+                // Read from the source branch (the branch we branched from), not the new branch
+                ref: sourceBranch
+            });
+            const decoded = Buffer.from(historyFile.content, 'base64').toString();
+            const parsed = JSON.parse(decoded);
+            historySha = historyFile && historyFile.sha ? historyFile.sha : undefined;
+            if (Array.isArray(parsed)) historyArray = parsed;
+        } catch (e) {
+            context.log(`history.json not found for ${folderPath}, will create new one.`);
+        }
+        historyArray.push(createHistoryEntry(templateData, dataFileName, dashboardFileName));
+        const historyJsonContent = JSON.stringify(historyArray, null, 2);
+        await octokit.repos.createOrUpdateFileContents({
+            owner,
+            repo,
+            path: `${folderPath}/history.json`,
+            message: `Update history.json for template: ${repoIdentifier}`,
+            content: Buffer.from(historyJsonContent).toString('base64'),
+            branch: branchName,
+            sha: historySha
+        });
+        context.log(`Created/Updated history.json: ${folderPath}/history.json`);
         
         // Get the current index-data.js file
         const { data: fileData } = await octokit.repos.getContent({
@@ -239,11 +300,13 @@ module.exports = async function (context, req) {
 - Passed: ${templateData.compliance.passed}
 - Scanned By: ${templateData.scannedBy ? templateData.scannedBy.join(', ') : 'Template Doctor'}
 
-### Files Created
+### Files Created/Updated
 - Added template to index-data.js
 - Created folder: ${folderPath}
 - Created dashboard file: ${folderPath}/${dashboardFileName}
 - Created data file: ${folderPath}/${dataFileName}
+- Created/Updated latest.json: ${folderPath}/latest.json
+- Created/Updated history.json: ${folderPath}/history.json
             `
         });
         context.log(`Created PR: ${prData.html_url}`);
@@ -550,4 +613,44 @@ function createDashboardHtml(templateData, dataFileName) {
     <script src="${dataFileName}"></script>
 </body>
 </html>`;
+}
+
+/**
+ * Create latest.json payload for a template folder
+ * @param {Object} templateData
+ * @param {string} dataFileName
+ * @param {string} dashboardFileName
+ */
+function createLatestJson(templateData, dataFileName, dashboardFileName) {
+    return {
+        repoUrl: templateData.repoUrl,
+        ruleSet: templateData.ruleSet || 'default',
+        timestamp: templateData.timestamp,
+        // Frontend expects dataPath relative to the folder
+        dataPath: dataFileName,
+        dashboardPath: dashboardFileName,
+        compliance: {
+            percentage: templateData.compliance.percentage,
+            issues: templateData.compliance.issues,
+            passed: templateData.compliance.passed
+        }
+    };
+}
+
+/**
+ * Create a single history entry object
+ * @param {Object} templateData
+ * @param {string} dataFileName
+ * @param {string} dashboardFileName
+ */
+function createHistoryEntry(templateData, dataFileName, dashboardFileName) {
+    return {
+        timestamp: templateData.timestamp,
+        ruleSet: templateData.ruleSet || 'default',
+        percentage: templateData.compliance.percentage,
+        issues: templateData.compliance.issues,
+        passed: templateData.compliance.passed,
+        dataPath: dataFileName,
+        dashboardPath: dashboardFileName
+    };
 }
