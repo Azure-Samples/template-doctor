@@ -12,7 +12,7 @@
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
     />
-  <link rel="icon" href="assets/images/templatedoctor.svg" type="image/svg+xml" />
+    <link rel="icon" href="assets/images/templatedoctor.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="css/style.css" />
     <link rel="stylesheet" href="css/templates.css" />
     <link rel="stylesheet" href="css/tooltips.css" />
@@ -43,7 +43,9 @@
         display: block;
       }
       @media (max-width: 600px) {
-        .product-menu img { height: 32px; }
+        .product-menu img {
+          height: 32px;
+        }
       }
     </style>
     <script src="https://d3js.org/d3.v7.min.js"></script>
@@ -75,20 +77,36 @@
         <h2>Azure Samples and Templates Framework Suite</h2>
         <!-- Product icon menu -->
         <nav class="product-menu" aria-label="Related products">
-          <a href="https://github.com/Azure-Samples/azd-template-artifacts" class="product-link" title="Template Framework" aria-label="Template Framework">
+          <a
+            href="https://github.com/Azure-Samples/azd-template-artifacts"
+            class="product-link"
+            title="Template Framework"
+            aria-label="Template Framework"
+          >
             <img src="assets/images/templateframework.svg" alt="Template Framework" />
           </a>
-          <a href="https://github.com/Template-Doctor/template-framework-mcp" class="product-link" title="Template MCP" aria-label="Template MCP">
+          <a
+            href="https://github.com/Template-Doctor/template-framework-mcp"
+            class="product-link"
+            title="Template MCP"
+            aria-label="Template MCP"
+          >
             <img src="assets/images/templatemcp.svg" alt="Template MCP" />
           </a>
-          <a href="https://github.com/Template-Doctor/template-doctor" class="product-link" title="Template Doctor" aria-label="Template Doctor">
+          <a
+            href="https://github.com/Template-Doctor/template-doctor"
+            class="product-link"
+            title="Template Doctor"
+            aria-label="Template Doctor"
+          >
             <img src="assets/images/templatedoctor.svg" alt="Template Doctor" />
           </a>
         </nav>
-        
+
         <p class="welcome-text">
-          Welcome to Template Doctor, part of the Templates Framework Suite! This tool helps you analyze Azure samples and templates
-          for compliance with a configurable definition of done, including the official
+          Welcome to Template Doctor, part of the Templates Framework Suite! This tool helps you
+          analyze Azure samples and templates for compliance with a configurable definition of done,
+          including the official
           <a
             href="https://github.com/Azure-Samples/azd-template-artifacts/blob/main/docs/development-guidelines/definition-of-done.md"
             target="_blank"
@@ -289,8 +307,8 @@
     <script src="js/github-action-hook.js"></script>
     <!-- AZD Provision functionality -->
     <script src="js/azd-provision.js"></script>
-  <!-- Template validation via GitHub workflow -->
-  <script src="js/github-workflow-validation.js?v=20250829"></script>
+    <!-- Template validation via GitHub workflow -->
+    <script src="js/github-workflow-validation.js?v=20250829"></script>
     <!-- Demo mode for presentations -->
     <script src="js/enable-demo-mode.js"></script>
     <!-- Runtime configuration -->

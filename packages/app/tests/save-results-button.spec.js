@@ -27,7 +27,11 @@ async function renderDashboard(page, { autoSaveResults }) {
       compliance: {
         issues: [
           // Add one simple issue to exercise rendering
-          { id: 'missing-file-readme', message: 'Missing required file: README.md', severity: 'warning' },
+          {
+            id: 'missing-file-readme',
+            message: 'Missing required file: README.md',
+            severity: 'warning',
+          },
         ],
         compliant: [],
       },
@@ -41,7 +45,9 @@ async function renderDashboard(page, { autoSaveResults }) {
 }
 
 test.describe('Save Results button behavior', () => {
-  test('is disabled when autoSaveResults is enabled and shows the auto-save note', async ({ page }) => {
+  test('is disabled when autoSaveResults is enabled and shows the auto-save note', async ({
+    page,
+  }) => {
     await renderDashboard(page, { autoSaveResults: true });
 
     const saveBtn = page.locator('#save-results-btn');

@@ -9,11 +9,11 @@
     apiBase: `${window.location.origin}`,
     defaultRuleSet: 'dod',
     requireAuthForResults: true,
-  autoSaveResults: false,
-  archiveEnabled: false,
-  archiveCollection: 'aigallery',
-  // Optional: explicit workflow host repo to dispatch to (owner/repo)
-  dispatchTargetRepo: '',
+    autoSaveResults: false,
+    archiveEnabled: false,
+    archiveCollection: 'aigallery',
+    // Optional: explicit workflow host repo to dispatch to (owner/repo)
+    dispatchTargetRepo: '',
   };
 
   // Initialize with defaults so consumers have something synchronously
@@ -26,7 +26,7 @@
         // Use our new unified ConfigLoader
         const config = await window.ConfigLoader.loadConfig();
         console.log('[runtime-config] loaded config via ConfigLoader');
-        
+
         // Back-compat mapping: support both top-level { apiBase } and nested { backend: { baseUrl, functionKey } }
         const mapped = { ...config };
         if (!mapped.apiBase && config.backend && typeof config.backend.baseUrl === 'string') {
@@ -35,7 +35,7 @@
         if (config.backend && typeof config.backend.functionKey === 'string') {
           mapped.functionKey = config.backend.functionKey;
         }
-        
+
         // Also check for direct environment variables
         if (config.API_BASE_URL) {
           mapped.apiBase = config.API_BASE_URL;
@@ -50,7 +50,10 @@
         if (config.DEFAULT_RULE_SET) {
           mapped.defaultRuleSet = String(config.DEFAULT_RULE_SET).toLowerCase();
         }
-        if (typeof config.REQUIRE_AUTH_FOR_RESULTS !== 'undefined' && config.REQUIRE_AUTH_FOR_RESULTS !== null) {
+        if (
+          typeof config.REQUIRE_AUTH_FOR_RESULTS !== 'undefined' &&
+          config.REQUIRE_AUTH_FOR_RESULTS !== null
+        ) {
           const v = String(config.REQUIRE_AUTH_FOR_RESULTS).trim().toLowerCase();
           mapped.requireAuthForResults = /^(1|true|yes|on)$/i.test(v);
         }
@@ -58,11 +61,11 @@
           const v2 = String(config.AUTO_SAVE_RESULTS).trim().toLowerCase();
           mapped.autoSaveResults = /^(1|true|yes|on)$/i.test(v2);
         }
-        
+
         window.TemplateDoctorConfig = Object.assign({}, DEFAULTS, mapped);
         return;
       }
-      
+
       // Fallback to direct fetch
       const response = await fetch('config.json', { cache: 'no-store' });
       if (response.ok) {

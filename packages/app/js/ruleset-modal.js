@@ -281,7 +281,9 @@ function setupRulesetModalHandlers() {
         const cfg = window.TemplateDoctorConfig || {};
         // Only set override when globally disabled and checkbox is present
         if (archiveOverrideContainer && archiveOverrideContainer.style.display !== 'none') {
-          const shouldArchiveThisRun = !!(archiveOverrideCheckbox && archiveOverrideCheckbox.checked);
+          const shouldArchiveThisRun = !!(
+            archiveOverrideCheckbox && archiveOverrideCheckbox.checked
+          );
           // Store as a one-time override to be picked up by submitAnalysisToGitHub
           cfg.nextAnalysisArchiveEnabledOverride = shouldArchiveThisRun;
           window.TemplateDoctorConfig = cfg;
@@ -347,7 +349,9 @@ function setupRulesetModalHandlers() {
       // Globally disabled: show the opt-in checkbox
       if (archiveOverrideContainer) archiveOverrideContainer.style.display = 'block';
       if (archiveOverrideCheckbox) archiveOverrideCheckbox.checked = false;
-      if (archiveOverrideHint) archiveOverrideHint.textContent = 'Global archive is OFF. Check this to archive this single run.';
+      if (archiveOverrideHint)
+        archiveOverrideHint.textContent =
+          'Global archive is OFF. Check this to archive this single run.';
     }
   } catch (_) {}
 }
@@ -374,7 +378,8 @@ function showRulesetModal(repoUrl) {
       } else {
         if (container) container.style.display = 'block';
         if (checkbox) checkbox.checked = false;
-        if (hint) hint.textContent = 'Global archive is OFF. Check this to archive this single run.';
+        if (hint)
+          hint.textContent = 'Global archive is OFF. Check this to archive this single run.';
       }
     } catch (_) {}
 

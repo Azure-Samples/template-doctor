@@ -1035,7 +1035,11 @@ class GitHubClient {
     try {
       // Check if the repo exists under the user's namespace and is a fork of the original repo
       const repoData = await this.request(`/repos/${username}/${repo}`);
-      if (repoData.fork === true && repoData.parent && repoData.parent.full_name === `${owner}/${repo}`) {
+      if (
+        repoData.fork === true &&
+        repoData.parent &&
+        repoData.parent.full_name === `${owner}/${repo}`
+      ) {
         return true;
       }
       // Repo exists but is not a fork of the original

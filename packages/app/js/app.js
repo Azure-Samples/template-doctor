@@ -1122,7 +1122,7 @@ document.addEventListener('DOMContentLoaded', () => {
       scannedTemplates = [];
       return false;
     }
-    
+
     // Check if window.templatesData exists (loaded from results/index-data.js)
     if (window.templatesData) {
       debug('app', 'Loading scanned templates from index-data.js', window.templatesData.length);
@@ -1203,10 +1203,11 @@ document.addEventListener('DOMContentLoaded', () => {
     createScannedTemplatesSection();
 
     if (!templateGrid) return;
-    
+
     // Check if user is authenticated
     if (!window.GitHubAuth || !window.GitHubAuth.isAuthenticated()) {
-      templateGrid.innerHTML = '<div class="no-templates">Please sign in to view scanned templates.</div>';
+      templateGrid.innerHTML =
+        '<div class="no-templates">Please sign in to view scanned templates.</div>';
       // Hide pagination
       const pagination = scannedTemplatesSection.querySelector('.pagination');
       if (pagination) pagination.style.display = 'none';
@@ -1245,7 +1246,13 @@ document.addEventListener('DOMContentLoaded', () => {
       // Get ruleset information from template, default to "DoD" if not available
       const ruleSet = template.ruleSet || 'dod';
       const ruleSetDisplay =
-        ruleSet === 'dod' ? 'DoD' : ruleSet === 'partner' ? 'Partner' : ruleSet === 'docs' ? 'Docs' : 'Custom';
+        ruleSet === 'dod'
+          ? 'DoD'
+          : ruleSet === 'partner'
+            ? 'Partner'
+            : ruleSet === 'docs'
+              ? 'Docs'
+              : 'Custom';
 
       // Check for gistUrl in custom rulesets
       let gistUrl = '';
@@ -1613,7 +1620,8 @@ document.addEventListener('DOMContentLoaded', () => {
         errorSection.style.display = 'none';
 
         // Set repo info
-        document.getElementById('repo-name').textContent = template.repoUrl.split('github.com/')[1] || template.repoUrl;
+        document.getElementById('repo-name').textContent =
+          template.repoUrl.split('github.com/')[1] || template.repoUrl;
         document.getElementById('repo-url').textContent = template.repoUrl;
 
         // Check if validation container exists, create if not
@@ -1627,8 +1635,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // Initialize the validation UI in the container
         if (window.GitHubWorkflowValidation) {
           window.GitHubWorkflowValidation.init(
-            'validation-container', 
-            template.repoUrl, 
+            'validation-container',
+            template.repoUrl,
             (status) => {
               debug('app', `Validation status update: ${status.status}`, status);
               // When validation completes, show the results container
@@ -1636,7 +1644,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 validationContainer.style.marginBottom = '30px';
                 resultsContainer.style.display = 'block';
               }
-            }
+            },
           );
         } else {
           validationContainer.innerHTML = `
@@ -1870,7 +1878,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Defensive fallback: if scanned templates haven't been populated yet but
     // window.templatesData exists (e.g., tests or late load), populate now to
     // avoid race conditions with the template-data-loaded event
-    if ((!scannedTemplates || scannedTemplates.length === 0) && Array.isArray(window.templatesData) && window.templatesData.length > 0) {
+    if (
+      (!scannedTemplates || scannedTemplates.length === 0) &&
+      Array.isArray(window.templatesData) &&
+      window.templatesData.length > 0
+    ) {
       scannedTemplates = window.templatesData;
     }
 
@@ -1971,7 +1983,7 @@ document.addEventListener('DOMContentLoaded', () => {
       div.querySelector('.validate-btn').addEventListener('click', () => {
         // Extract template URL from the repoUrl
         const templateUrl = matchedTemplate.repoUrl;
-        
+
         // Show validation UI in the analysis section
         document.getElementById('search-section').style.display = 'none';
         if (scannedTemplatesSection) scannedTemplatesSection.style.display = 'none';
@@ -1979,12 +1991,12 @@ document.addEventListener('DOMContentLoaded', () => {
         resultsContainer.style.display = 'none';
         loadingContainer.style.display = 'none';
         errorSection.style.display = 'none';
-        
+
         // Set repo info
         document.getElementById('repo-name').textContent =
           matchedTemplate.repoUrl.split('github.com/')[1] || matchedTemplate.repoUrl;
         document.getElementById('repo-url').textContent = matchedTemplate.repoUrl;
-        
+
         // Create validation container if it doesn't exist
         let validationContainer = document.getElementById('validation-container');
         if (!validationContainer) {
@@ -1992,23 +2004,19 @@ document.addEventListener('DOMContentLoaded', () => {
           validationContainer.id = 'validation-container';
           resultsContainer.parentNode.insertBefore(validationContainer, resultsContainer);
         }
-        
+
         validationContainer.style.display = 'block';
-        
+
         // Initialize the validation UI
         if (window.GitHubWorkflowValidation) {
-          window.GitHubWorkflowValidation.init(
-            'validation-container', 
-            templateUrl,
-            (status) => {
-              debug('app', 'Validation status update:', status);
-              // When validation completes, show the results container
-              if (status.status === 'completed') {
-                validationContainer.style.marginBottom = '30px';
-                resultsContainer.style.display = 'block';
-              }
+          window.GitHubWorkflowValidation.init('validation-container', templateUrl, (status) => {
+            debug('app', 'Validation status update:', status);
+            // When validation completes, show the results container
+            if (status.status === 'completed') {
+              validationContainer.style.marginBottom = '30px';
+              resultsContainer.style.display = 'block';
             }
-          );
+          });
         } else {
           validationContainer.innerHTML = `
             <div class="validation-error">
@@ -2016,7 +2024,7 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
           `;
         }
-        
+
         // Scroll to the validation container
         validationContainer.scrollIntoView({ behavior: 'smooth' });
       });
@@ -2082,7 +2090,8 @@ document.addEventListener('DOMContentLoaded', () => {
             errorSection.style.display = 'none';
 
             // Set repo info
-            document.getElementById('repo-name').textContent = repoUrl.split('github.com/')[1] || repoUrl;
+            document.getElementById('repo-name').textContent =
+              repoUrl.split('github.com/')[1] || repoUrl;
             document.getElementById('repo-url').textContent = repoUrl;
 
             // Check if validation container exists, create if not
@@ -2095,18 +2104,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Initialize the validation UI in the container
             if (window.GitHubWorkflowValidation) {
-              window.GitHubWorkflowValidation.init(
-                'validation-container', 
-                repoUrl, 
-                (status) => {
-                  debug('app', `Validation status update: ${status.status}`, status);
-                  // When validation completes, show the results container
-                  if (status.status === 'completed') {
-                    validationContainer.style.marginBottom = '30px';
-                    resultsContainer.style.display = 'block';
-                  }
+              window.GitHubWorkflowValidation.init('validation-container', repoUrl, (status) => {
+                debug('app', `Validation status update: ${status.status}`, status);
+                // When validation completes, show the results container
+                if (status.status === 'completed') {
+                  validationContainer.style.marginBottom = '30px';
+                  resultsContainer.style.display = 'block';
                 }
-              );
+              });
             } else {
               validationContainer.innerHTML = `
                 <div class="validation-error">
@@ -2295,8 +2300,8 @@ document.addEventListener('DOMContentLoaded', () => {
           // Initialize the validation UI in the container
           if (window.GitHubWorkflowValidation) {
             window.GitHubWorkflowValidation.init(
-              'validation-container', 
-              repo.html_url, 
+              'validation-container',
+              repo.html_url,
               (status) => {
                 debug('app', `Validation status update: ${status.status}`, status);
                 // When validation completes, show the results container
@@ -2304,7 +2309,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   validationContainer.style.marginBottom = '30px';
                   resultsContainer.style.display = 'block';
                 }
-              }
+              },
             );
           } else {
             validationContainer.innerHTML = `
@@ -2545,7 +2550,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // Notify user that analysis is starting
     if (window.NotificationSystem) {
       const ruleSetDisplayName =
-        ruleSet === 'dod' ? 'DoD' : ruleSet === 'partner' ? 'Partner' : ruleSet === 'docs' ? 'Docs' : 'Custom';
+        ruleSet === 'dod'
+          ? 'DoD'
+          : ruleSet === 'partner'
+            ? 'Partner'
+            : ruleSet === 'docs'
+              ? 'Docs'
+              : 'Custom';
       window.NotificationSystem.showInfo(
         'Analysis Started',
         `Analyzing repository: ${repoName} with ${ruleSetDisplayName} ruleset`,
@@ -2705,7 +2716,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
               // Prefer confirmed fork URL if available (poll client for availability)
               try {
-                if (window.GitHubClient && typeof window.GitHubClient.waitForForkAvailability === 'function') {
+                if (
+                  window.GitHubClient &&
+                  typeof window.GitHubClient.waitForForkAvailability === 'function'
+                ) {
                   const urlParts = forkUrl.split('github.com/')[1].split('/');
                   const forkOwner = urlParts[0];
                   const forkRepo = urlParts[1];
@@ -2718,7 +2732,10 @@ document.addEventListener('DOMContentLoaded', () => {
                   }
                 }
               } catch (confirmErr) {
-                console.warn('[App] Fork confirmation failed, proceeding with initial URL:', confirmErr?.message || confirmErr);
+                console.warn(
+                  '[App] Fork confirmation failed, proceeding with initial URL:',
+                  confirmErr?.message || confirmErr,
+                );
               }
 
               // Use the internal analyze function to analyze the forked repo (confirmed URL if available)
@@ -2886,9 +2903,9 @@ document.addEventListener('DOMContentLoaded', () => {
       loadScannedTemplates();
     });
   }
-  
+
   // Listen for authentication state changes
-  document.addEventListener('auth-state-changed', function(event) {
+  document.addEventListener('auth-state-changed', function (event) {
     debug('app', 'Auth state changed event received', event.detail);
     if (event.detail.authenticated) {
       // User authenticated, load templates data
@@ -2897,7 +2914,8 @@ document.addEventListener('DOMContentLoaded', () => {
       // User logged out, clear templates data
       scannedTemplates = [];
       if (templateGrid) {
-        templateGrid.innerHTML = '<div class="no-templates">Please sign in to view scanned templates.</div>';
+        templateGrid.innerHTML =
+          '<div class="no-templates">Please sign in to view scanned templates.</div>';
       }
       // Hide pagination
       const pagination = scannedTemplatesSection?.querySelector('.pagination');

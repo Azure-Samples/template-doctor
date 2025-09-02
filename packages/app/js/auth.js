@@ -29,14 +29,14 @@ function getBasePath() {
  * Remember to register your OAuth app at: https://github.com/settings/applications/new
  * with callback URL set to your GitHub Pages URL
  */
-const AUTH_CONFIG = { 
+const AUTH_CONFIG = {
   clientId: '', // Provided via _site/config.json at deploy time
   redirectUri: window.location.origin + getBasePath() + '/callback.html',
   scope: 'public_repo read:user', // public_repo gives issue creation/assignment for public repos
   authUrl: 'https://github.com/login/oauth/authorize',
   tokenStorageKey: 'gh_access_token',
   userStorageKey: 'gh_user_info',
-}; 
+};
 
 // Log the redirectUri to help debug
 console.log('AUTH_CONFIG.redirectUri:', AUTH_CONFIG.redirectUri);
@@ -49,7 +49,7 @@ async function loadRuntimeAuthConfig() {
     // Use the ConfigLoader if available
     if (window.ConfigLoader && window.ConfigLoader.loadConfig) {
       const config = await window.ConfigLoader.loadConfig();
-      
+
       // Apply GitHub OAuth settings
       if (config.githubOAuth) {
         if (config.githubOAuth.clientId) {
@@ -66,22 +66,22 @@ async function loadRuntimeAuthConfig() {
           AUTH_CONFIG.redirectUri = config.githubOAuth.redirectUri;
         }
       }
-      
+
       // Also check for environment variables directly
       if (config.GITHUB_CLIENT_ID) {
         AUTH_CONFIG.clientId = config.GITHUB_CLIENT_ID;
       }
-      
+
       console.log('Updated AUTH_CONFIG:', {
         clientId: AUTH_CONFIG.clientId ? 'Set' : 'Not set',
         redirectUri: AUTH_CONFIG.redirectUri,
         scope: AUTH_CONFIG.scope,
-        authUrl: AUTH_CONFIG.authUrl
+        authUrl: AUTH_CONFIG.authUrl,
       });
-      
+
       return;
     }
-    
+
     // Fallback to original method if ConfigLoader not available
     const basePath = getBasePath();
     const res = await fetch(`${basePath}/config.json`, { cache: 'no-store' });
@@ -158,12 +158,12 @@ class GitHubAuth {
     authUrl.searchParams.append('redirect_uri', AUTH_CONFIG.redirectUri);
     authUrl.searchParams.append('scope', AUTH_CONFIG.scope);
     authUrl.searchParams.append('state', this.generateState());
-    
+
     console.log('Full auth URL:', authUrl.toString());
     console.log('redirect_uri parameter:', authUrl.searchParams.get('redirect_uri'));
     console.log('redirect_uri encoded:', encodeURIComponent(AUTH_CONFIG.redirectUri));
     console.log('redirect_uri raw:', AUTH_CONFIG.redirectUri);
-    
+
     if (!AUTH_CONFIG.clientId) {
       // Ensure runtime config is loaded before proceeding
       // This is synchronous if already loaded; otherwise fetch once
@@ -177,7 +177,9 @@ class GitHubAuth {
             'GitHub OAuth clientId is not configured. Set GITHUB_CLIENT_ID environment variable in your .env file.',
             6000,
           )
-        : alert('GitHub OAuth clientId is not configured. Please set GITHUB_CLIENT_ID in your .env file.');
+        : alert(
+            'GitHub OAuth clientId is not configured. Please set GITHUB_CLIENT_ID in your .env file.',
+          );
       return;
     }
 
@@ -329,12 +331,12 @@ class GitHubAuth {
               // Try parsing as JSON to see the raw response structure
               const rawJson = JSON.parse(rawText);
               debug('exchangeCodeForToken', 'Raw token exchange response as JSON:', rawJson);
-              
+
               // Check for and handle specific error cases
               if (rawJson.error) {
                 console.error('OAuth error:', rawJson.error, rawJson.error_description);
                 const errorMsg = `${rawJson.error}: ${rawJson.error_description || 'Unknown error'}`;
-                
+
                 // Show a user-friendly notification if available
                 const errorNotify = window.Notifications?.error?.bind(window.Notifications);
                 if (errorNotify) {
@@ -342,10 +344,10 @@ class GitHubAuth {
                 } else {
                   alert(`GitHub OAuth Error: ${errorMsg}`);
                 }
-                
+
                 throw new Error(errorMsg);
               }
-              
+
               if (rawJson.scope) {
                 debug('exchangeCodeForToken', 'Token scopes from response:', rawJson.scope);
               }
@@ -574,13 +576,15 @@ class GitHubAuth {
       // Show search section, hide welcome section
       if (searchSection) searchSection.style.display = 'block';
       if (welcomeSection) welcomeSection.style.display = 'none';
-      
+
       // Dispatch auth-state-changed event with authenticated=true
-      document.dispatchEvent(new CustomEvent('auth-state-changed', { 
-        detail: { authenticated: true },
-        bubbles: true,
-        cancelable: true
-      }));
+      document.dispatchEvent(
+        new CustomEvent('auth-state-changed', {
+          detail: { authenticated: true },
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
       console.log('updateUI: Dispatched auth-state-changed event with authenticated=true');
     } else {
       console.log('updateUI: User is not authenticated, updating UI');
@@ -591,13 +595,15 @@ class GitHubAuth {
       // Show welcome section, hide search section
       if (searchSection) searchSection.style.display = 'none';
       if (welcomeSection) welcomeSection.style.display = 'block';
-      
+
       // Dispatch auth-state-changed event with authenticated=false
-      document.dispatchEvent(new CustomEvent('auth-state-changed', { 
-        detail: { authenticated: false },
-        bubbles: true,
-        cancelable: true
-      }));
+      document.dispatchEvent(
+        new CustomEvent('auth-state-changed', {
+          detail: { authenticated: false },
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
       console.log('updateUI: Dispatched auth-state-changed event with authenticated=false');
     }
   }

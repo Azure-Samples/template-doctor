@@ -1,11 +1,11 @@
 /**
  * NotificationSystem - A simple notification system for showing toast-style notifications
- * 
+ *
  * This module provides functions to show success, error, warning, and info notifications
  * that appear at the top of the page and automatically disappear after a specified time.
  */
 
-(function() {
+(function () {
   // Create a container for notifications if it doesn't exist
   let container = document.getElementById('notification-container');
   if (!container) {
@@ -185,7 +185,7 @@
     const notification = document.createElement('div');
     notification.id = notificationId;
     notification.className = `notification ${type}`;
-    
+
     // Icon based on type
     let icon = '';
     switch (type) {
@@ -203,7 +203,7 @@
         icon = '<i class="fas fa-info-circle notification-icon"></i>';
         break;
     }
-    
+
     notification.innerHTML = `
       ${icon}
       <button class="notification-close" aria-label="Close" onclick="document.getElementById('${notificationId}').remove()">
@@ -217,25 +217,25 @@
         <div class="notification-progress-bar"></div>
       </div>
     `;
-    
+
     container.prepend(notification);
-    
+
     // Auto-dismiss after duration (if not 0)
     if (duration > 0) {
       const progressBar = notification.querySelector('.notification-progress-bar');
       progressBar.style.transition = `width ${duration}ms linear`;
-      
+
       // Start progress bar animation
       setTimeout(() => {
         progressBar.style.width = '100%';
       }, 10);
-      
+
       // Schedule removal
       setTimeout(() => {
         // Add slide-out animation
         if (document.getElementById(notificationId)) {
           notification.classList.add('slide-out');
-          
+
           // Remove after animation completes
           setTimeout(() => {
             if (document.getElementById(notificationId)) {
@@ -245,7 +245,7 @@
         }
       }, duration);
     }
-    
+
     return notification;
   }
 
@@ -257,43 +257,52 @@
      * @param {string} message - The notification message
      * @param {number} duration - How long to show the notification in ms
      */
-    showSuccess: function(title, message, duration = 5000) {
+    showSuccess: function (title, message, duration = 5000) {
       return showNotification('success', title, message, duration);
     },
-    
+
     /**
      * Show an error notification
      * @param {string} title - The notification title
      * @param {string} message - The notification message
      * @param {number} duration - How long to show the notification in ms
      */
-    showError: function(title, message, duration = 8000) {
+    showError: function (title, message, duration = 8000) {
       return showNotification('error', title, message, duration);
     },
-    
+
     /**
      * Show a warning notification
      * @param {string} title - The notification title
      * @param {string} message - The notification message
      * @param {number} duration - How long to show the notification in ms
      */
-    showWarning: function(title, message, duration = 7000) {
+    showWarning: function (title, message, duration = 7000) {
       return showNotification('warning', title, message, duration);
     },
-    
+
     /**
      * Show an info notification
      * @param {string} title - The notification title
      * @param {string} message - The notification message
      * @param {number} duration - How long to show the notification in ms
      */
-    showInfo: function(title, message, duration = 5000) {
+    showInfo: function (title, message, duration = 5000) {
       return showNotification('info', title, message, duration);
     },
 
     // Minimal confirm support to align with richer API used by tests
     // Provides a warning-style notification with inline actions.
-    confirm: function(title, message, { confirmLabel = 'Confirm', cancelLabel = 'Cancel', onConfirm = () => {}, onCancel = () => {} } = {}) {
+    confirm: function (
+      title,
+      message,
+      {
+        confirmLabel = 'Confirm',
+        cancelLabel = 'Cancel',
+        onConfirm = () => {},
+        onCancel = () => {},
+      } = {},
+    ) {
       const el = showNotification('warning', title, message, 0);
       // Build actions area inside content
       const content = el.querySelector('.notification-content');
@@ -313,7 +322,11 @@
         cancelBtn.style.borderRadius = '6px';
         cancelBtn.textContent = cancelLabel;
         cancelBtn.addEventListener('click', () => {
-          try { onCancel(); } finally { el?.remove(); }
+          try {
+            onCancel();
+          } finally {
+            el?.remove();
+          }
         });
 
         const confirmBtn = document.createElement('button');
@@ -326,7 +339,11 @@
         confirmBtn.style.borderRadius = '6px';
         confirmBtn.textContent = confirmLabel;
         confirmBtn.addEventListener('click', () => {
-          try { onConfirm(); } finally { el?.remove(); }
+          try {
+            onConfirm();
+          } finally {
+            el?.remove();
+          }
         });
 
         actionsDiv.appendChild(cancelBtn);
@@ -334,6 +351,6 @@
         content.appendChild(actionsDiv);
       }
       return el?.id;
-    }
+    },
   };
 })();

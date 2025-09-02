@@ -33,7 +33,10 @@ async function submitAnalysisToGitHub(result, username) {
     const cfg = window.TemplateDoctorConfig || {};
     // If a one-time override is set (from ruleset modal), prefer it when global is false
     let archiveEnabled = !!cfg.archiveEnabled;
-    const hasOverride = Object.prototype.hasOwnProperty.call(cfg, 'nextAnalysisArchiveEnabledOverride');
+    const hasOverride = Object.prototype.hasOwnProperty.call(
+      cfg,
+      'nextAnalysisArchiveEnabledOverride',
+    );
     if (!archiveEnabled && hasOverride) {
       archiveEnabled = !!cfg.nextAnalysisArchiveEnabledOverride;
       // Clear one-time override after reading so it only applies to the next submission
@@ -68,7 +71,7 @@ async function submitAnalysisToGitHub(result, username) {
     };
 
     // Post via server to avoid org OAuth restrictions (uses server GH_WORKFLOW_TOKEN)
-  // cfg already defined above
+    // cfg already defined above
     const apiBase = cfg.apiBase || window.location.origin;
     const serverUrl = `${apiBase.replace(/\/$/, '')}/api/submit-analysis-dispatch`;
     console.log(`Submitting via server endpoint: ${serverUrl}`);
@@ -100,13 +103,19 @@ async function submitAnalysisToGitHub(result, username) {
 
       // Provide more helpful error messages based on status code
       if (response.status === 404) {
-        throw new Error('Endpoint not found (404): Check that the submit-analysis-dispatch function is deployed and apiBase is correct.');
+        throw new Error(
+          'Endpoint not found (404): Check that the submit-analysis-dispatch function is deployed and apiBase is correct.',
+        );
       }
       if (response.status === 401) {
-        throw new Error('Unauthorized (401): Function key missing or invalid for the server endpoint.');
+        throw new Error(
+          'Unauthorized (401): Function key missing or invalid for the server endpoint.',
+        );
       }
       if (response.status === 403) {
-        throw new Error('Permission denied (403): The server token may lack required scopes or org SSO. Contact an admin to approve GH_WORKFLOW_TOKEN for the org.');
+        throw new Error(
+          'Permission denied (403): The server token may lack required scopes or org SSO. Contact an admin to approve GH_WORKFLOW_TOKEN for the org.',
+        );
       }
 
       throw new Error(`Server error (${response.status}): ${errorData || 'Unknown error'}`);

@@ -33,7 +33,9 @@ async function submitWithIntercept(page) {
     const req = route.request();
     const bodyText = req.postData() || '';
     let parsed = null;
-    try { parsed = JSON.parse(bodyText); } catch {}
+    try {
+      parsed = JSON.parse(bodyText);
+    } catch {}
     requests.push({ url: req.url(), method: req.method(), body: parsed });
     await route.fulfill({ status: 204, body: '' });
   });
@@ -53,7 +55,9 @@ async function submitWithIntercept(page) {
 }
 
 test.describe('Archive toggle in ruleset modal', () => {
-  test('shows opt-in checkbox when global archive is disabled and applies one-time override', async ({ page }) => {
+  test('shows opt-in checkbox when global archive is disabled and applies one-time override', async ({
+    page,
+  }) => {
     await openRulesetModal(page, { archiveEnabledGlobal: false });
 
     const container = page.locator('#archive-override-container');
@@ -86,7 +90,9 @@ test.describe('Archive toggle in ruleset modal', () => {
     await expect(page.locator('#archive-override-container')).toBeHidden();
   });
 
-  test('when global archive disabled and not checked, payload archiveEnabled is false', async ({ page }) => {
+  test('when global archive disabled and not checked, payload archiveEnabled is false', async ({
+    page,
+  }) => {
     await openRulesetModal(page, { archiveEnabledGlobal: false });
 
     // Do not check the box, click Analyze

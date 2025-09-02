@@ -4,14 +4,24 @@
 (function () {
   function loadTemplateData() {
     // Check if the user is authenticated using GitHubAuth
-    console.log('[templates-data-loader] Checking authentication status:', 
-                window.GitHubAuth ? 'GitHubAuth exists' : 'GitHubAuth missing',
-                window.GitHubAuth?.isAuthenticated ? 'isAuthenticated method exists' : 'isAuthenticated method missing',
-                window.GitHubAuth?.isAuthenticated ? 'Auth state: ' + window.GitHubAuth.isAuthenticated() : 'Cannot check auth state');
-    
-    if (window.GitHubAuth && window.GitHubAuth.isAuthenticated && window.GitHubAuth.isAuthenticated()) {
+    console.log(
+      '[templates-data-loader] Checking authentication status:',
+      window.GitHubAuth ? 'GitHubAuth exists' : 'GitHubAuth missing',
+      window.GitHubAuth?.isAuthenticated
+        ? 'isAuthenticated method exists'
+        : 'isAuthenticated method missing',
+      window.GitHubAuth?.isAuthenticated
+        ? 'Auth state: ' + window.GitHubAuth.isAuthenticated()
+        : 'Cannot check auth state',
+    );
+
+    if (
+      window.GitHubAuth &&
+      window.GitHubAuth.isAuthenticated &&
+      window.GitHubAuth.isAuthenticated()
+    ) {
       console.log('[templates-data-loader] User is authenticated, loading template data');
-      
+
       // Create a script element to load the index-data.js file
       const script = document.createElement('script');
       script.src = 'results/index-data.js'; // Relative path to the index-data.js file
@@ -20,9 +30,15 @@
         console.log('[templates-data-loader] Successfully loaded template data');
         // Check if the data was actually loaded
         if (window.templatesData && Array.isArray(window.templatesData)) {
-          console.log('[templates-data-loader] Loaded templatesData with', window.templatesData.length, 'entries');
+          console.log(
+            '[templates-data-loader] Loaded templatesData with',
+            window.templatesData.length,
+            'entries',
+          );
         } else {
-          console.warn('[templates-data-loader] templatesData is not available or not an array after loading');
+          console.warn(
+            '[templates-data-loader] templatesData is not available or not an array after loading',
+          );
           window.templatesData = [];
         }
         // Dispatch an event to notify app.js that template data is ready
@@ -31,7 +47,7 @@
       script.onerror = function (error) {
         console.warn(
           '[templates-data-loader] Failed to load template data from results/index-data.js',
-          error
+          error,
         );
         // Initialize empty array if data doesn't load
         window.templatesData = [];
@@ -60,10 +76,12 @@
   }
 
   // Listen for auth-state-changed events
-  document.addEventListener('auth-state-changed', function(e) {
+  document.addEventListener('auth-state-changed', function (e) {
     console.log('[templates-data-loader] Received auth-state-changed event:', e.detail);
     if (e.detail && e.detail.authenticated) {
-      console.log('[templates-data-loader] Auth state changed to authenticated, loading template data');
+      console.log(
+        '[templates-data-loader] Auth state changed to authenticated, loading template data',
+      );
       loadTemplateData();
     }
   });

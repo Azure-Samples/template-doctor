@@ -5,7 +5,7 @@
  * Configuration can be loaded from multiple sources:
  * 1. config.json file in the app directory
  * 2. Environment variables via the runtime-config API
- * 
+ *
  * For local development, the port for the Azure Functions API can be configured:
  * - Set window.LOCAL_FUNCTIONS_PORT in JavaScript
  * - Add ?funcPort=xxxx to the URL query parameters
@@ -17,7 +17,7 @@ async function loadEnvironmentVariables() {
   // We'll use a server-side endpoint to get environment variables
   try {
     const isLocalhost = window.location.hostname === 'localhost';
-    
+
     // Allow port override via window.LOCAL_FUNCTIONS_PORT or ?funcPort=xxxx
     let localPort = 7071; // Default Azure Functions port
     if (window.LOCAL_FUNCTIONS_PORT) {
@@ -28,20 +28,20 @@ async function loadEnvironmentVariables() {
         localPort = urlParams.get('funcPort');
       }
     }
-    
+
     // Use local Functions port in pure localhost dev, otherwise use SWA-managed /api proxy
     const configUrl = isLocalhost
       ? `http://localhost:${localPort}/api/client-settings`
       : '/api/client-settings';
-    
+
     console.log('Fetching environment config from:', configUrl);
-    
+
     const response = await fetch(configUrl);
     if (!response.ok) {
       console.warn('Unable to fetch environment config', response.status);
       return {};
     }
-    
+
     const data = await response.json();
     console.log('Loaded environment config:', Object.keys(data));
     return data;
@@ -59,7 +59,7 @@ async function loadConfigJson() {
       console.warn('Unable to fetch config.json', response.status);
       return {};
     }
-    
+
     const data = await response.json();
     console.log('Loaded config.json:', Object.keys(data));
     return data;
@@ -73,10 +73,10 @@ async function loadConfigJson() {
 async function loadConfig() {
   const configJson = await loadConfigJson();
   const envVars = await loadEnvironmentVariables();
-  
+
   // Start with config.json
   const config = { ...configJson };
-  
+
   // If the environment endpoint provided a backend section, merge it
   if (envVars && typeof envVars === 'object') {
     // Merge backend baseUrl and functionKey if provided by env (non-empty only)
@@ -107,33 +107,48 @@ async function loadConfig() {
       };
     }
     // Frontend behavior flags from env (strings); leave mapping to runtime-config.js
-    if (typeof envVars.DEFAULT_RULE_SET === 'string' && envVars.DEFAULT_RULE_SET.trim().length > 0) {
+    if (
+      typeof envVars.DEFAULT_RULE_SET === 'string' &&
+      envVars.DEFAULT_RULE_SET.trim().length > 0
+    ) {
       config.DEFAULT_RULE_SET = envVars.DEFAULT_RULE_SET;
     }
-    if (typeof envVars.REQUIRE_AUTH_FOR_RESULTS === 'string' && envVars.REQUIRE_AUTH_FOR_RESULTS.trim().length > 0) {
+    if (
+      typeof envVars.REQUIRE_AUTH_FOR_RESULTS === 'string' &&
+      envVars.REQUIRE_AUTH_FOR_RESULTS.trim().length > 0
+    ) {
       config.REQUIRE_AUTH_FOR_RESULTS = envVars.REQUIRE_AUTH_FOR_RESULTS;
     }
-    if (typeof envVars.AUTO_SAVE_RESULTS === 'string' && envVars.AUTO_SAVE_RESULTS.trim().length > 0) {
+    if (
+      typeof envVars.AUTO_SAVE_RESULTS === 'string' &&
+      envVars.AUTO_SAVE_RESULTS.trim().length > 0
+    ) {
       config.AUTO_SAVE_RESULTS = envVars.AUTO_SAVE_RESULTS;
     }
     if (typeof envVars.ARCHIVE_ENABLED === 'string' && envVars.ARCHIVE_ENABLED.trim().length > 0) {
       config.ARCHIVE_ENABLED = envVars.ARCHIVE_ENABLED;
     }
-    if (typeof envVars.ARCHIVE_COLLECTION === 'string' && envVars.ARCHIVE_COLLECTION.trim().length > 0) {
+    if (
+      typeof envVars.ARCHIVE_COLLECTION === 'string' &&
+      envVars.ARCHIVE_COLLECTION.trim().length > 0
+    ) {
       config.ARCHIVE_COLLECTION = envVars.ARCHIVE_COLLECTION;
     }
-    if (typeof envVars.DISPATCH_TARGET_REPO === 'string' && envVars.DISPATCH_TARGET_REPO.trim().length > 0) {
+    if (
+      typeof envVars.DISPATCH_TARGET_REPO === 'string' &&
+      envVars.DISPATCH_TARGET_REPO.trim().length > 0
+    ) {
       config.DISPATCH_TARGET_REPO = envVars.DISPATCH_TARGET_REPO;
     }
   }
-  
+
   // Additional env variables can be merged above as needed
-  
+
   console.log('Consolidated config:', config);
   return config;
 }
 
 // Export the config loader
 window.ConfigLoader = {
-  loadConfig
+  loadConfig,
 };

@@ -5,19 +5,61 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Mock: validation-status</title>
     <style>
-      body { font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif; margin: 24px; }
-      label { display: block; margin-top: 12px; font-weight: 600; }
-      input { width: 480px; max-width: 100%; padding: 8px; margin-top: 6px; }
-      button { margin-top: 16px; padding: 8px 14px; border-radius: 6px; border: 1px solid #0366d6; background: #0366d6; color: #fff; cursor: pointer; }
-      pre { background: #0d1117; color: #c9d1d9; padding: 12px; border-radius: 6px; overflow: auto; }
-      .row { margin-top: 8px; }
-      .hint { color: #57606a; font-size: 13px; }
-      a { color: #0969da; }
+      body {
+        font-family:
+          -apple-system,
+          BlinkMacSystemFont,
+          Segoe UI,
+          Helvetica,
+          Arial,
+          sans-serif;
+        margin: 24px;
+      }
+      label {
+        display: block;
+        margin-top: 12px;
+        font-weight: 600;
+      }
+      input {
+        width: 480px;
+        max-width: 100%;
+        padding: 8px;
+        margin-top: 6px;
+      }
+      button {
+        margin-top: 16px;
+        padding: 8px 14px;
+        border-radius: 6px;
+        border: 1px solid #0366d6;
+        background: #0366d6;
+        color: #fff;
+        cursor: pointer;
+      }
+      pre {
+        background: #0d1117;
+        color: #c9d1d9;
+        padding: 12px;
+        border-radius: 6px;
+        overflow: auto;
+      }
+      .row {
+        margin-top: 8px;
+      }
+      .hint {
+        color: #57606a;
+        font-size: 13px;
+      }
+      a {
+        color: #0969da;
+      }
     </style>
   </head>
   <body>
     <h1>Mock tester: GET /api/validation-status</h1>
-    <p class="hint">This page calls the local Azure Functions host at <code>http://localhost:7071</code> so you can see server logs in your terminal.</p>
+    <p class="hint">
+      This page calls the local Azure Functions host at <code>http://localhost:7071</code> so you
+      can see server logs in your terminal.
+    </p>
 
     <div class="row">
       <label for="runId">runId (required)</label>
@@ -31,7 +73,10 @@
 
     <div class="row">
       <label for="githubRunUrl">githubRunUrl (optional)</label>
-      <input id="githubRunUrl" placeholder="e.g. https://github.com/Template-Doctor/template-doctor/actions/runs/17322734726" />
+      <input
+        id="githubRunUrl"
+        placeholder="e.g. https://github.com/Template-Doctor/template-doctor/actions/runs/17322734726"
+      />
       <div class="hint">Paste the run URL when you have it; the API will parse the id.</div>
     </div>
 
@@ -44,7 +89,9 @@
     <div class="row">
       <label for="owner">Override owner (optional)</label>
       <input id="owner" placeholder="e.g. Template-Doctor" />
-      <div class="hint">If set, will be sent as a query param to help verify the API is targeting the right repo.</div>
+      <div class="hint">
+        If set, will be sent as a query param to help verify the API is targeting the right repo.
+      </div>
     </div>
 
     <div class="row">
@@ -54,30 +101,36 @@
 
     <div class="row">
       <label><input type="checkbox" id="includeLogsUrl" /> includeLogsUrl</label>
-      <div class="hint">When checked, the status call will request a signed logs archive URL (if available).</div>
+      <div class="hint">
+        When checked, the status call will request a signed logs archive URL (if available).
+      </div>
     </div>
     <div class="row">
       <label><input type="checkbox" id="includeJobLogs" /> includeJobLogs</label>
-      <div class="hint">When checked, the status call will request per-job logs links and job statuses.</div>
+      <div class="hint">
+        When checked, the status call will request per-job logs links and job statuses.
+      </div>
     </div>
 
     <div class="row">
       <button id="go">Check Status</button>
-      <button id="cancel" style="margin-left: 12px; background: #d73a49; border-color: #d73a49;">Cancel Run</button>
+      <button id="cancel" style="margin-left: 12px; background: #d73a49; border-color: #d73a49">
+        Cancel Run
+      </button>
     </div>
 
     <h2>Request</h2>
     <pre id="req"></pre>
 
-  <h2>Response</h2>
+    <h2>Response</h2>
     <pre id="res"></pre>
 
     <div id="link"></div>
 
-  <h2>Cancel Request</h2>
-  <pre id="cancelReq"></pre>
-  <h2>Cancel Response</h2>
-  <pre id="cancelRes"></pre>
+    <h2>Cancel Request</h2>
+    <pre id="cancelReq"></pre>
+    <h2>Cancel Response</h2>
+    <pre id="cancelRes"></pre>
 
     <script>
       const $ = (id) => document.getElementById(id);
@@ -86,36 +139,42 @@
       $('go').addEventListener('click', async () => {
         const runId = $('runId').value.trim();
         const githubRunId = $('githubRunId').value.trim();
-  const baseUrl = $('baseUrl').value.replace(/\/$/, '');
-  const owner = $('owner').value.trim();
-  const repo = $('repo').value.trim();
-  const githubRunUrl = $('githubRunUrl').value.trim();
-  const includeLogsUrl = $('includeLogsUrl').checked;
-  const includeJobLogs = $('includeJobLogs').checked;
+        const baseUrl = $('baseUrl').value.replace(/\/$/, '');
+        const owner = $('owner').value.trim();
+        const repo = $('repo').value.trim();
+        const githubRunUrl = $('githubRunUrl').value.trim();
+        const includeLogsUrl = $('includeLogsUrl').checked;
+        const includeJobLogs = $('includeJobLogs').checked;
 
         if (!runId) {
           alert('Please enter a runId');
           return;
         }
 
-    const url = new URL('/api/validation-status', baseUrl);
+        const url = new URL('/api/validation-status', baseUrl);
         url.searchParams.set('runId', runId);
-  if (githubRunId) url.searchParams.set('githubRunId', githubRunId);
-  if (githubRunUrl) url.searchParams.set('githubRunUrl', githubRunUrl);
-  if (owner) url.searchParams.set('owner', owner);
-  if (repo) url.searchParams.set('repo', repo);
-  if (includeLogsUrl) url.searchParams.set('includeLogsUrl', '1');
-  if (includeJobLogs) url.searchParams.set('includeJobLogs', '1');
+        if (githubRunId) url.searchParams.set('githubRunId', githubRunId);
+        if (githubRunUrl) url.searchParams.set('githubRunUrl', githubRunUrl);
+        if (owner) url.searchParams.set('owner', owner);
+        if (repo) url.searchParams.set('repo', repo);
+        if (includeLogsUrl) url.searchParams.set('includeLogsUrl', '1');
+        if (includeJobLogs) url.searchParams.set('includeJobLogs', '1');
 
         $('req').textContent = `GET ${url.toString()}`;
         $('res').textContent = 'Loading...';
         $('link').innerHTML = '';
 
         try {
-          const resp = await fetch(url.toString(), { headers: { 'Content-Type': 'application/json' } });
+          const resp = await fetch(url.toString(), {
+            headers: { 'Content-Type': 'application/json' },
+          });
           const text = await resp.text();
           let parsed = null;
-          try { parsed = JSON.parse(text); } catch { /* raw text */ }
+          try {
+            parsed = JSON.parse(text);
+          } catch {
+            /* raw text */
+          }
 
           $('res').textContent = parsed ? JSON.stringify(parsed, null, 2) : text;
           if (parsed && typeof parsed === 'object') {
@@ -132,14 +191,20 @@
             const parts = [];
             parts.push(`<p><a href="${parsed.runUrl}" target="_blank">Open GitHub run</a></p>`);
             if (parsed.logsArchiveUrl) {
-              parts.push(`<p><a href="${parsed.logsArchiveUrl}" target="_blank">Download logs (archive)</a></p>`);
+              parts.push(
+                `<p><a href="${parsed.logsArchiveUrl}" target="_blank">Download logs (archive)</a></p>`,
+              );
             }
             if (parsed.jobLogs && Array.isArray(parsed.jobLogs) && parsed.jobLogs.length) {
-              const items = parsed.jobLogs.map(j => {
-                const badge = j.conclusion ? j.conclusion : j.status;
-                const link = j.logsUrl ? ` - <a href="${j.logsUrl}" target="_blank">logs</a>` : '';
-                return `<li><strong>${j.name}</strong> <em>(${badge})</em>${link}</li>`;
-              }).join('');
+              const items = parsed.jobLogs
+                .map((j) => {
+                  const badge = j.conclusion ? j.conclusion : j.status;
+                  const link = j.logsUrl
+                    ? ` - <a href="${j.logsUrl}" target="_blank">logs</a>`
+                    : '';
+                  return `<li><strong>${j.name}</strong> <em>(${badge})</em>${link}</li>`;
+                })
+                .join('');
               parts.push(`<div><p>Job logs</p><ul>${items}</ul></div>`);
             }
             $('link').innerHTML = parts.join('');
@@ -164,7 +229,9 @@
         }
 
         if (!runId && !githubRunId && !githubRunUrl) {
-          alert('Provide at least one: runId (for logging), githubRunId or githubRunUrl (required to cancel).');
+          alert(
+            'Provide at least one: runId (for logging), githubRunId or githubRunUrl (required to cancel).',
+          );
           return;
         }
 
@@ -183,11 +250,15 @@
           const resp = await fetch(url.toString(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
+            body: JSON.stringify(body),
           });
           const text = await resp.text();
           let parsed = null;
-          try { parsed = JSON.parse(text); } catch { /* raw text */ }
+          try {
+            parsed = JSON.parse(text);
+          } catch {
+            /* raw text */
+          }
           $('cancelRes').textContent = parsed ? JSON.stringify(parsed, null, 2) : text;
         } catch (e) {
           $('cancelRes').textContent = 'Error: ' + (e && e.message ? e.message : String(e));
@@ -195,4 +266,4 @@
       });
     </script>
   </body>
-  </html>
+</html>

@@ -1,5 +1,5 @@
 // Template Analyzer - Core logic from analyzeTemplate.ts adapted for browser
-// 
+//
 // Security Best Practices:
 // The analyzer now includes enhanced security checks for Azure Bicep files:
 // 1. Detection of Managed Identity usage - Identifies when Managed Identity is correctly used
@@ -316,7 +316,14 @@ class TemplateAnalyzer {
       // Run repository-level configuration validations early (docs-config rules)
       // Only run docs-specific repo validations when the docs ruleset is selected
       if (ruleSet === 'docs') {
-        TemplateAnalyzerDocs.prototype.validateRepoConfiguration(config, repoInfo, defaultBranch, files, issues, compliant);
+        TemplateAnalyzerDocs.prototype.validateRepoConfiguration(
+          config,
+          repoInfo,
+          defaultBranch,
+          files,
+          issues,
+          compliant,
+        );
       }
 
       // Normalize file paths for case-insensitive comparison
@@ -465,7 +472,7 @@ class TemplateAnalyzer {
                 foundResources.push(resource);
               }
             }
-            
+
             // Check for authentication methods and recommend Managed Identity when appropriate
             this.analyzeAuthenticationMethods(content, file, issues, compliant);
           } catch (err) {
@@ -595,7 +602,7 @@ class TemplateAnalyzer {
 
     // Compare exact match by default; normalize if case-insensitive comparison desired
     const normalize = (s) => String(s).trim();
-    if (normalize(defaultBranch) !== normalize(expected)) { 
+    if (normalize(defaultBranch) !== normalize(expected)) {
       issues.push({
         id: `default-branch-not-${expected}`,
         severity: 'error',
@@ -626,13 +633,13 @@ class TemplateAnalyzer {
     if (!securityChecks) {
       return;
     }
-    
+
     // Check for Managed Identity
     const hasManagedIdentity = this.checkForManagedIdentity(content);
-    
+
     // Check for other authentication methods
     const authMethods = this.detectAuthenticationMethods(content);
-    
+
     if (hasManagedIdentity) {
       compliant.push({
         id: `bicep-uses-managed-identity-${file}`,
@@ -640,42 +647,42 @@ class TemplateAnalyzer {
         message: `Good practice: ${file} uses Managed Identity for Azure authentication`,
         details: {
           file: file,
-          authMethod: 'ManagedIdentity'
+          authMethod: 'ManagedIdentity',
         },
       });
     }
-    
+
     // If other authentication methods are found, suggest using Managed Identity instead
     if (securityChecks.detectInsecureAuth && authMethods.length > 0) {
       const authMethodsList = authMethods.join(', ');
-      
+
       issues.push({
         id: `bicep-alternative-auth-${file}`,
         severity: 'warning',
         message: `Security recommendation: Replace ${authMethodsList} with Managed Identity in ${file}`,
         error: `File ${file} uses ${authMethodsList} for authentication instead of Managed Identity`,
-        recommendation: `Consider replacing ${authMethodsList} with Managed Identity for better security.`
+        recommendation: `Consider replacing ${authMethodsList} with Managed Identity for better security.`,
       });
     }
-    
+
     // If no authentication method is found, check if there are any resources that typically need auth
     if (securityChecks.checkAnonymousAccess && !hasManagedIdentity && authMethods.length === 0) {
       const resourcesRequiringAuth = this.detectResourcesRequiringAuth(content);
-      
+
       if (resourcesRequiringAuth.length > 0) {
         const resourcesList = resourcesRequiringAuth.join(', ');
-        
+
         issues.push({
           id: `bicep-missing-auth-${file}`,
           severity: 'warning',
           message: `Security recommendation: Add Managed Identity for ${resourcesList} in ${file}`,
           error: `File ${file} may have resources (${resourcesList}) with anonymous access or missing authentication`,
-          recommendation: `Configure Managed Identity for secure access to these resources.`
+          recommendation: `Configure Managed Identity for secure access to these resources.`,
         });
       }
     }
   }
-  
+
   /**
    * Check if the Bicep file uses Managed Identity
    * @param {string} content - The Bicep file content
@@ -691,17 +698,17 @@ class TemplateAnalyzer {
       /['"]identity['"]\s*:\s*\{\s*['"]type['"]\s*:\s*['"]UserAssigned['"]/i,
       /['"]identity['"]\s*:\s*\{\s*['"]type['"]\s*:\s*['"]SystemAssigned,UserAssigned['"]/i,
       /managedIdentities:\s*\{\s*systemAssigned:\s*true/i,
-      /managedIdentities:\s*\{\s*userAssignedResourceIds:/i
+      /managedIdentities:\s*\{\s*userAssignedResourceIds:/i,
     ];
-    
-    return patterns.some(pattern => pattern.test(content));
+
+    return patterns.some((pattern) => pattern.test(content));
   }
-  
+
   /**
    * Detect other authentication methods in Bicep files
    * @param {string} content - The Bicep file content
    * @returns {string[]} - Array of detected authentication methods
-   * 
+   *
    * This method looks for various authentication patterns in Bicep templates that could be
    * replaced with Managed Identity for better security. It detects:
    * 1. Connection strings (potentially containing credentials)
@@ -710,25 +717,30 @@ class TemplateAnalyzer {
    * 4. SAS tokens
    * 5. Storage account keys
    * 6. Connection strings with explicit credentials
-   * 
+   *
    * When these patterns are found, the analyzer will recommend replacing them with
    * Managed Identity for improved security.
    */
   detectAuthenticationMethods(content) {
     const authMethods = [];
-    
+
     // Check for connection strings
     if (/connectionString/i.test(content) || /['"]ConnectionString['"]/i.test(content)) {
       authMethods.push('Connection String');
     }
-    
+
     // Check for access keys
-    if (/accessKey/i.test(content) || /['"]accessKey['"]/i.test(content) || 
-        /primaryKey/i.test(content) || /['"]primaryKey['"]/i.test(content) ||
-        /secondaryKey/i.test(content) || /['"]secondaryKey['"]/i.test(content)) {
+    if (
+      /accessKey/i.test(content) ||
+      /['"]accessKey['"]/i.test(content) ||
+      /primaryKey/i.test(content) ||
+      /['"]primaryKey['"]/i.test(content) ||
+      /secondaryKey/i.test(content) ||
+      /['"]secondaryKey['"]/i.test(content)
+    ) {
       authMethods.push('Access Key');
     }
-    
+
     // Check for secrets
     // Find resource blocks that reference KeyVault secrets
     const resourceBlocks = content.match(/resource\s+\w+\s+'[^']*'\s*{[^}]*}/gis) || [];
@@ -745,45 +757,53 @@ class TemplateAnalyzer {
     if (keyVaultSecretWithoutMI) {
       authMethods.push('KeyVault Secret without Managed Identity');
     }
-    
+
     // Check for SAS tokens
-    if (/sasToken/i.test(content) || /['"]sasToken['"]/i.test(content) || 
-        /sharedAccessSignature/i.test(content) || /SharedAccessKey/i.test(content)) {
+    if (
+      /sasToken/i.test(content) ||
+      /['"]sasToken['"]/i.test(content) ||
+      /sharedAccessSignature/i.test(content) ||
+      /SharedAccessKey/i.test(content)
+    ) {
       authMethods.push('SAS Token');
     }
-    
+
     // Check for Storage Account Keys
     if (/storageAccountKey/i.test(content) || /['"]storageAccountKey['"]/i.test(content)) {
       authMethods.push('Storage Account Key');
     }
-    
+
     // Check for connection strings with credentials
-    if (/AccountKey=/i.test(content) || /Password=/i.test(content) || 
-        /UserName=/i.test(content) || /AccountEndpoint=/i.test(content)) {
+    if (
+      /AccountKey=/i.test(content) ||
+      /Password=/i.test(content) ||
+      /UserName=/i.test(content) ||
+      /AccountEndpoint=/i.test(content)
+    ) {
       authMethods.push('Connection String with credentials');
     }
-    
+
     return authMethods;
   }
-  
+
   /**
    * Detect resources that typically require authentication
    * @param {string} content - The Bicep file content
    * @returns {string[]} - Array of resources that typically require authentication
-   * 
+   *
    * This method identifies Azure resources in Bicep templates that typically
    * should use some form of authentication - preferably Managed Identity.
    * When such resources are found but no authentication method is detected,
    * the analyzer will suggest adding Managed Identity to avoid potential
    * anonymous access security risks.
-   * 
+   *
    * This is particularly important for resources like Key Vault, Storage Accounts,
    * Cosmos DB, SQL Server, and other services that should never be exposed without
    * proper authentication.
    */
   detectResourcesRequiringAuth(content) {
     const resources = [];
-    
+
     // Common Azure resources that typically require authentication
     const resourcePatterns = [
       { pattern: /Microsoft\.Storage\/storageAccounts/i, name: 'Storage Account' },
@@ -799,15 +819,15 @@ class TemplateAnalyzer {
       { pattern: /Microsoft\.ContainerService\/managedClusters/i, name: 'AKS Cluster' },
       { pattern: /Microsoft\.Cache\/Redis/i, name: 'Redis Cache' },
       { pattern: /Microsoft\.Search\/searchServices/i, name: 'Search Service' },
-      { pattern: /Microsoft\.OperationalInsights\/workspaces/i, name: 'Log Analytics' }
+      { pattern: /Microsoft\.OperationalInsights\/workspaces/i, name: 'Log Analytics' },
     ];
-    
+
     for (const { pattern, name } of resourcePatterns) {
       if (pattern.test(content)) {
         resources.push(name);
       }
     }
-    
+
     return resources;
   }
 
@@ -838,7 +858,6 @@ class TemplateAnalyzer {
       });
     }
   }
-
 }
 
 // Function to initialize the analyzer

@@ -11,30 +11,30 @@ function runGitHubWorkflowValidationDemo() {
     console.error('GitHub Workflow Validation component not loaded!');
     return;
   }
-  
+
   // Sample template URL - replace with an actual URL if needed
   const templateUrl = 'https://github.com/microsoft/vscode-azuretools-template';
-  
+
   // Find an existing container or create one if needed
   let container = document.getElementById('githubWorkflowValidationContainer');
   if (!container) {
     container = document.createElement('div');
     container.id = 'githubWorkflowValidationContainer';
-    
+
     // Insert the container where appropriate
     const target = document.querySelector('.main-content') || document.body;
     target.appendChild(container);
   }
-  
+
   // Initialize the validation component in demo mode
   window.GitHubWorkflowValidation.runDemo(
-    'githubWorkflowValidationContainer', 
+    'githubWorkflowValidationContainer',
     templateUrl,
     (status) => {
       console.log('Validation status update:', status);
-    }
+    },
   );
-  
+
   console.log('Demo validation started - showing successful results in 4 seconds');
 }
 

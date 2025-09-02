@@ -325,7 +325,13 @@ document.addEventListener('DOMContentLoaded', function () {
         data.compliance.compliant.find((item) => item.category === 'meta')?.details?.ruleSet ||
         'dod';
       const ruleSetDisplay =
-        ruleSet === 'dod' ? 'DoD' : ruleSet === 'partner' ? 'Partner' : ruleSet === 'docs' ? 'Docs' : 'Custom';
+        ruleSet === 'dod'
+          ? 'DoD'
+          : ruleSet === 'partner'
+            ? 'Partner'
+            : ruleSet === 'docs'
+              ? 'Docs'
+              : 'Custom';
 
       // Check for Gist URL in custom configuration
       const gistUrl = data.customConfig?.gistUrl;
@@ -426,8 +432,12 @@ document.addEventListener('DOMContentLoaded', function () {
         if (Array.isArray(window.templatesData)) {
           const match = window.templatesData.find((t) => {
             // Normalize possible trailing .git and case
-            const a = String(t.repoUrl || '').replace(/\.git$/, '').toLowerCase();
-            const b = String(repoUrl).replace(/\.git$/, '').toLowerCase();
+            const a = String(t.repoUrl || '')
+              .replace(/\.git$/, '')
+              .toLowerCase();
+            const b = String(repoUrl)
+              .replace(/\.git$/, '')
+              .toLowerCase();
             return a === b;
           });
           if (match && match.relativePath) {
@@ -496,15 +506,15 @@ document.addEventListener('DOMContentLoaded', function () {
       const height = 120;
       const padding = 12;
 
-  const times = points.map((p) => p.x.getTime());
-  const values = points.map((p) => p.y);
-  const minX = Math.min(...times);
-  const maxX = Math.max(...times);
-  // Compute y-bounds from data and clamp to [0,100]
-  let minY = Math.min(...values);
-  let maxY = Math.max(...values);
-  minY = Math.max(0, Math.min(100, minY));
-  maxY = Math.max(0, Math.min(100, maxY));
+      const times = points.map((p) => p.x.getTime());
+      const values = points.map((p) => p.y);
+      const minX = Math.min(...times);
+      const maxX = Math.max(...times);
+      // Compute y-bounds from data and clamp to [0,100]
+      let minY = Math.min(...values);
+      let maxY = Math.max(...values);
+      minY = Math.max(0, Math.min(100, minY));
+      maxY = Math.max(0, Math.min(100, maxY));
 
       const xScale = (t) => {
         if (maxX === minX) return padding;
@@ -519,7 +529,10 @@ document.addEventListener('DOMContentLoaded', function () {
       };
 
       const pathD = points
-        .map((p, i) => `${i === 0 ? 'M' : 'L'} ${xScale(p.x.getTime()).toFixed(2)} ${yScale(p.y).toFixed(2)}`)
+        .map(
+          (p, i) =>
+            `${i === 0 ? 'M' : 'L'} ${xScale(p.x.getTime()).toFixed(2)} ${yScale(p.y).toFixed(2)}`,
+        )
         .join(' ');
 
       const last = points[points.length - 1];
@@ -989,7 +1002,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
               } else {
                 if (noteEl) {
-                  noteEl.textContent = 'Clicking "Save Results" will open a pull request to store this analysis under the results directory in the configured repo.';
+                  noteEl.textContent =
+                    'Clicking "Save Results" will open a pull request to store this analysis under the results directory in the configured repo.';
                 }
               }
             } catch (_) {}
@@ -1014,13 +1028,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 const res = await window.submitAnalysisToGitHub(original, username);
                 if (res && res.success) {
-                  const msg = 'A pull request is being created with your analysis results. Once the PR is merged, results will appear on the site after the nightly deployment. If you are an admin, you can deploy the site manually to publish immediately.';
+                  const msg =
+                    'A pull request is being created with your analysis results. Once the PR is merged, results will appear on the site after the nightly deployment. If you are an admin, you can deploy the site manually to publish immediately.';
                   if (window.NotificationSystem) {
-                    window.NotificationSystem.showSuccess(
-                      'Save Requested',
-                      msg,
-                      9000
-                    );
+                    window.NotificationSystem.showSuccess('Save Requested', msg, 9000);
                   } else {
                     alert('Save requested. ' + msg);
                   }
@@ -1030,7 +1041,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     window.NotificationSystem.showWarning(
                       'Save Failed',
                       `Could not save results: ${msg}`,
-                      8000
+                      8000,
                     );
                   } else {
                     alert(`Could not save results: ${msg}`);

@@ -2,10 +2,10 @@
   "githubOAuth": {
     "clientId": "<set in GitHub Secrets as GH_OAUTH_CLIENT_ID>",
     "scope": "public_repo read:user",
-    "redirectUri": "" 
+    "redirectUri": ""
   },
   "backend": {
-    "baseUrl": "", 
+    "baseUrl": "",
     "functionKey": ""
   }
 }

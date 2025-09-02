@@ -30,7 +30,9 @@
 }
 
 @media (max-width: 400px) {
-  .view-report-btn, .rescan-btn, .validate-btn {
+  .view-report-btn,
+  .rescan-btn,
+  .validate-btn {
     flex: 1 0 100%;
     margin-bottom: 5px;
   }

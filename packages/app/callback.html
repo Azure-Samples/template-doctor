@@ -79,7 +79,11 @@
         const withoutFile = pathname.match(/\.[a-zA-Z0-9]+$/)
           ? pathname.substring(0, pathname.lastIndexOf('/'))
           : pathname;
-        return withoutFile === '/' ? '' : (withoutFile.endsWith('/') ? withoutFile.slice(0, -1) : withoutFile);
+        return withoutFile === '/'
+          ? ''
+          : withoutFile.endsWith('/')
+            ? withoutFile.slice(0, -1)
+            : withoutFile;
       }
 
       // Load configuration
@@ -110,7 +114,7 @@
         // Load configuration first
         const config = await loadConfig();
         document.getElementById('process-info').textContent = 'Configuration loaded, processing...';
-        
+
         // Show error if present
         if (error) {
           document.getElementById('loading').style.display = 'none';
@@ -129,8 +133,9 @@
         }
         // Process code
         else if (code && state) {
-          document.getElementById('process-info').textContent = 'Authorization code received, redirecting...';
-          
+          document.getElementById('process-info').textContent =
+            'Authorization code received, redirecting...';
+
           // Send code and state back to index page and redirect
           sessionStorage.setItem('gh_auth_code', code);
           sessionStorage.setItem('gh_auth_state', state);
@@ -158,16 +163,16 @@
       }
 
       // Start processing
-      processCallback().catch(err => {
+      processCallback().catch((err) => {
         console.error('Error during callback processing:', err);
         document.getElementById('loading').style.display = 'none';
         const errorElement = document.getElementById('error-message');
         errorElement.textContent = `Error during authentication: ${err.message}`;
         errorElement.style.display = 'block';
-        
+
         // Store error
         sessionStorage.setItem('auth_error', `Error during callback processing: ${err.message}`);
-        
+
         // Redirect back to main page after 5 seconds
         setTimeout(() => {
           const basePath = getBasePath();

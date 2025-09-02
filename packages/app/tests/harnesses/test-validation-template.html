@@ -1,197 +1,202 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Validation Template Test</title>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-      line-height: 1.6;
-      color: #333;
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 20px;
-    }
-    button {
-      background-color: #0366d6;
-      color: white;
-      border: none;
-      padding: 10px 15px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 16px;
-      margin: 10px 0;
-    }
-    button:hover {
-      background-color: #0255b3;
-    }
-    .result {
-      background-color: #f6f8fa;
-      border: 1px solid #e1e4e8;
-      border-radius: 6px;
-      padding: 15px;
-      margin-top: 20px;
-      overflow-x: auto;
-    }
-    .success {
-      border-left: 4px solid #28a745;
-    }
-    .error {
-      border-left: 4px solid #d73a49;
-    }
-    h1 {
-      border-bottom: 1px solid #eaecef;
-      padding-bottom: 10px;
-    }
-    pre {
-      white-space: pre-wrap;
-      word-wrap: break-word;
-    }
-  </style>
-</head>
-<body>
-  <h1>Validation Template API Test</h1>
-  
-  <div>
-    <button id="testGetBtn">Test GET endpoint</button>
-    <button id="testPostBtn">Test POST endpoint</button>
-  </div>
-  
-  <div id="resultContainer" class="result" style="display: none;">
-    <h3 id="resultTitle">Result</h3>
-    <pre id="resultContent"></pre>
-  </div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Validation Template Test</title>
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+        line-height: 1.6;
+        color: #333;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      button {
+        background-color: #0366d6;
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 16px;
+        margin: 10px 0;
+      }
+      button:hover {
+        background-color: #0255b3;
+      }
+      .result {
+        background-color: #f6f8fa;
+        border: 1px solid #e1e4e8;
+        border-radius: 6px;
+        padding: 15px;
+        margin-top: 20px;
+        overflow-x: auto;
+      }
+      .success {
+        border-left: 4px solid #28a745;
+      }
+      .error {
+        border-left: 4px solid #d73a49;
+      }
+      h1 {
+        border-bottom: 1px solid #eaecef;
+        padding-bottom: 10px;
+      }
+      pre {
+        white-space: pre-wrap;
+        word-wrap: break-word;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Validation Template API Test</h1>
 
-  <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      const resultContainer = document.getElementById('resultContainer');
-      const resultTitle = document.getElementById('resultTitle');
-      const resultContent = document.getElementById('resultContent');
-      
-      // Test GET endpoint
-      document.getElementById('testGetBtn').addEventListener('click', async function() {
-        try {
-          resultContainer.style.display = 'block';
-          resultTitle.textContent = 'Testing GET endpoint...';
-          resultContent.textContent = 'Sending request...';
-          
-          // Get the current location to determine API URL
-          const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-          const apiBase = isLocalhost ? 'http://localhost:7071' : window.location.origin;
-          const apiUrl = `${apiBase}/api/validation-template`;
-          
-          resultContent.textContent = `Sending GET request to: ${apiUrl}`;
-          
-          const response = await fetch(apiUrl, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Client-ID': 'test-page'
+    <div>
+      <button id="testGetBtn">Test GET endpoint</button>
+      <button id="testPostBtn">Test POST endpoint</button>
+    </div>
+
+    <div id="resultContainer" class="result" style="display: none">
+      <h3 id="resultTitle">Result</h3>
+      <pre id="resultContent"></pre>
+    </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        const resultContainer = document.getElementById('resultContainer');
+        const resultTitle = document.getElementById('resultTitle');
+        const resultContent = document.getElementById('resultContent');
+
+        // Test GET endpoint
+        document.getElementById('testGetBtn').addEventListener('click', async function () {
+          try {
+            resultContainer.style.display = 'block';
+            resultTitle.textContent = 'Testing GET endpoint...';
+            resultContent.textContent = 'Sending request...';
+
+            // Get the current location to determine API URL
+            const isLocalhost =
+              window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            const apiBase = isLocalhost ? 'http://localhost:7071' : window.location.origin;
+            const apiUrl = `${apiBase}/api/validation-template`;
+
+            resultContent.textContent = `Sending GET request to: ${apiUrl}`;
+
+            const response = await fetch(apiUrl, {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Client-ID': 'test-page',
+              },
+            });
+
+            const statusLine = `Status: ${response.status} ${response.statusText}`;
+
+            // Get response headers as string
+            const headersText = Array.from(response.headers.entries())
+              .map(([key, value]) => `${key}: ${value}`)
+              .join('\\n');
+
+            // Get response body
+            const responseBody = await response.text();
+            let formattedBody;
+            try {
+              // Try to parse and pretty-print JSON
+              formattedBody = JSON.stringify(JSON.parse(responseBody), null, 2);
+            } catch (e) {
+              // If not JSON, use as-is
+              formattedBody = responseBody;
             }
-          });
-          
-          const statusLine = `Status: ${response.status} ${response.statusText}`;
-          
-          // Get response headers as string
-          const headersText = Array.from(response.headers.entries())
-            .map(([key, value]) => `${key}: ${value}`)
-            .join('\\n');
-          
-          // Get response body
-          const responseBody = await response.text();
-          let formattedBody;
-          try {
-            // Try to parse and pretty-print JSON
-            formattedBody = JSON.stringify(JSON.parse(responseBody), null, 2);
-          } catch (e) {
-            // If not JSON, use as-is
-            formattedBody = responseBody;
-          }
-          
-          // Set result content
-          resultContent.textContent = `${statusLine}\n\nHeaders:\n${headersText}\n\nBody:\n${formattedBody}`;
-          
-          // Set appropriate class
-          resultContainer.className = response.ok ? 'result success' : 'result error';
-          resultTitle.textContent = response.ok ? 'GET Request Successful' : 'GET Request Failed';
-          
-        } catch (error) {
-          console.error('Error testing GET endpoint:', error);
-          resultContainer.className = 'result error';
-          resultTitle.textContent = 'GET Request Error';
-          resultContent.textContent = `Error: ${error.message}`;
-        }
-      });
-      
-      // Test POST endpoint
-      document.getElementById('testPostBtn').addEventListener('click', async function() {
-        try {
-          resultContainer.style.display = 'block';
-          resultTitle.textContent = 'Testing POST endpoint...';
-          resultContent.textContent = 'Sending request...';
-          
-          // Get template URL from prompt
-          const templateUrl = prompt('Enter a GitHub template URL to validate:', 'https://github.com/Azure-Samples/todo-nodejs-mongo-aca');
-          
-          if (!templateUrl) {
+
+            // Set result content
+            resultContent.textContent = `${statusLine}\n\nHeaders:\n${headersText}\n\nBody:\n${formattedBody}`;
+
+            // Set appropriate class
+            resultContainer.className = response.ok ? 'result success' : 'result error';
+            resultTitle.textContent = response.ok ? 'GET Request Successful' : 'GET Request Failed';
+          } catch (error) {
+            console.error('Error testing GET endpoint:', error);
             resultContainer.className = 'result error';
-            resultTitle.textContent = 'POST Request Cancelled';
-            resultContent.textContent = 'Operation cancelled. No URL provided.';
-            return;
+            resultTitle.textContent = 'GET Request Error';
+            resultContent.textContent = `Error: ${error.message}`;
           }
-          
-          // Get the current location to determine API URL
-          const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-          const apiBase = isLocalhost ? 'http://localhost:7071' : window.location.origin;
-          const apiUrl = `${apiBase}/api/validation-template`;
-          
-          resultContent.textContent = `Sending POST request to: ${apiUrl}\nWith template URL: ${templateUrl}`;
-          
-          const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Client-ID': 'test-page'
-            },
-            body: JSON.stringify({
-              templateUrl: templateUrl
-            })
-          });
-          
-          const statusLine = `Status: ${response.status} ${response.statusText}`;
-          
-          // Get response headers as string
-          const headersText = Array.from(response.headers.entries())
-            .map(([key, value]) => `${key}: ${value}`)
-            .join('\\n');
-          
-          // Get response body
-          const responseBody = await response.text();
-          let formattedBody;
+        });
+
+        // Test POST endpoint
+        document.getElementById('testPostBtn').addEventListener('click', async function () {
           try {
-            // Try to parse and pretty-print JSON
-            formattedBody = JSON.stringify(JSON.parse(responseBody), null, 2);
-          } catch (e) {
-            // If not JSON, use as-is
-            formattedBody = responseBody;
+            resultContainer.style.display = 'block';
+            resultTitle.textContent = 'Testing POST endpoint...';
+            resultContent.textContent = 'Sending request...';
+
+            // Get template URL from prompt
+            const templateUrl = prompt(
+              'Enter a GitHub template URL to validate:',
+              'https://github.com/Azure-Samples/todo-nodejs-mongo-aca',
+            );
+
+            if (!templateUrl) {
+              resultContainer.className = 'result error';
+              resultTitle.textContent = 'POST Request Cancelled';
+              resultContent.textContent = 'Operation cancelled. No URL provided.';
+              return;
+            }
+
+            // Get the current location to determine API URL
+            const isLocalhost =
+              window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            const apiBase = isLocalhost ? 'http://localhost:7071' : window.location.origin;
+            const apiUrl = `${apiBase}/api/validation-template`;
+
+            resultContent.textContent = `Sending POST request to: ${apiUrl}\nWith template URL: ${templateUrl}`;
+
+            const response = await fetch(apiUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Client-ID': 'test-page',
+              },
+              body: JSON.stringify({
+                templateUrl: templateUrl,
+              }),
+            });
+
+            const statusLine = `Status: ${response.status} ${response.statusText}`;
+
+            // Get response headers as string
+            const headersText = Array.from(response.headers.entries())
+              .map(([key, value]) => `${key}: ${value}`)
+              .join('\\n');
+
+            // Get response body
+            const responseBody = await response.text();
+            let formattedBody;
+            try {
+              // Try to parse and pretty-print JSON
+              formattedBody = JSON.stringify(JSON.parse(responseBody), null, 2);
+            } catch (e) {
+              // If not JSON, use as-is
+              formattedBody = responseBody;
+            }
+
+            // Set result content
+            resultContent.textContent = `${statusLine}\n\nHeaders:\n${headersText}\n\nBody:\n${formattedBody}`;
+
+            // Set appropriate class
+            resultContainer.className = response.ok ? 'result success' : 'result error';
+            resultTitle.textContent = response.ok
+              ? 'POST Request Successful'
+              : 'POST Request Failed';
+          } catch (error) {
+            console.error('Error testing POST endpoint:', error);
+            resultContainer.className = 'result error';
+            resultTitle.textContent = 'POST Request Error';
+            resultContent.textContent = `Error: ${error.message}`;
           }
-          
-          // Set result content
-          resultContent.textContent = `${statusLine}\n\nHeaders:\n${headersText}\n\nBody:\n${formattedBody}`;
-          
-          // Set appropriate class
-          resultContainer.className = response.ok ? 'result success' : 'result error';
-          resultTitle.textContent = response.ok ? 'POST Request Successful' : 'POST Request Failed';
-          
-        } catch (error) {
-          console.error('Error testing POST endpoint:', error);
-          resultContainer.className = 'result error';
-          resultTitle.textContent = 'POST Request Error';
-          resultContent.textContent = `Error: ${error.message}`;
-        }
+        });
       });
-    });
-  </script>
-</body>
+    </script>
+  </body>
 </html>
