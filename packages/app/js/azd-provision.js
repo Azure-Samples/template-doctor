@@ -219,7 +219,7 @@ function runAzdProvisionTest() {
         throw new Error(`Validation start failed: ${r.status}${detail}`);
       }
       const data = await r.json();
-  const { runId, githubRunId, githubRunUrl, requestId } = data;
+  const { runId = null, githubRunId = null, githubRunUrl = null, requestId = null } = data || {};
       appendLog(logEl, `[info] Validation started. Run ID: ${runId}${requestId ? ` (req ${requestId})` : ''}`);
       if (githubRunId) appendLog(logEl, `[info] GitHub run id: ${githubRunId}`);
       if (githubRunUrl) appendLog(logEl, `[info] GitHub run url: ${githubRunUrl}`);
