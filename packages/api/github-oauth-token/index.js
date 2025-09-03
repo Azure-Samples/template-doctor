@@ -3,8 +3,6 @@
 // Expects: { code: string }
 // Returns: { access_token: string }
 
-const fetch = require('node-fetch');
-
 module.exports = async function (context, req) {
     context.log('GitHub OAuth token exchange function triggered');
     

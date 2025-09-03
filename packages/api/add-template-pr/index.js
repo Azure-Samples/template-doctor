@@ -3,7 +3,6 @@
 // Creates a PR to add a new template to the index-data.js file
 // and creates the result files for the template
 
-const fetch = require('node-fetch');
 // Using dynamic import for @octokit/rest which is an ES Module
 let Octokit;
 
