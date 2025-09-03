@@ -271,8 +271,9 @@ function runAzdProvisionTest() {
           }
         };
       }
+      const MAX_POLLING_ATTEMPTS = 60; // ~30 minutes at 30s
       let attempts = 0;
-      const maxAttempts = 60; // ~30 minutes at 30s
+      const maxAttempts = MAX_POLLING_ATTEMPTS;
 
       const pollOnce = async () => {
         attempts++;
