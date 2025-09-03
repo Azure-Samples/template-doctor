@@ -20,16 +20,14 @@ function testAzdProvision() {
   if (window.Notifications) {
     window.Notifications.confirm(
       'Test AZD Provision',
-      'This will clone the template repository in an Azure Container and analyze it. Proceed?',
+      'This will trigger the template validation GitHub workflow for this repository. Proceed?',
       {
         onConfirm: () => runAzdProvisionTest(),
       },
     );
   } else {
     if (
-      confirm(
-        'This will clone the template repository in an Azure Container and analyze it. Proceed?',
-      )
+      confirm('This will trigger the template validation GitHub workflow for this repository. Proceed?')
     ) {
       runAzdProvisionTest();
     }
@@ -62,10 +60,12 @@ function runAzdProvisionTest() {
     return name;
   }
   // Determine backend base URL via runtime config with safe fallback
-  const FORCED_BACKEND_BASE =
-    window.TemplateDoctorConfig && window.TemplateDoctorConfig.apiBase
-      ? String(window.TemplateDoctorConfig.apiBase || '').trim()
-      : window.location.origin;
+  // Align with GitHub workflow validation behavior: use Functions port on localhost
+  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const configuredBase = (window.TemplateDoctorConfig && window.TemplateDoctorConfig.apiBase)
+    ? String(window.TemplateDoctorConfig.apiBase || '').trim()
+    : window.location.origin;
+  const FORCED_BACKEND_BASE = isLocalhost ? 'http://localhost:7071' : configuredBase;
   // Helper to fetch runtime config (cached)
   function getBasePath() {
     const pathname = window.location.pathname || '/';
@@ -117,20 +117,25 @@ function runAzdProvisionTest() {
   const templateRepo = normalizeTemplateToRepo(templateName);
 
   // Show loading state
-  const testProvisionButton = document.getElementById('testProvisionButton');
+  const testProvisionButton = (function() {
+    return document.getElementById('testProvisionButton')
+      || document.getElementById('testProvisionButton-direct')
+      || document.getElementById('testProvisionButton-fallback');
+  })();
+  let originalText = null;
+  const restoreButton = () => {
+    if (!testProvisionButton) return;
+    // small delay lets last UI updates render before flipping back
+    setTimeout(() => {
+      testProvisionButton.innerHTML = originalText || 'Test AZD Provision';
+      testProvisionButton.style.backgroundColor = '';
+      testProvisionButton.disabled = false;
+    }, 500);
+  };
   if (testProvisionButton) {
-    const originalText = testProvisionButton.innerHTML;
+    originalText = testProvisionButton.innerHTML;
     testProvisionButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting…';
     testProvisionButton.disabled = true;
-
-    // Function to restore button
-    const restoreButton = () => {
-      setTimeout(() => {
-        testProvisionButton.innerHTML = originalText;
-        testProvisionButton.style.backgroundColor = '';
-        testProvisionButton.disabled = false;
-      }, 3000);
-    };
   }
 
   // Create a live log container below the header (simple terminal-style area)
@@ -148,9 +153,8 @@ function runAzdProvisionTest() {
     controls.style.cssText = 'margin:10px 0 6px; display:flex; gap:8px; align-items:center;';
     const stopBtn = document.createElement('button');
     stopBtn.id = 'azd-stop-btn';
-    stopBtn.textContent = 'Stop Provision';
-    stopBtn.style.cssText =
-      'padding:6px 12px; background:#b10e1e; color:#fff; border:none; border-radius:6px; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,0.15); margin: 0 0 10px 20px';
+    stopBtn.textContent = 'Cancel Validation';
+    stopBtn.style.cssText = 'padding:6px 12px; background:#b10e1e; color:#fff; border:none; border-radius:6px; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,0.15); margin: 0 0 10px 20px';
     stopBtn.disabled = true;
     controls.appendChild(stopBtn);
     logEl.parentNode.insertBefore(controls, logEl);
@@ -195,20 +199,19 @@ function runAzdProvisionTest() {
   // Add debug log to show we're using the latest frontend code
   appendLog(logEl, `[debug] Using updated frontend code with enhanced debugging`);
   appendLog(logEl, `[debug] Template repo: ${templateRepo}, Template name: ${templateName}`);
-  // Kick off ACA Job via Function (public routes, now with /aca prefix)
-  const startUrl = joinUrl(apiBase, '/api/aca-start-job');
-  appendLog(logEl, `[info] Calling start URL: ${startUrl}`);
-  console.log('[azd] startUrl:', startUrl);
-  appendLog(logEl, `[info] Requested template: ${templateRepo} (server will normalize)`);
-  fetch(startUrl, {
+  // Trigger GitHub workflow via the same endpoint used by Run Analysis
+  const validateUrl = joinUrl(apiBase, '/api/validation-template');
+  appendLog(logEl, `[info] Triggering validation workflow: ${validateUrl}`);
+  console.log('[azd] validationUrl:', validateUrl);
+  const templateUrlFull = window.reportData.repoUrl;
+
+  fetch(validateUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      templateName: templateRepo,
-      mode: 'list', // Force list mode which only clones and doesn't run azd commands
-      action: 'list', // Force list action
-      jobName: 'template-doctor-aca-job-app', // Explicitly request the app-runner job
-    }),
+      templateUrl: templateUrlFull,
+      targetRepoUrl: templateUrlFull
+    })
   })
     .then(async (r) => {
       if (!r.ok) {
@@ -223,247 +226,131 @@ function runAzdProvisionTest() {
             detail = t ? ` - ${t.substring(0, 200)}` : '';
           }
         } catch {}
-        throw new Error(`Start failed: ${r.status}${detail}`);
+        throw new Error(`Validation start failed: ${r.status}${detail}`);
       }
-      const json = await r.json();
-      const { executionName } = json;
-      appendLog(logEl, `[info] Job started: ${executionName}`);
-      if (json.templateUsed) {
-        appendLog(logEl, `[info] Template used: ${json.templateUsed}`);
+      const data = await r.json();
+  const { runId = null, githubRunId = null, githubRunUrl = null, requestId = null } = data || {};
+      appendLog(logEl, `[info] Validation started. Run ID: ${runId}${requestId ? ` (req ${requestId})` : ''}`);
+      if (githubRunId) appendLog(logEl, `[info] GitHub run id: ${githubRunId}`);
+      if (githubRunUrl) appendLog(logEl, `[info] GitHub run url: ${githubRunUrl}`);
+
+      // Persist correlation so other views can pick it up
+      try {
+        localStorage.setItem(`validation_${runId}`, JSON.stringify({ githubRunId: githubRunId || null, githubRunUrl: githubRunUrl || null }));
+        localStorage.setItem('lastValidationRunInfo', JSON.stringify({ runId, githubRunId: githubRunId || null, githubRunUrl: githubRunUrl || null }));
+      } catch {}
+
+      if (notification) {
+        notification.success(
+          'Validation Started',
+          githubRunUrl ? 'Workflow started. Opening GitHub run in a new tab.' : 'Workflow started. You can monitor status below.'
+        );
       }
-      // Open SSE stream with polling fallback and Stop button support
-      const streamPath = `/api/aca-job-logs/${encodeURIComponent(executionName)}`;
-      const streamUrl = joinUrl(apiBase, streamPath);
-      appendLog(logEl, `[info] Connecting logs stream: ${streamUrl}`);
-      console.log('[azd] streamUrl:', streamUrl);
+      // Offer to open the GitHub run if we have a URL
+      if (githubRunUrl) {
+        try { window.open(githubRunUrl, '_blank'); } catch {}
+      }
+
+      // Start a lightweight polling loop to surface status updates in the same log area
+      const statusUrlBase = joinUrl(apiBase, '/api/validation-status');
       const stopBtn = document.getElementById('azd-stop-btn');
-      let ev;
-      let pollTimer;
-      let pollSince = '';
-      let finished = false;
-      let currentExecution = executionName;
-
-      function finalize(result) {
-        finished = true;
-        if (ev)
-          try {
-            ev.close();
-          } catch {}
-        if (pollTimer) {
-          clearTimeout(pollTimer);
-          pollTimer = null;
-        }
-        if (stopBtn) stopBtn.disabled = true;
-        if (!notification) return;
-        if (result && result.succeeded) {
-          notification.success('Provision Completed', 'azd completed successfully');
-        } else if (result && result.status) {
-          notification.error('Provision Failed', `Status: ${result.status}`);
-        }
-      }
-
-      function startPolling() {
-        const doPoll = async () => {
-          if (finished) return;
-          try {
-            // Construct polling URL with mode=poll as a query parameter
-            const url =
-              streamUrl + `?mode=poll${pollSince ? `&since=${encodeURIComponent(pollSince)}` : ''}`;
-            appendLog(logEl, `[debug] Polling full URL: ${url}`);
-            console.log('[detailed-debug] Polling full URL:', url);
-            const pr = await fetch(url, { headers: { Accept: 'application/json' } });
-            if (!pr.ok) throw new Error(`poll ${pr.status}`);
-            const data = await pr.json();
-
-            // Debug raw response
-            console.log('[debug] Poll response:', data);
-
-            if (Array.isArray(data.messages)) {
-              appendLog(logEl, `[debug] Received ${data.messages.length} messages`);
-              data.messages.forEach((m) => appendLog(logEl, m));
-            }
-            if (data.nextSince) pollSince = data.nextSince;
-            if (data.status) {
-              const det = data.details || {};
-              const extras = [];
-              if (det.provisioningState) extras.push(`prov=${det.provisioningState}`);
-              if (det.status) extras.push(`status=${det.status}`);
-              if (typeof det.exitCode !== 'undefined' && det.exitCode !== null)
-                extras.push(`exit=${det.exitCode}`);
-              appendLog(
-                logEl,
-                `[status] ${data.status}${extras.length ? ' (' + extras.join(', ') + ')' : ''}`,
-              );
-            }
-            if (data.done)
-              return finalize({ succeeded: data.status === 'Succeeded', status: data.status });
-          } catch (e) {
-            appendLog(logEl, `[error] poll: ${e.message}`);
-          } finally {
-            if (!finished) pollTimer = setTimeout(doPoll, 3000);
-          }
-        };
-        doPoll();
-      }
-
-      function trySSE() {
-        try {
-          ev = new EventSource(streamUrl);
-        } catch (e) {
-          appendLog(logEl, `[warn] SSE unavailable, falling back to polling`);
-          return startPolling();
-        }
-        ev.addEventListener('open', () => {
-          if (stopBtn) stopBtn.disabled = false;
-        });
-        ev.addEventListener('status', (e) => {
-          try {
-            const d = JSON.parse(e.data);
-            if (d && typeof d === 'object') {
-              const det = d.details || {};
-              const extras = [];
-              if (det.provisioningState) extras.push(`prov=${det.provisioningState}`);
-              if (det.status) extras.push(`status=${det.status}`);
-              if (typeof det.exitCode !== 'undefined' && det.exitCode !== null)
-                extras.push(`exit=${det.exitCode}`);
-              appendLog(
-                logEl,
-                `[status] ${d.state}${extras.length ? ' (' + extras.join(', ') + ')' : ''}`,
-              );
-            } else {
-              appendLog(logEl, `[status] ${d}`);
-            }
-          } catch {}
-        });
-        ev.addEventListener('message', (e) => {
-          appendLog(logEl, e.data);
-        });
-        ev.addEventListener('error', () => {
-          if (!finished) {
-            appendLog(logEl, `[warn] Stream error, switching to polling`);
-            try {
-              ev.close();
-            } catch {}
-            startPolling();
-          }
-        });
-        ev.addEventListener('complete', (e) => {
-          try {
-            const d = JSON.parse(e.data);
-            if (d && d.details) {
-              const { startTime, endTime, exitCode } = d.details;
-              if (startTime && endTime) {
-                const st = new Date(startTime);
-                const et = new Date(endTime);
-                const durMs = Math.max(0, et - st);
-                const mins = Math.floor(durMs / 60000);
-                const secs = Math.floor((durMs % 60000) / 1000);
-                appendLog(
-                  logEl,
-                  `[summary] ${d.status} in ${mins}m ${secs}s${typeof exitCode === 'number' ? ` (exit=${exitCode})` : ''}`,
-                );
-              }
-            }
-            finalize(d);
-          } catch {
-            finalize({ succeeded: false, status: 'Unknown' });
-          }
-        });
-      }
-
-      // Wire Stop button
+      // Wire up cancel button for workflow runs
       if (stopBtn) {
         stopBtn.disabled = false;
-        stopBtn.onclick = () => {
-          appendLog(logEl, '[info] Stopping…');
-          // Best-effort: ask backend to stop the job execution
+        stopBtn.onclick = async () => {
           try {
-            const stopUrl = joinUrl(apiBase, '/api/aca-stop-job');
-            // Add additional debug for the container app job name prefix
-            const containerAppJobName = 'template-doctor-aca-job'; // Hardcoded job name
-            const jobExecutionName = `${containerAppJobName}-${currentExecution}`;
-
-            appendLog(
-              logEl,
-              `[debug] Attempting to stop job with full execution name: ${jobExecutionName}`,
-            );
-            appendLog(
-              logEl,
-              `[debug] Falling back to short execution name if that fails: ${currentExecution}`,
-            );
-
-            // First try with the fully qualified name
-            fetch(stopUrl, {
+            stopBtn.disabled = true;
+            const prev = stopBtn.textContent;
+            stopBtn.textContent = 'Cancelling…';
+            const cancelUrl = joinUrl(apiBase, '/api/validation-cancel');
+            const resp = await fetch(cancelUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                executionName: jobExecutionName,
-                originalExecutionName: currentExecution,
-                resourceGroup: 'template-doctor-rg',
-              }),
-            })
-              .then(async (r) => {
-                if (!r.ok) {
-                  let msg = '';
-                  try {
-                    const j = await r.json();
-                    msg = j.error || '';
-                  } catch {}
-                  appendLog(
-                    logEl,
-                    `[warn] Stop request failed with full name: ${r.status}${msg ? ' - ' + msg : ''}`,
-                  );
-
-                  // Fall back to the short name
-                  return fetch(stopUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      executionName: currentExecution,
-                      resourceGroup: 'template-doctor-rg',
-                    }),
-                  });
-                } else {
-                  appendLog(logEl, '[info] Stop requested successfully with full execution name');
-                  return { ok: true };
-                }
-              })
-              .then(async (r) => {
-                if (r && !r.ok) {
-                  let msg = '';
-                  try {
-                    const j = await r.json();
-                    msg = j.error || '';
-                  } catch {}
-                  appendLog(
-                    logEl,
-                    `[warn] Stop request failed with short name: ${r.status}${msg ? ' - ' + msg : ''}`,
-                  );
-                  appendLog(
-                    logEl,
-                    `[warn] Both stop attempts failed. The container job may need to be stopped manually.`,
-                  );
-                } else if (r && r.ok && r !== true) {
-                  appendLog(logEl, '[info] Stop requested successfully with short execution name');
-                }
-              })
-              .catch((error) => {
-                appendLog(logEl, `[error] Stop request error: ${error.message || error}`);
-              });
-          } catch (error) {
-            appendLog(logEl, `[error] Error attempting to stop job: ${error.message || error}`);
+              body: JSON.stringify({ runId, githubRunId, githubRunUrl })
+            });
+            if (!resp.ok) {
+              const t = await resp.text().catch(() => '');
+              throw new Error(`Cancel failed: ${resp.status} ${resp.statusText}${t ? ` - ${t.substring(0,200)}` : ''}`);
+            }
+            const j = await resp.json().catch(() => ({}));
+            appendLog(logEl, `[info] Cancellation requested for GitHub run ${j.githubRunId || githubRunId}. Waiting for status to reflect 'cancelled'…`);
+          } catch (e) {
+            appendLog(logEl, `[error] ${e.message}`);
+            stopBtn.disabled = false;
+            stopBtn.textContent = 'Cancel Validation';
           }
-          finalize({ succeeded: false, status: 'Stopped' });
         };
       }
+      const MAX_POLLING_ATTEMPTS = 60; // ~30 minutes at 30s
+      let attempts = 0;
+      const maxAttempts = MAX_POLLING_ATTEMPTS;
 
-      // Skip SSE and go straight to polling since SSE consistently fails
-      // trySSE();
-      startPolling();
+      const pollOnce = async () => {
+        attempts++;
+        try {
+          const u = new URL(statusUrlBase);
+          u.searchParams.set('runId', runId);
+          u.searchParams.set('includeLogsUrl', '1');
+          if (githubRunId) u.searchParams.set('githubRunId', githubRunId);
+          const resp = await fetch(u.toString(), { headers: { 'Content-Type': 'application/json' } });
+          if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
+          const s = await resp.json();
+          if (s.status) appendLog(logEl, `[status] ${s.status}${s.conclusion ? ` (${s.conclusion})` : ''}`);
+          if (s.logsArchiveUrl && !document.getElementById('gh-logs-link')) {
+            const link = document.createElement('a');
+            link.id = 'gh-logs-link';
+            link.href = s.logsArchiveUrl;
+            link.textContent = 'Download workflow logs';
+            link.target = '_blank';
+            const container = document.getElementById('azd-provision-controls') || logEl.parentNode;
+            const wrap = document.createElement('div');
+            wrap.style.cssText = 'margin: 8px 0 0 20px;';
+            wrap.appendChild(link);
+            container.appendChild(wrap);
+          }
+          if (s.status === 'completed') {
+            if (notification) {
+              if (s.conclusion === 'success') notification.success('Validation Completed', 'Template passed validation.');
+              else notification.error('Validation Completed', 'Template validation completed with issues.');
+            }
+            // disable cancel and restore the main button
+            try {
+              const stop = document.getElementById('azd-stop-btn');
+              if (stop) stop.disabled = true;
+            } catch {}
+            restoreButton();
+            return true;
+          }
+        } catch (e) {
+          appendLog(logEl, `[warn] Status check failed: ${e.message}`);
+        }
+        return false;
+      };
+      const loop = async () => {
+        if (attempts === 0) {
+          appendLog(logEl, '[info] Monitoring GitHub workflow status…');
+        }
+        const done = await pollOnce();
+        if (!done && attempts < maxAttempts) {
+          setTimeout(loop, 30000);
+        } else if (!done && attempts >= maxAttempts) {
+          appendLog(logEl, '[warn] Timed out waiting for workflow to complete. You can open the GitHub run to check live status.');
+          if (notification) {
+            try { notification.warning ? notification.warning('Validation Timeout', 'Stopped polling after 30 minutes.') : notification.info('Validation Timeout', 'Stopped polling after 30 minutes.'); } catch {}
+          }
+          try {
+            const stop = document.getElementById('azd-stop-btn');
+            if (stop) stop.disabled = true;
+          } catch {}
+          restoreButton();
+        }
+      };
+      loop();
     })
     .catch((err) => {
       appendLog(logEl, `[error] ${err.message}`);
       if (notification) notification.error('Error', err.message);
+      restoreButton();
     });
 }
 

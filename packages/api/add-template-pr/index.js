@@ -62,9 +62,11 @@ module.exports = async function (context, req) {
         // GitHub repository configuration
         const owner = process.env.GITHUB_REPO_OWNER || user.login;  // Use authenticated user as owner by default
         const repo = process.env.GITHUB_REPO_NAME || 'template-doctor';  // Set your default repository name
-    let baseBranch = 'main';  // Default base branch
-    // Track the actual source branch we branched from (may be default branch if 'main' doesn't exist)
-    let sourceBranch = baseBranch;
+
+        const DEFAULT_BRANCH_NAME = 'main';  // Default branch name
+        let baseBranch = DEFAULT_BRANCH_NAME;  // Default base branch
+        // Track the actual source branch we branched from (may be default branch if 'main' doesn't exist)
+        let sourceBranch = DEFAULT_BRANCH_NAME;
         
         // Check if repository exists and is accessible
         try {
@@ -230,7 +232,7 @@ module.exports = async function (context, req) {
             });
             const decoded = Buffer.from(historyFile.content, 'base64').toString();
             const parsed = JSON.parse(decoded);
-            historySha = historyFile && historyFile.sha ? historyFile.sha : undefined;
+            historySha = historyFile?.sha;
             if (Array.isArray(parsed)) historyArray = parsed;
         } catch (e) {
             context.log(`history.json not found for ${folderPath}, will create new one.`);
