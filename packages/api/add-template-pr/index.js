@@ -231,7 +231,7 @@ module.exports = async function (context, req) {
             });
             const decoded = Buffer.from(historyFile.content, 'base64').toString();
             const parsed = JSON.parse(decoded);
-            historySha = historyFile && historyFile.sha ? historyFile.sha : undefined;
+            historySha = historyFile?.sha;
             if (Array.isArray(parsed)) historyArray = parsed;
         } catch (e) {
             context.log(`history.json not found for ${folderPath}, will create new one.`);
