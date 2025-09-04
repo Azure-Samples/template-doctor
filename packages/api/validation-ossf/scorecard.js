@@ -49,7 +49,6 @@ async function getOSSFScore(context, workflowToken, workflowUrl, workflowFile, t
     }
 
     try {
-        //const [owner, repo] = templateOwnerRepo.split('/');
         const client = typeof ScorecardClient !== 'undefined' ? new ScorecardClient(context, undefined, workflowToken, workflowUrl, workflowFile) : null;
         if (!client) {
             issues.push({
@@ -162,7 +161,7 @@ class ScorecardClient {
             this.workflowOwnerRepo = workflowOwnerRepo;
             this.workflowId = workflowId;
         }
-        this.context = context ? context : () => ({ log: (str) => { console.log(str) } });
+        this.context = context ? context : { log: (str) => { console.log(str) } };
     }
 
     async triggerWorkflow(templateOwnerRep, incomingGuid) {
