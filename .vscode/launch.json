@@ -8,6 +8,48 @@
             "restart": true,
             "port": 9229,
             "preLaunchTask": "func: host start"
+        },
+        {
+            "name": "Launch API",
+            "request": "launch",
+            "runtimeArgs": [
+                "run",
+                "-w",
+                "packages/api",
+                "start"
+            ],
+            "runtimeExecutable": "npm",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "cwd": "${workspaceFolder}",
+            "type": "node"
+        },
+        {
+            "name": "Launch APP",
+            "request": "launch",
+            "runtimeArgs": [
+                "run",
+                "-w",
+                "packages/app",
+                "start"
+            ],
+            "runtimeExecutable": "npm",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "cwd": "${workspaceFolder}",
+            "type": "node"
+        },
+    ],
+    "compounds": [
+        {
+            "name": "Launch API & APP",
+            "configurations": [
+                "Launch API",
+                "Launch APP"
+            ],
+            "stopAll": true
         }
     ]
 }
