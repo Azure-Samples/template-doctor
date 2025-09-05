@@ -3,16 +3,21 @@
   "version": "0.0.1",
   "description": "Template Doctor frontend",
   "scripts": {
+    "dev": "vite",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
     "test:debug": "playwright test --debug",
     "start": "python3 -m http.server 8080",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "build": "echo 'Static site - copying files as-is' && cp -r . ."
+    "build": "vite build",
+    "typecheck": "tsc -p . --noEmit",
+    "pretest": "npm run build"
   },
   "devDependencies": {
     "prettier": "^3.6.2",
-    "@playwright/test": "^1.55.0"
+    "@playwright/test": "^1.55.0",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.8"
   }
 }

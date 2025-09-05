@@ -43,6 +43,10 @@ test.describe('App.js Functionality', () => {
   });
 
   test('should initialize app services correctly', async ({ page }) => {
+    // Wait for migrated module globals to be present (TemplateAnalyzer & DashboardRenderer may initialize after GitHubClient)
+    await page.waitForFunction(() => {
+      return !!window.GitHubAuth && !!window.TemplateAnalyzer && !!window.DashboardRenderer;
+    }, { timeout: 10000 });
     // Check if app services are initialized
     const servicesInitialized = await page.evaluate(() => {
       return {

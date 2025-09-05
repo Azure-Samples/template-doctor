@@ -25,11 +25,13 @@ module.exports = defineConfig({
     },
   ],
 
+  // Use Vite dev server so that module-based TS migrations (e.g., main.ts) are executed during tests.
+  // The previous python static server failed to process /src/main.ts causing missing globals (TemplateAnalyzer, ApiRoutes).
   webServer: {
-    command: 'python3 -m http.server 8080',
+    command: 'npm run dev',
     url: 'http://localhost:8080',
-    reuseExistingServer: true, // Reuse server to avoid port conflicts
-    timeout: 120000, // Allow more time for server to start
+    reuseExistingServer: true,
+    timeout: 120000,
     stdout: 'pipe',
     stderr: 'pipe',
   },

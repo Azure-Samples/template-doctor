@@ -284,22 +284,14 @@
     <script src="js/notifications-compat.js"></script>
     <!-- Notification system initialization -->
     <script src="js/notifications-init.js"></script>
-  <!-- Configuration loader - Loads and merges configuration from multiple sources -->
-  <script src="js/config-loader.js"></script>
   <!-- API route builder (version aware) -->
   <script src="js/api-routes.js"></script>
     <!-- GitHub OAuth handling -->
     <script src="js/auth.js"></script>
     <!-- GitHub API client -->
     <script src="js/github-client-new.js"></script>
-    <!-- Dashboard generation logic -->
-    <script src="js/dashboard-renderer.js"></script>
-    <!-- Report loader - handles loading report data from various sources -->
-    <script src="js/report-loader.js"></script>
     <!-- GitHub issue handling -->
     <script src="js/github-issue-handler.js"></script>
-    <!-- Template Doctor analysis logic -->
-    <script src="js/analyzer.js"></script>
     <!-- Ruleset for Docs org -->
     <script src="js/ruleset-docs/analyzer.js"></script>
     <!-- Template data loader - loads previously scanned templates -->
@@ -323,6 +315,8 @@
     <!-- Fallback scripts to ensure action buttons are visible -->
     <script src="js/action-buttons-fallback.js"></script>
     <script src="js/action-buttons-direct.js"></script>
+    <!-- Begin TypeScript migration entrypoint (Vite module graph). Safe to keep after legacy scripts so it can augment globals. -->
+    <script type="module" src="/src/main.ts"></script>
     <script>
       (function(){
         const el = document.getElementById('analysis-mode-indicator');

@@ -56,6 +56,11 @@ test.describe('API Version Routing', () => {
   test('should prefix /api/v4 when apiVersion is set', async ({ page }) => {
     await page.goto('./index.html');
 
+    // Wait for migrated module globals to be ready (race safeguard after TS migration)
+    await page.waitForFunction(() => !!window.TemplateAnalyzer, { timeout: 8000 });
+    // ApiRoutes might be defined via config-loader -> api-routes chain; poll separately with fallback.
+    await page.waitForFunction(() => !!window.ApiRoutes, { timeout: 8000 });
+
     // Trigger the server-side analysis which should perform a fetch
     await triggerServerSideAnalyze(page);
 

@@ -1,25 +1,21 @@
-// @ts-check
-import { test } from '@playwright/test';
+// Guard meta-spec: ensures the dialog-prevention fixture is active.
+// This file now simply asserts the guard fixture works. Real guarding happens in fixtures/guardFixture.ts.
+// Keeping this allows: `--grep setup.guard` to return a test instead of "No tests found".
+import { test, expect } from './fixtures/guardFixture';
 
-// Global guard: fail if any native dialog api is used
-test.beforeEach(async ({ page }) => {
-  // Fail the test if any dialog is triggered
-  page.on('dialog', async (dialog) => {
-    throw new Error(`Native dialog used: ${dialog.type()} - ${dialog.message()}`);
-  });
-
-  // Override alert/confirm/prompt at init to throw if called
-  await page.addInitScript(() => {
-    const fail = (name) => {
-      throw new Error(`Native ${name} called`);
-    };
-    try {
-      // eslint-disable-next-line no-alert
-      window.alert = new Proxy(window.alert, { apply: () => fail('alert') });
-      // eslint-disable-next-line no-alert
-      window.confirm = new Proxy(window.confirm, { apply: () => fail('confirm') });
-      // eslint-disable-next-line no-alert
-      window.prompt = new Proxy(window.prompt, { apply: () => fail('prompt') });
-    } catch {}
+test.describe('setup.guard', () => {
+  test('guard fixture active (meta)', async ({ page }) => {
+    // Navigate so init scripts apply on actual app document.
+    await page.goto('/');
+    const error = await page.evaluate(() => {
+      try {
+        // eslint-disable-next-line no-alert
+        alert('SHOULD_FAIL');
+        return 'no error';
+      } catch (e) {
+        return e && e.message ? e.message : String(e);
+      }
+    });
+    expect(error).toContain('Native alert called');
   });
 });

@@ -11,10 +11,14 @@ test.describe('Notification system', () => {
   test('shows info/success/warning/error toasts', async ({ page }) => {
     await page.evaluate(() => {
       const ns = window.NotificationSystem || window.Notifications;
-      ns.info('Info Title', 'Info message', 1000);
-      ns.success('Success Title', 'Success message', 1000);
-      ns.warning('Warning Title', 'Warning message', 1000);
-      ns.error('Error Title', 'Error message', 1000);
+      // Use longer durations so auto-dismiss does not race the expectation.
+      // The legacy NotificationSystem (notifications.js) auto-removes exactly at duration; under CI
+      // timing jitter the 1000ms originals could disappear before Playwright stabilizes the count.
+      const stableDuration = 4000; // 4s gives ample margin without slowing suite meaningfully.
+      ns.info('Info Title', 'Info message', stableDuration);
+      ns.success('Success Title', 'Success message', stableDuration);
+      ns.warning('Warning Title', 'Warning message', stableDuration);
+      ns.error('Error Title', 'Error message', stableDuration);
     });
 
     const items = page.locator('.notification');
@@ -71,10 +75,12 @@ test.describe('Notification system', () => {
   test('back-compat showX APIs are wired', async ({ page }) => {
     await page.evaluate(() => {
       const ns = window.NotificationSystem || window.Notifications;
-      ns.showInfo('Legacy Info', 'works', 500);
-      ns.showSuccess('Legacy Success', 'works', 500);
-      ns.showWarning('Legacy Warning', 'works', 500);
-      ns.showError('Legacy Error', 'works', 500);
+      // Stabilize durations to avoid flakiness (see earlier test rationale)
+      const stableDuration = 4000;
+      ns.showInfo('Legacy Info', 'works', stableDuration);
+      ns.showSuccess('Legacy Success', 'works', stableDuration);
+      ns.showWarning('Legacy Warning', 'works', stableDuration);
+      ns.showError('Legacy Error', 'works', stableDuration);
     });
     await expect(page.locator('.notification')).toHaveCount(4);
   });
