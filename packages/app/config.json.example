@@ -6,7 +6,8 @@
   },
   "backend": {
     "baseUrl": "",
-    "functionKey": ""
+    "functionKey": "",
+    "apiVersion": "" // Set to "v4" (or future version) to prefix all API calls with /api/v4. Leave blank for legacy unversioned paths.
   },
   "analysis": {
     "useServerSide": false,

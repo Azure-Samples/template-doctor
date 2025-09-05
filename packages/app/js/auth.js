@@ -294,9 +294,16 @@ class GitHubAuth {
     // Determine the correct API URL based on the environment
     const isLocalhost = window.location.hostname === 'localhost';
     // Use local Functions port in pure localhost dev, otherwise use SWA-managed /api proxy
-    const apiUrl = isLocalhost
-      ? 'http://localhost:7071/api/github-oauth-token'
-      : '/api/github-oauth-token';
+    let apiUrl;
+    if (isLocalhost) {
+      // Local dev: explicit Functions host (unversioned) for predictability
+      apiUrl = 'http://localhost:7071/api/github-oauth-token';
+    } else if (window.ApiRoutes) {
+      // Use versioned route builder in hosted / static environments
+      apiUrl = window.ApiRoutes.build('github-oauth-token');
+    } else {
+      apiUrl = '/api/github-oauth-token';
+    }
     debug('exchangeCodeForToken', `API URL: ${apiUrl}`);
 
     // Simple fetch with minimal options to reduce CORS complexity

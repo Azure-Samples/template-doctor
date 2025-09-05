@@ -200,7 +200,7 @@ function runAzdProvisionTest() {
   appendLog(logEl, `[debug] Using updated frontend code with enhanced debugging`);
   appendLog(logEl, `[debug] Template repo: ${templateRepo}, Template name: ${templateName}`);
   // Trigger GitHub workflow via the same endpoint used by Run Analysis
-  const validateUrl = joinUrl(apiBase, '/api/validation-template');
+  const validateUrl = window.ApiRoutes ? window.ApiRoutes.build('validation-template') : joinUrl(apiBase, '/api/validation-template');
   appendLog(logEl, `[info] Triggering validation workflow: ${validateUrl}`);
   console.log('[azd] validationUrl:', validateUrl);
   const templateUrlFull = window.reportData.repoUrl;
@@ -252,7 +252,7 @@ function runAzdProvisionTest() {
       }
 
       // Start a lightweight polling loop to surface status updates in the same log area
-      const statusUrlBase = joinUrl(apiBase, '/api/validation-status');
+  const statusUrlBase = window.ApiRoutes ? window.ApiRoutes.build('validation-status') : joinUrl(apiBase, '/api/validation-status');
       const stopBtn = document.getElementById('azd-stop-btn');
       // Wire up cancel button for workflow runs
       if (stopBtn) {
@@ -262,7 +262,7 @@ function runAzdProvisionTest() {
             stopBtn.disabled = true;
             const prev = stopBtn.textContent;
             stopBtn.textContent = 'Cancelling…';
-            const cancelUrl = joinUrl(apiBase, '/api/validation-cancel');
+            const cancelUrl = window.ApiRoutes ? window.ApiRoutes.build('validation-cancel') : joinUrl(apiBase, '/api/validation-cancel');
             const resp = await fetch(cancelUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },

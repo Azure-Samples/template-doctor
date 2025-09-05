@@ -92,8 +92,10 @@ async function submitAnalysisToGitHub(result, username) {
 
     // Post via server to avoid org OAuth restrictions (uses server GH_WORKFLOW_TOKEN)
     // cfg already defined above
-    const apiBase = cfg.apiBase || window.location.origin;
-    const serverUrl = `${apiBase.replace(/\/$/, '')}/api/submit-analysis-dispatch`;
+    const apiBase = cfg.apiBase || window.location.origin; // keep for debug fallback
+    const serverUrl = window.ApiRoutes
+      ? window.ApiRoutes.build('submit-analysis-dispatch')
+      : `${apiBase.replace(/\/$/, '')}/api/submit-analysis-dispatch`;
     debug('github-action-hook', `Submitting via server endpoint: ${serverUrl}`);
 
     // Build headers; include function key if provided by runtime config

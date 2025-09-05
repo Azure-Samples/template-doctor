@@ -134,7 +134,8 @@ async function runTemplateValidation(templateName, apiBase) {
 
   try {
     // Call the template validation API
-    const response = await fetch(`${apiBase}/api/validation-template`, {
+  const validationUrl = window.ApiRoutes ? window.ApiRoutes.build('validation-template') : `${apiBase}/api/validation-template`;
+  const response = await fetch(validationUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -274,7 +275,9 @@ async function pollValidationStatus(apiBase, correlationId) {
       validationProgress.style.width = `${progress}%`;
 
       // Construct the polling URL with GitHub run ID if available
-      let statusUrl = `${apiBase}/api/validation-status?runId=${correlationId}`;
+      let statusUrl = window.ApiRoutes
+        ? window.ApiRoutes.build('validation-status', { query: { runId: correlationId } })
+        : `${apiBase}/api/validation-status?runId=${correlationId}`;
 
       // Add query parameters for GitHub run ID if available
       if (githubRunInfo && githubRunInfo.githubRunId) {

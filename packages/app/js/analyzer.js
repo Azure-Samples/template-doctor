@@ -637,8 +637,10 @@ class TemplateAnalyzer {
       
       // Get the API endpoint
       const cfg = window.TemplateDoctorConfig || {};
-      const apiBase = cfg.apiBase || window.location.origin;
-      const endpoint = `${apiBase.replace(/\/$/, '')}/api/analyze-template`;
+      const apiBase = cfg.apiBase || window.location.origin; // retained for fallback logging
+      const endpoint = window.ApiRoutes
+        ? window.ApiRoutes.build('analyze-template')
+        : `${apiBase.replace(/\/$/, '')}/api/analyze-template`;
       
       // Build headers
       const headers = {

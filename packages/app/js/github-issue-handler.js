@@ -784,7 +784,7 @@ function runAzdProvisionTest() {
   }
   console.log('[azd] apiBase:', apiBase);
   // Kick off ACA Job via Function (public routes, now with /aca prefix)
-  const startUrl = joinUrl(apiBase, '/api/aca-start-job');
+  const startUrl = window.ApiRoutes ? window.ApiRoutes.build('aca-start-job') : joinUrl(apiBase, '/api/aca-start-job');
   appendLog(logEl, `[info] Calling start URL: ${startUrl}`);
   console.log('[azd] startUrl:', startUrl);
   appendLog(logEl, `[info] Requested template: ${templateRepo} (server will normalize)`);
@@ -815,8 +815,9 @@ function runAzdProvisionTest() {
         appendLog(logEl, `[info] Template used: ${json.templateUsed}`);
       }
       // Open SSE stream with polling fallback and Stop button support
-      const streamPath = `/api/aca-job-logs/${encodeURIComponent(executionName)}`;
-      const streamUrl = joinUrl(apiBase, streamPath);
+      const streamUrl = window.ApiRoutes
+        ? window.ApiRoutes.build(`aca-job-logs/${encodeURIComponent(executionName)}`)
+        : joinUrl(apiBase, `/api/aca-job-logs/${encodeURIComponent(executionName)}`);
       appendLog(logEl, `[info] Connecting logs stream: ${streamUrl}`);
       console.log('[azd] streamUrl:', streamUrl);
       const stopBtn = document.getElementById('azd-stop-btn');
@@ -953,7 +954,7 @@ function runAzdProvisionTest() {
           appendLog(logEl, '[info] Stopping…');
           // Best-effort: ask backend to stop the job execution
           try {
-            const stopUrl = joinUrl(apiBase, '/api/aca-stop-job');
+            const stopUrl = window.ApiRoutes ? window.ApiRoutes.build('aca-stop-job') : joinUrl(apiBase, '/api/aca-stop-job');
             fetch(stopUrl, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
