@@ -297,12 +297,12 @@ class GitHubAuth {
     let apiUrl;
     if (isLocalhost) {
       // Local dev: explicit Functions host (unversioned) for predictability
-      apiUrl = 'http://localhost:7071/api/github-oauth-token';
+  apiUrl = 'http://localhost:7071/api/v4/github-oauth-token';
     } else if (window.ApiRoutes) {
       // Use versioned route builder in hosted / static environments
       apiUrl = window.ApiRoutes.build('github-oauth-token');
     } else {
-      apiUrl = '/api/github-oauth-token';
+  apiUrl = '/api/v4/github-oauth-token';
     }
     debug('exchangeCodeForToken', `API URL: ${apiUrl}`);
 

@@ -668,7 +668,7 @@ class TemplateAnalyzer {
       const apiBase = cfg.apiBase || window.location.origin; // retained for fallback logging
       const endpoint = window.ApiRoutes
         ? window.ApiRoutes.build('analyze-template')
-        : `${apiBase.replace(/\/$/, '')}/api/analyze-template`;
+  : `${apiBase.replace(/\/$/, '')}/api/v4/analyze-template`;
       
       // Build headers
       const headers = {
