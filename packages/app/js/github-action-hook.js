@@ -95,7 +95,7 @@ async function submitAnalysisToGitHub(result, username) {
     const apiBase = cfg.apiBase || window.location.origin; // keep for debug fallback
     const serverUrl = window.ApiRoutes
       ? window.ApiRoutes.build('submit-analysis-dispatch')
-      : `${apiBase.replace(/\/$/, '')}/api/submit-analysis-dispatch`;
+      : `${apiBase.replace(/\/$/, '')}/api/v4/submit-analysis-dispatch`;
     debug('github-action-hook', `Submitting via server endpoint: ${serverUrl}`);
 
     // Build headers; include function key if provided by runtime config

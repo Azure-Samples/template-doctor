@@ -29,7 +29,7 @@ async function openRulesetModal(page, { archiveEnabledGlobal }) {
 
 async function submitWithIntercept(page) {
   const requests = [];
-  await page.route('**/api/submit-analysis-dispatch', async (route) => {
+  await page.route('**/api/v4/submit-analysis-dispatch', async (route) => {
     const req = route.request();
     const bodyText = req.postData() || '';
     let parsed = null;

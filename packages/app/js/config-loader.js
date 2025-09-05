@@ -30,16 +30,16 @@ async function loadEnvironmentVariables() {
     }
 
     // Use local Functions port in pure localhost dev, otherwise use SWA-managed /api proxy
+    const versionedPath = '/api/v4/client-settings';
     const configUrl = isLocalhost
-      ? `http://localhost:${localPort}/api/client-settings`
-      : '/api/client-settings';
-
-    console.log('Fetching environment config from:', configUrl);
+      ? `http://localhost:${localPort}${versionedPath}`
+      : versionedPath;
+    console.log('[config-loader] fetching environment config (v4 only):', configUrl);
 
     const response = await fetch(configUrl);
     if (!response.ok) {
-      console.warn('Unable to fetch environment config', response.status);
-      return {};
+      console.error('[config-loader] failed to fetch required v4 client-settings endpoint', response.status);
+      throw new Error('Failed to load client settings from v4 API');
     }
 
     const data = await response.json();
@@ -93,6 +93,12 @@ async function loadConfig() {
         envVars.backend.functionKey.trim().length > 0
       ) {
         mergedBackend.functionKey = envVars.backend.functionKey;
+      }
+      if (
+        typeof envVars.backend.apiVersion === 'string' &&
+        envVars.backend.apiVersion.trim().length > 0
+      ) {
+        mergedBackend.apiVersion = envVars.backend.apiVersion.trim();
       }
       config.backend = mergedBackend;
     }

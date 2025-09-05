@@ -1,4 +1,4 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 
 export async function validationCallbackHandler(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   if (request.method === 'OPTIONS') {
@@ -63,10 +63,4 @@ export async function validationCallbackHandler(request: HttpRequest, context: I
   }
 }
 
-// Register the function with Azure Functions
-app.http('validation-callback', {
-  methods: ['POST', 'OPTIONS'],
-  authLevel: 'anonymous',
-  route: 'api/v4/validation-callback',
-  handler: validationCallbackHandler
-});
+// registration moved to barrel index.ts

@@ -341,7 +341,7 @@ test.describe('Server-side analysis', () => {
     // Setup the config to use server-side analysis
     await page.evaluate(() => {
       window.TemplateDoctorConfig = {
-        preferServerSideAnalysis: true,
+        analysis: { useServerSide: true },
         apiBase: 'http://localhost:8080'
       };
     });
@@ -376,49 +376,13 @@ test.describe('Server-side analysis', () => {
     expect(sourceText).toContain('server-side');
   });
   
-  test('should fall back when failed', async ({ page }) => {
-    // Setup the config to use server-side analysis with fallback enabled
-    await page.evaluate(() => {
-      window.TemplateDoctorConfig = {
-        preferServerSideAnalysis: true,
-        apiBase: 'http://localhost:8080',
-        analysis: {
-          fallbackToClientSide: true
-        }
-      };
-    });
-    
-    // Setup the analyzer with server-side that fails
-    await mockTemplateAnalyzer(page, { serverSideEnabled: true, serverSideFails: true });
-      // Reinitialize services so the app uses the mocked analyzer
-      await page.evaluate(() => {
-        if (typeof window.tryReinitializeServices === 'function') {
-          window.tryReinitializeServices();
-        }
-      });
-    
-    // Trigger an analysis
-    await page.evaluate(() => {
-      window.analyzeRepo('https://github.com/test-owner/test-repo', 'dod');
-    });
-    
-    // Wait for the analysis to complete
-    await page.waitForSelector('.dashboard-container');
-    
-    // Check that client-side was used as fallback
-    const analyzerSource = await page.evaluate(() => window.lastRenderedData.analyzerSource);
-    expect(analyzerSource).toBe('client-side');
-    
-    // Verify the source is displayed correctly
-    const sourceText = await page.textContent('.analysis-source');
-    expect(sourceText).toContain('client-side');
-  });
+  // Removed fallback test: fallback path no longer supported.
   
   test('should use client-side when disabled', async ({ page }) => {
     // Setup the config to NOT use server-side analysis
     await page.evaluate(() => {
       window.TemplateDoctorConfig = {
-        preferServerSideAnalysis: false
+        analysis: { useServerSide: false }
       };
     });
     

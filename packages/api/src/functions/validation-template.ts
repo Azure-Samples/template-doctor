@@ -1,4 +1,4 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import crypto from 'crypto';
 
 export async function validationTemplateHandler(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
@@ -84,10 +84,4 @@ export async function validationTemplateHandler(request: HttpRequest, context: I
   }
 }
 
-// Register the function with Azure Functions
-app.http('validation-template', {
-  methods: ['POST', 'OPTIONS'],
-  authLevel: 'anonymous',
-  route: 'api/v4/validation-template',
-  handler: validationTemplateHandler
-});
+// registration moved to barrel index.ts

@@ -68,6 +68,9 @@
               <i class="fas fa-sign-out-alt"></i>
             </button>
           </div>
+          <div id="analysis-mode-indicator" style="display:none; margin-left:12px; font-size:12px; padding:4px 8px; border-radius:4px; background:#eee; color:#333; font-weight:500;">
+            Mode: <span id="analysis-mode-text">loading…</span>
+          </div>
         </div>
       </div>
     </header>
@@ -320,5 +323,38 @@
     <!-- Fallback scripts to ensure action buttons are visible -->
     <script src="js/action-buttons-fallback.js"></script>
     <script src="js/action-buttons-direct.js"></script>
+    <script>
+      (function(){
+        const el = document.getElementById('analysis-mode-indicator');
+        const text = document.getElementById('analysis-mode-text');
+        function refresh(){
+          if(!window.TemplateDoctorConfig){ return; }
+          const cfg = window.TemplateDoctorConfig;
+          const rt = window.TemplateDoctorRuntime || {};
+          const serverPref = cfg.analysis?.useServerSide === true;
+          const version = cfg.apiVersion || (cfg.backend && cfg.backend.apiVersion) || 'legacy';
+          let modeLabel;
+          switch(rt.lastMode){
+            case 'server': modeLabel = 'Server'; break;
+            case 'server-failed': modeLabel = 'Server Failed'; break;
+            case 'client': modeLabel = 'Client'; break;
+            default: modeLabel = serverPref ? 'Server?' : 'Client?';
+          }
+          text.textContent = modeLabel + ' | v:' + version;
+          el.style.display = 'inline-block';
+          // Color coding
+          if(rt.lastMode === 'server') { el.style.background = '#e0f7e9'; el.style.color = '#0a5d2a'; }
+          else if(rt.lastMode === 'server-failed') { el.style.background = '#fdecea'; el.style.color = '#b71c1c'; }
+          else if(rt.fallbackUsed) { /* fallback removed; retain branch for legacy runtime objects but no style change */ }
+          else { el.style.background = '#e7e9f2'; el.style.color = '#2c3e50'; }
+          el.title = 'ServerPref=' + serverPref + ' apiBase=' + cfg.apiBase;
+        }
+        document.addEventListener('template-config-loaded', refresh);
+        document.addEventListener('analysis-mode-changed', refresh);
+        // periodic refresh in case events missed
+        setInterval(refresh, 5000);
+        window.addEventListener('load', ()=> setTimeout(refresh,600));
+      })();
+    </script>
   </body>
 </html>

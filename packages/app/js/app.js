@@ -2449,7 +2449,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const cfg = window.TemplateDoctorConfig || {};
     // Check for server-side analysis preference in config - now handled by the analyzer
     // We still need this for backward compatibility with older code paths
-    const useServerSide = cfg.analysis?.preferServerSide === true || cfg.preferServerSideAnalysis === true;
+  const useServerSide = cfg.analysis?.useServerSide === true;
 
     // Check if the repository belongs to one of the configured organizations
     // and offer to use the user's fork instead
@@ -2601,21 +2601,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (apiError) {
           debug('app', `Server-side analysis failed: ${apiError.message}`, apiError);
           
-          // Check if we should fall back to client-side analysis
-          if (cfg.analysis?.fallbackToClientSide === true) {
-            debug('app', 'Falling back to client-side analysis');
-            if (window.NotificationSystem) {
-              window.NotificationSystem.showWarning(
-                'Server Analysis Failed',
-                'Falling back to client-side analysis...',
-                3000,
-              );
-            }
-            result = await appAnalyzer.analyzeTemplate(repoUrl, ruleSet);
-          } else {
-            // Re-throw error if no fallback
-            throw apiError;
-          }
+          // Strict mode: no client-side fallback when server preferred
+          throw apiError;
         }
       } else {
         // Use client-side analyzer

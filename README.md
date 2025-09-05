@@ -45,7 +45,8 @@ Make sure to create an .env file at the root, with [./.env.example](./.env.examp
 
 - packages/app — Static web app (frontend UI)
 	- Serves the dashboard and loads scan results from `packages/app/results/`
-- packages/api — Azure Functions (PR creation, OAuth helpers, AZD validation)
+- packages/api — Azure Functions v4 (TypeScript, programmatic registration, all active endpoints under `api/v4/*`)
+- packages/api-legacy — (DEPRECATED / pending removal) legacy Azure Functions v3 folder retained temporarily; do not modify
 - docs — Documentation for GitHub Action/App and usage
 
 Results live under `packages/app/results/`:
@@ -69,8 +70,8 @@ This repo uses npm workspaces.
 	- `npm test`
 	- `npm run test:ui`
 	- `npm run test:debug`
-- Start API locally:
-	- `npm run -w packages/api start`
+- Start v4 API locally:
+  - `npm run -w packages/api start`
 
 > [!IMPORTANT]
 > For now the frontend is just JavaScript. To start it
@@ -133,8 +134,8 @@ npm ci
 
 3) Run services:
    
-- Start API locally:
-	- `npm run -w packages/api start`
+- Start v4 API locally:
+  - `npm run -w packages/api start`
 
 > [!IMPORTANT]
 > For now the frontend is just JavaScript. To start it

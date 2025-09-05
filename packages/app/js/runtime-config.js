@@ -7,6 +7,8 @@
     // Keep a working default for now; override via config.json in production
     // Prefer same-origin by default; override via config.json in production
     apiBase: `${window.location.origin}`,
+    // Enforce versioned API calls (migration to /api/v4/*)
+    apiVersion: 'v4',
     defaultRuleSet: 'dod',
     requireAuthForResults: true,
     autoSaveResults: false,
@@ -18,6 +20,7 @@
 
   // Initialize with defaults so consumers have something synchronously
   window.TemplateDoctorConfig = Object.assign({}, DEFAULTS);
+  window.TemplateDoctorRuntime = { lastMode: 'unknown', fallbackUsed: false };
 
   // Use the ConfigLoader if available, otherwise fallback to direct fetch
   const loadConfig = async () => {
@@ -62,7 +65,12 @@
           mapped.autoSaveResults = /^(1|true|yes|on)$/i.test(v2);
         }
 
+        // Map apiVersion if nested under backend
+        if (!mapped.apiVersion && mapped.backend && mapped.backend.apiVersion) {
+          mapped.apiVersion = mapped.backend.apiVersion;
+        }
         window.TemplateDoctorConfig = Object.assign({}, DEFAULTS, mapped);
+        document.dispatchEvent(new CustomEvent('template-config-loaded'));
         return;
       }
 
@@ -97,7 +105,11 @@
           if (typeof cfg.dispatchTargetRepo === 'string') {
             mapped.dispatchTargetRepo = cfg.dispatchTargetRepo;
           }
-          window.TemplateDoctorConfig = Object.assign({}, DEFAULTS, mapped);
+          if (!mapped.apiVersion && mapped.backend && mapped.backend.apiVersion) {
+            mapped.apiVersion = mapped.backend.apiVersion;
+          }
+            window.TemplateDoctorConfig = Object.assign({}, DEFAULTS, mapped);
+            document.dispatchEvent(new CustomEvent('template-config-loaded'));
           console.log('[runtime-config] loaded config.json');
         } else {
           console.log('[runtime-config] no config.json found, using defaults');

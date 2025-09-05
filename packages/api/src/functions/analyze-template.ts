@@ -1,14 +1,13 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { Octokit } from '@octokit/rest';
 
-// Import analyzer from local package
+// Import analyzer from built dist output of local package
 const getRunAnalyzer = async () => {
   try {
-    // Use a relative path import to the analyzer-core source files directly
-    const mod = await import('../../../analyzer-core/src/run-analyzer.js');
-    return mod.runAnalyzer;
+    const mod = await import('../../../analyzer-core/dist/run-analyzer.js');
+    return (mod as any).runAnalyzer;
   } catch (error) {
-    console.error('Error importing analyzer-core:', error);
+    console.error('Error importing analyzer-core dist:', error);
     throw error;
   }
 };
@@ -126,10 +125,4 @@ async function getFileContent(octokit: Octokit, owner: string, repo: string, pat
   throw new Error('Unable to get content for ' + path); 
 }
 
-// Register the function with Azure Functions
-app.http('analyze-template', {
-  methods: ['POST', 'OPTIONS'],
-  authLevel: 'anonymous',
-  route: 'api/v4/analyze-template',
-  handler: analyzeTemplateHandler
-});
+// registration moved to barrel index.ts

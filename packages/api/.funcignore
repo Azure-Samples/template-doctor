@@ -1,0 +1,8 @@
+# NOTE: We intentionally do NOT exclude node_modules or dist here because
+# the v4 programmatic model (TypeScript) builds into dist and the host
+# needs those artifacts. Leaving these lines empty keeps defaults minimal.
+# Add any large local-only test artifacts below if needed.
+
+*.log
+playwright-report
+coverage

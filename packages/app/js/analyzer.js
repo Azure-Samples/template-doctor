@@ -290,11 +290,39 @@ class TemplateAnalyzer {
     
     // Check if server-side analysis is preferred
     const cfg = window.TemplateDoctorConfig || {};
-    const preferServerSide = cfg.preferServerSideAnalysis === true;
-    
+    // Support both legacy flag (preferServerSideAnalysis) and new nested config.analysis.useServerSide
+    const preferServerSide =
+      cfg.preferServerSideAnalysis === true || cfg.analysis?.useServerSide === true;
+    // Fallback disabled permanently post v4 migration
+    const allowFallback = false;
+
     if (preferServerSide) {
-      return this.analyzeTemplateServerSide(repoUrl, ruleSet);
+      try {
+        const result = await this.analyzeTemplateServerSide(repoUrl, ruleSet);
+        window.TemplateDoctorRuntime = Object.assign({}, window.TemplateDoctorRuntime, {
+          lastMode: 'server',
+          lastServerAttemptFailed: false,
+          fallbackUsed: false,
+        });
+        document.dispatchEvent(new CustomEvent('analysis-mode-changed'));
+        return result;
+      } catch (err) {
+        console.error('[analyzer] Server-side analysis failed', err);
+        window.TemplateDoctorRuntime = Object.assign({}, window.TemplateDoctorRuntime, {
+          lastMode: 'server-failed',
+          lastServerAttemptFailed: true,
+        });
+        document.dispatchEvent(new CustomEvent('analysis-mode-changed'));
+        // Fallback removed: propagate error
+        throw err instanceof Error ? err : new Error(String(err));
+      }
     }
+    // If we reach here we are doing client-side only because server not preferred; no fallback semantics
+    window.TemplateDoctorRuntime = Object.assign({}, window.TemplateDoctorRuntime, {
+      lastMode: 'client',
+      fallbackUsed: false,
+    });
+    document.dispatchEvent(new CustomEvent('analysis-mode-changed'));
     
     // Get the appropriate configuration based on the rule set
     const config = this.getConfig(ruleSet);

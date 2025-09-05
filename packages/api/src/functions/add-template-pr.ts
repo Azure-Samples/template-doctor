@@ -1,4 +1,4 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { Octokit } from '@octokit/rest';
 import { randomUUID } from 'crypto';
 
@@ -216,10 +216,4 @@ ${JSON.stringify(analysis, null, 2)}`,
   }
 }
 
-// Register the function with Azure Functions
-app.http('add-template-pr', {
-  methods: ['POST', 'OPTIONS'],
-  authLevel: 'anonymous',
-  route: 'api/v4/add-template-pr',
-  handler: addTemplatePrHandler
-});
+// registration moved to barrel index.ts

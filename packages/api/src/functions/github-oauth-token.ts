@@ -1,4 +1,4 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 
 export async function githubOauthTokenHandler(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
     context.log('GitHub OAuth token exchange function triggered');
@@ -91,10 +91,4 @@ export async function githubOauthTokenHandler(request: HttpRequest, context: Inv
     }
 }
 
-// Register the function with Azure Functions
-app.http('github-oauth-token', {
-    methods: ['GET', 'POST', 'OPTIONS'],
-    authLevel: 'anonymous',
-    route: 'api/v4/github-oauth-token',
-    handler: githubOauthTokenHandler
-});
+// registration moved to barrel index.ts

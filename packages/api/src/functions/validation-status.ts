@@ -1,4 +1,4 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { Octokit } from '@octokit/rest';
 
 export async function validationStatusHandler(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
@@ -276,10 +276,4 @@ export async function validationStatusHandler(request: HttpRequest, context: Inv
   }
 }
 
-// Register the function with Azure Functions
-app.http('validation-status', {
-  methods: ['GET', 'OPTIONS'],
-  authLevel: 'anonymous',
-  route: 'api/v4/validation-status',
-  handler: validationStatusHandler
-});
+// registration moved to barrel index.ts

@@ -5,7 +5,8 @@
   },
   "backend": {
     "baseUrl": "http://localhost:7071",
-    "functionKey": ""
+    "functionKey": "",
+    "apiVersion": "v4"
   },
   "defaultRuleSet": "dod",
   "requireAuthForResults": true,
@@ -13,8 +14,7 @@
   "archiveEnabled": false,
   "archiveCollection": "aigallery",
   "analysis": {
-    "useServerSide": false,
-    "fallbackToClientSide": true,
+    "useServerSide": true,
     "serverSideDispatch": false
   }
 }

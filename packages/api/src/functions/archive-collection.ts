@@ -1,4 +1,4 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 
 interface ArchiveRequest {
   collection: string;
@@ -143,10 +143,4 @@ export async function archiveCollectionHandler(request: HttpRequest, context: In
   }
 }
 
-// Register the function with Azure Functions
-app.http('archive-collection', {
-  methods: ['POST', 'OPTIONS'],
-  authLevel: 'anonymous',
-  route: 'api/v4/archive-collection',
-  handler: archiveCollectionHandler
-});
+// registration moved to barrel index.ts

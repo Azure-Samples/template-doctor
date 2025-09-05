@@ -1,4 +1,4 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 
 interface DispatchRequest {
   event_type: string;
@@ -92,10 +92,4 @@ export async function submitAnalysisDispatchHandler(request: HttpRequest, contex
   }
 }
 
-// Register the function with Azure Functions
-app.http('submit-analysis-dispatch', {
-  methods: ['POST', 'OPTIONS'],
-  authLevel: 'anonymous',
-  route: 'api/v4/submit-analysis-dispatch',
-  handler: submitAnalysisDispatchHandler
-});
+// registration moved to barrel index.ts

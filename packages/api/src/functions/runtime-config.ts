@@ -1,4 +1,4 @@
-import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 
 export async function runtimeConfigHandler(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   // CORS headers
@@ -40,7 +40,8 @@ export async function runtimeConfigHandler(request: HttpRequest, context: Invoca
         baseUrl: baseUrl,
         // WARNING: This exposes a function key to the client. Ensure you accept
         // this tradeoff or prefer a server-side proxy to avoid secrets in the browser.
-        functionKey: functionKey || ''
+        functionKey: functionKey || '',
+        apiVersion: 'v4'
       },
       DISPATCH_TARGET_REPO: dispatchTargetRepo,
       DEFAULT_RULE_SET: defaultRuleSet,
@@ -51,11 +52,3 @@ export async function runtimeConfigHandler(request: HttpRequest, context: Invoca
     }
   };
 }
-
-// Register the function with Azure Functions
-app.http('runtime-config', {
-  methods: ['GET', 'OPTIONS'],
-  authLevel: 'anonymous',
-  route: 'api/v4/client-settings',
-  handler: runtimeConfigHandler
-});

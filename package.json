@@ -12,9 +12,15 @@
     },
     "scripts": {
         "setup:uami": "bash ./scripts/setup.sh",
-        "test": "npm run -w packages/app test",
+        "dev:api": "npm -w packages/api start",
+        "dev:frontend": "npm -w packages/app start",
+        "test": "npm run test:frontend",
+        "test:frontend": "npm run -w packages/app test",
+        "test:api": "npm run -w packages/api test",
+        "test:all": "npm run test:api && npm run test:frontend",
         "test:ui": "npm run -w packages/app test:ui",
-        "test:debug": "npm run -w packages/app test:debug"
+        "test:debug": "npm run -w packages/app test:debug",
+        "smoke:api": "node scripts/smoke-api.mjs"
     },
     "keywords": [
         "azd",

@@ -1,20 +1,30 @@
 {
   "name": "template-doctor-api",
-  "version": "1.0.0",
-  "description": "API functions for Template Doctor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Azure Functions v4 TypeScript migration of existing API",
+  "main": "index.js",
   "scripts": {
+    "build": "tsc -p .",
+    "prestart": "npm run build",
     "start": "func start",
-    "test": "echo \"No tests yet\""
+    "build:watch": "tsc -p . -w",
+    "start:watch": "func start --typescript",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@azure/functions": "^3.5.0",
-    "@octokit/rest": "^22.0.0",
-    "@azure/identity": "^4.0.0",
-    "@azure/arm-appcontainers": "^2.2.0",
-    "@azure/monitor-query": "^1.2.0",
-    "uuid": "^9.0.0"
+    "@azure/functions": "4.5.0",
+    "@octokit/rest": "^19.0.0"
   },
-  "engines": {
-    "node": ">=16"
+  "devDependencies": {
+    "@types/node": "^20.14.9",
+    "@vitest/ui": "^3.2.4",
+    "msw": "^2.11.1",
+    "typescript": "^5.6.2",
+    "vitest": "^3.2.4"
   }
 }
