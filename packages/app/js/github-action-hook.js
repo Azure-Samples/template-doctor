@@ -14,8 +14,17 @@ async function submitAnalysisToGitHub(result, username) {
   }
 
   try {
+    // Helper function for debug logging
+    const debug = (tag, message, data) => {
+      if (window.debug) {
+        window.debug(tag, message, data);
+      } else {
+        console.log(`[${tag}] ${message}`, data || '');
+      }
+    };
+
     // Log analysis data for debugging
-    console.log('Analysis data being submitted:', {
+    debug('github-action-hook', 'Analysis data being submitted:', {
       repoUrl: result.repoUrl,
       ruleSet: result.ruleSet,
       username,
@@ -70,11 +79,22 @@ async function submitAnalysisToGitHub(result, username) {
       },
     };
 
+    // Check if server-side API should be used directly for issue creation
+    // This is for future direct issue creation which could be handled by the server
+    const useServerSide = cfg.analysis?.useServerSide === true && 
+                          cfg.analysis?.serverSideDispatch === true;
+    
+    if (useServerSide) {
+      debug('github-action-hook', 'Using server-side dispatch API');
+      // Future implementation would call a different endpoint for direct issue creation
+      // For now, we'll still use the submit-analysis-dispatch API
+    }
+
     // Post via server to avoid org OAuth restrictions (uses server GH_WORKFLOW_TOKEN)
     // cfg already defined above
     const apiBase = cfg.apiBase || window.location.origin;
     const serverUrl = `${apiBase.replace(/\/$/, '')}/api/submit-analysis-dispatch`;
-    console.log(`Submitting via server endpoint: ${serverUrl}`);
+    debug('github-action-hook', `Submitting via server endpoint: ${serverUrl}`);
 
     // Build headers; include function key if provided by runtime config
     const headers = {
@@ -83,19 +103,29 @@ async function submitAnalysisToGitHub(result, username) {
     if (cfg.functionKey) {
       headers['x-functions-key'] = cfg.functionKey;
     }
+    
+    // Add authorization if available (for potential server-side issue creation)
+    if (window.GitHubClient && window.GitHubClient.auth && window.GitHubClient.auth.isAuthenticated()) {
+      const token = window.GitHubClient.auth.getToken();
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+    }
 
     // Make the API request to our server function
-    console.log('Sending repository_dispatch event via server...');
+    debug('github-action-hook', 'Sending repository_dispatch event via server...');
     const response = await fetch(serverUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify({
         event_type: 'template-analysis-completed',
         client_payload: payload,
+        // Flag for server to know if it should create issues directly when supported
+        useDirectIssueCreation: useServerSide
       }),
     });
 
-    console.log('Server dispatch response status:', response.status);
+    debug('github-action-hook', `Server dispatch response status: ${response.status}`);
 
     if (!response.ok) {
       const errorData = await response.text();

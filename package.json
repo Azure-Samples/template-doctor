@@ -24,11 +24,11 @@
     "author": "",
     "license": "MIT",
     "devDependencies": {
-        "@playwright/test": "^1.54.1",
+        "@playwright/test": "^1.55.0",
         "@types/node": "^24.0.14"
     },
     "dependencies": {
-    "@actions/core": "^1.11.1",
+        "@actions/core": "^1.11.1",
         "dotenv": "^17.2.0",
         "open": "^10.2.0"
     }

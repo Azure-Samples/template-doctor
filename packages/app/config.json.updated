@@ -9,8 +9,7 @@
     "functionKey": ""
   },
   "analysis": {
-    "useServerSide": false,
-    "fallbackToClientSide": true,
-    "serverSideDispatch": false
+    "preferServerSide": false,
+    "fallbackToClientSide": true
   }
 }

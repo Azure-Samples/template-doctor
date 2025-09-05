@@ -21,6 +21,15 @@ class TemplateAnalyzer {
 
     // Load rule set configurations
     this.loadRuleSetConfigs();
+    
+    // Add a debug method for consistent logging
+    this.debug = (tag, message, data) => {
+      if (window.debug) {
+        window.debug(tag, message, data);
+      } else {
+        console.log(`[${tag}] ${message}`, data || '');
+      }
+    };
   }
 
   /**
@@ -278,6 +287,15 @@ class TemplateAnalyzer {
         ruleSet = cfg.defaultRuleSet;
       }
     }
+    
+    // Check if server-side analysis is preferred
+    const cfg = window.TemplateDoctorConfig || {};
+    const preferServerSide = cfg.preferServerSideAnalysis === true;
+    
+    if (preferServerSide) {
+      return this.analyzeTemplateServerSide(repoUrl, ruleSet);
+    }
+    
     // Get the appropriate configuration based on the rule set
     const config = this.getConfig(ruleSet);
     const repoInfo = this.extractRepoInfo(repoUrl);
@@ -296,7 +314,7 @@ class TemplateAnalyzer {
     }
 
     // UI feedback - this is usually handled by the caller
-    console.log(`Analyzing repository ${repoInfo.fullName} with rule set: ${ruleSet}`);
+    this.debug('analyzer', `Analyzing repository ${repoInfo.fullName} with rule set: ${ruleSet}`);
 
     try {
       // Get default branch
@@ -584,6 +602,86 @@ class TemplateAnalyzer {
     } catch (error) {
       console.error('Error analyzing template:', error);
       throw new Error(`Failed to analyze repository: ${error.message}`);
+    }
+  }
+
+  /**
+   * Analyze a GitHub repository using the server-side API
+   * @param {string} repoUrl - The GitHub repository URL
+   * @param {string} ruleSet - The rule set to use: "dod", "partner", "docs", or "custom"
+   * @returns {Promise<Object>} - The analysis result
+   */
+  async analyzeTemplateServerSide(repoUrl, ruleSet) {
+    this.debug('analyzer', `Using server-side analysis for ${repoUrl} with ruleset: ${ruleSet}`);
+    
+    try {
+      // Get custom configuration if needed
+      let customConfig = null;
+      if (ruleSet === 'custom') {
+        try {
+          const savedConfig = localStorage.getItem('td_custom_ruleset');
+          if (savedConfig) {
+            customConfig = JSON.parse(savedConfig);
+          }
+        } catch (e) {
+          console.error('Error loading custom configuration:', e);
+        }
+      }
+      
+      // Create the request payload
+      const payload = {
+        repoUrl,
+        ruleSet,
+        ...(customConfig ? { customConfig } : {})
+      };
+      
+      // Get the API endpoint
+      const cfg = window.TemplateDoctorConfig || {};
+      const apiBase = cfg.apiBase || window.location.origin;
+      const endpoint = `${apiBase.replace(/\/$/, '')}/api/analyze-template`;
+      
+      // Build headers
+      const headers = {
+        'Content-Type': 'application/json',
+      };
+      
+      // Add function key if available
+      if (cfg.functionKey) {
+        headers['x-functions-key'] = cfg.functionKey;
+      }
+      
+      // Add authorization if available
+      if (window.GitHubClient && window.GitHubClient.auth && window.GitHubClient.auth.isAuthenticated()) {
+        const token = window.GitHubClient.auth.getToken();
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+      }
+      
+      // Make the API request
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Server-side analysis failed: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+      
+      // Parse the result
+      const result = await response.json();
+      
+      // Add timestamp if not provided
+      if (!result.timestamp) {
+        result.timestamp = new Date().toISOString();
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('Error in server-side analysis:', error);
+      throw new Error(`Server-side analysis failed: ${error.message}`);
     }
   }
 

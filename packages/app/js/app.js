@@ -2424,6 +2424,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ruleSet = cfg.defaultRuleSet;
       }
     }
+    
     // First verify we have necessary modules initialized
     if (!appAnalyzer || !appDashboard) {
       debug('app', 'Required services not available, attempting to reinitialize');
@@ -2443,6 +2444,12 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
     }
+    
+    // Determine whether to use server-side or client-side analysis
+    const cfg = window.TemplateDoctorConfig || {};
+    // Check for server-side analysis preference in config - now handled by the analyzer
+    // We still need this for backward compatibility with older code paths
+    const useServerSide = cfg.analysis?.preferServerSide === true || cfg.preferServerSideAnalysis === true;
 
     // Check if the repository belongs to one of the configured organizations
     // and offer to use the user's fork instead
@@ -2566,7 +2573,55 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       debug('app', `Starting analysis of repo: ${repoUrl} with ruleset: ${ruleSet}`);
-      const result = await appAnalyzer.analyzeTemplate(repoUrl, ruleSet);
+      let result;
+      
+      // Determine whether to use server-side or client-side analysis
+      if (useServerSide) {
+        try {
+          debug('app', `Using server-side analysis for ${repoUrl}`);
+          
+          // Use the analyzer's server-side implementation which handles all the API logic
+          result = await appAnalyzer.analyzeTemplate(repoUrl, ruleSet);
+          
+          // Add custom configuration details if applicable
+          if (ruleSet === 'custom' && customConfig) {
+            result.customConfig = {
+              gistUrl: customConfig.gistUrl || null,
+            };
+          }
+          
+          // Validate minimal result structure
+          if (!result.repoUrl) result.repoUrl = repoUrl;
+          if (!result.ruleSet) result.ruleSet = ruleSet;
+          if (!result.compliance) {
+            throw new Error('Invalid analysis result: missing compliance data');
+          }
+          
+          debug('app', 'Server-side analysis complete');
+        } catch (apiError) {
+          debug('app', `Server-side analysis failed: ${apiError.message}`, apiError);
+          
+          // Check if we should fall back to client-side analysis
+          if (cfg.analysis?.fallbackToClientSide === true) {
+            debug('app', 'Falling back to client-side analysis');
+            if (window.NotificationSystem) {
+              window.NotificationSystem.showWarning(
+                'Server Analysis Failed',
+                'Falling back to client-side analysis...',
+                3000,
+              );
+            }
+            result = await appAnalyzer.analyzeTemplate(repoUrl, ruleSet);
+          } else {
+            // Re-throw error if no fallback
+            throw apiError;
+          }
+        }
+      } else {
+        // Use client-side analyzer
+        debug('app', `Using client-side analysis for ${repoUrl}`);
+        result = await appAnalyzer.analyzeTemplate(repoUrl, ruleSet);
+      }
 
       loadingContainer.style.display = 'none';
       resultsContainer.style.display = 'block';

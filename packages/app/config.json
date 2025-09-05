@@ -11,5 +11,10 @@
   "requireAuthForResults": true,
   "autoSaveResults": false,
   "archiveEnabled": false,
-  "archiveCollection": "aigallery"
+  "archiveCollection": "aigallery",
+  "analysis": {
+    "useServerSide": false,
+    "fallbackToClientSide": true,
+    "serverSideDispatch": false
+  }
 }
