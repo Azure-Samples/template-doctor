@@ -316,7 +316,7 @@ class TemplateAnalyzer {
       // Run repository-level configuration validations early (docs-config rules)
       // Only run docs-specific repo validations when the docs ruleset is selected
       if (ruleSet === 'docs') {
-        TemplateAnalyzerDocs.prototype.validateRepoConfiguration(
+        TemplateAnalyzerDocs.prototype.validateDocConfiguration(
           config,
           repoInfo,
           defaultBranch,

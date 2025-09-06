@@ -68,7 +68,7 @@ class TemplateAnalyzerDocs {
    * @param {Array} issues
    * @param {Array} compliant
    */
-  validateRepoConfiguration(config, repoInfo, defaultBranch, files, issues, compliant) {
+  validateDocConfiguration(config, repoInfo, defaultBranch, files, issues, compliant) {
     try {
       // Run the existing default branch rule (docs-config defaultBranch.mustBe)
       this.evaluateDefaultBranchRule(config, repoInfo, defaultBranch, issues, compliant);
