@@ -4,8 +4,6 @@
  * This allows persistence across function restarts without a separate DB.
  */
 
-const fetch = require('node-fetch');
-
 const OWNER = process.env.GITHUB_REPO_OWNER || 'Template-Doctor';
 const REPO = process.env.GITHUB_REPO_NAME || 'template-doctor';
 const BRANCH = process.env.GITHUB_REPO_BRANCH || 'main';
