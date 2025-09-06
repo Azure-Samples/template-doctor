@@ -12,6 +12,8 @@ import { validationStatusHandler } from './functions/validation-status.js';
 import { validationCancelHandler } from './functions/validation-cancel.js';
 import { addTemplatePrHandler } from './functions/add-template-pr.js';
 import { pingHandler } from './functions/ping.js';
+import { issueCreateHandler } from './functions/issue-create.js';
+import { repoForkHandler } from './functions/repo-fork.js';
 
 // Centralized registrations
 // DEBUG MODE: All registrations commented out to isolate syntax/registration issues.
@@ -93,4 +95,18 @@ app.http('ping', {
 	authLevel: 'anonymous',
 	route: 'v4/ping',
 	handler: pingHandler
+});
+// 12. issue-create (added after existing stable endpoints)
+app.http('issue-create', {
+  methods: ['POST', 'OPTIONS'],
+  authLevel: 'anonymous',
+  route: 'v4/issue-create',
+  handler: issueCreateHandler
+});
+// 13. repo-fork
+app.http('repo-fork', {
+	methods: ['POST', 'OPTIONS'],
+	authLevel: 'anonymous',
+	route: 'v4/repo-fork',
+	handler: repoForkHandler
 });
