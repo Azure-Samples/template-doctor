@@ -158,7 +158,7 @@ async function getOSSFScore(context, workflowToken, workflowUrl, workflowFile, t
 
 
     } catch (err) {
-        context.error('Error fetching Scorecard:', err);
+        context.log('Error fetching Scorecard:', err);
         addIssue(issues, 'ossf-score-error', 'warning', 'Failed to fetch OSSF Scorecard', 
                 { error: err instanceof Error ? err.message : String(err) });
     }
@@ -196,6 +196,8 @@ class ScorecardClient {
             signal: AbortSignal.timeout(options.timeout || fetchTimeout)
         };
 
+        this.context.log(`Fetching URL: ${url} with options: ${JSON.stringify(requestOptions)}`);
+        
         return fetch(url, requestOptions);
     }
 

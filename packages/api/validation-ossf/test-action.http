@@ -1,0 +1,13 @@
+POST https://api.github.com/repos/diberry/actions/actions/workflows/ossf.yml/dispatches
+Authorization: Bearer ghp_
+Accept: application/vnd.github+json
+X-GitHub-Api-Version: 2022-11-28
+Content-Type: application/json
+
+{
+    "ref": "main",
+    "inputs": {
+        "repo": "microsoft/mcp",
+        "id": "2a3441fd-f6a2-48f9-bf69-858eb53216b9"
+    }
+}

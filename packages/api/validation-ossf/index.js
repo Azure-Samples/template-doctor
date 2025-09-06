@@ -2,6 +2,10 @@ const crypto = require('crypto');
 const { getOSSFScore } = require('./scorecard');
 
 module.exports = async function (context, req) {
+  // Replace context.log with console.log in development mode
+  if (process.env.NODE_ENV === "development") {
+    context.log = console.log;
+  }
   if (req.method === 'OPTIONS') {
     context.res = {
       status: 204,
@@ -74,7 +78,11 @@ module.exports = async function (context, req) {
       }
     };
   } catch (err) {
-    context.log.error("validate-template error:", err);
+    if (process.env.NODE_ENV === "development") {
+      console.error("validate-template error:", err);
+    } else {
+      context.log.error("validate-template error:", err);
+    }
     const isGitHubError = err.message && err.message.includes('GitHub dispatch failed');
     context.res = {
       status: isGitHubError ? 502 : 500,
