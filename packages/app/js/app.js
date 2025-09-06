@@ -2410,7 +2410,18 @@ document.addEventListener('DOMContentLoaded', () => {
               } else {
                 // Create a new fork
                 console.log(`[App] Attempting to create a new fork of ${owner}/${repo}`);
-                const forkResult = await window.forkRepositoryUnified(owner, repo);
+                let forkResult;
+                try {
+                  if (window.TemplateDoctorApiClient) {
+                    forkResult = await window.TemplateDoctorApiClient.forkRepository({ sourceOwner: owner, sourceRepo: repo });
+                  } else if (window.GitHubClient && typeof window.GitHubClient.forkRepository === 'function') {
+                    forkResult = await window.GitHubClient.forkRepository(owner, repo);
+                  } else {
+                    throw new Error('Fork client unavailable');
+                  }
+                } catch(forkErr){
+                  throw forkErr;
+                }
 
                 if (!forkResult || !forkResult.html_url) {
                   throw new Error('Failed to create fork - no URL returned');
@@ -2691,13 +2702,4 @@ document.addEventListener('template-analyzer-ready', () => {
   }
 });
 
-// Minimal delegator for tests; prefers ApiClient logic (which shows SAML notification itself)
-window.forkRepositoryUnified = async function(owner, repo){
-  if(window.TemplateDoctorApiClient){
-    return window.TemplateDoctorApiClient.forkRepository({ sourceOwner: owner, sourceRepo: repo });
-  }
-  if(window.GitHubClient){
-    return window.GitHubClient.forkRepository(owner, repo);
-  }
-  throw new Error('No fork mechanism available');
-};
+// forkRepositoryUnified removed (replaced by direct TemplateDoctorApiClient usage)
