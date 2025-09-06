@@ -8,6 +8,8 @@ import './modules/notifications';
 import './modules/notifications-compat';
 import './modules/notifications-init';
 import './scripts/auth';
+// New TypeScript GitHub client wrapper (phase 1) – placed before analyzer so it can attach immediately
+import './scripts/github-client';
 // Newly migrated core analytic & rendering modules
 import './scripts/analyzer';
 import './scripts/report-loader';
@@ -15,6 +17,7 @@ import './scripts/dashboard-renderer';
 // Minimal scanned templates renderer shim (temporary until full app.js migration)
 import './scripts/template-list';
 import './scripts/template-card-view-handler';
+import './scripts/search';
 // TODO: migrate and add remaining legacy scripts progressively.
 
 // Simple runtime confirmation that the module graph executed.

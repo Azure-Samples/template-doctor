@@ -12,10 +12,11 @@ interface ScannedTemplateEntry {
   customConfig?: { gistUrl?: string };
 }
 
+// Uses the shared GitHubAuthLike from global.d.ts
+
 declare global {
   interface Window {
     templatesData?: ScannedTemplateEntry[];
-    GitHubAuth?: { isAuthenticated: () => boolean };
     TemplateList?: TemplateListAPI;
   }
 }
