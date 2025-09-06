@@ -1,118 +1,141 @@
+const pollingTimeout = 120000; // 2 minutes in ms
+const pollingInterval = 10000; // 10 seconds in ms
+const gitHubApiVersion = "2022-11-28"; // GitHub API version for headers
+const fetchTimeout = 30000; // 30 seconds for fetch requests
+const initialDelayAfterTrigger = 3000; // 3 seconds initial delay after workflow trigger
+const maxPollingDelay = 30000; // Maximum polling delay (30 seconds)
+const jitterFactor = 0.2; // 20% jitter for exponential backoff
+const backoffMultiplier = 1.5; // Multiplier for exponential backoff
+const retryDelayMultiplier = 1000; // Base milliseconds for retry (1 second)
+
+/**
+ * Creates standard GitHub API headers
+ * @param {string} token - GitHub API token
+ * @returns {Object} - Headers object for GitHub API requests
+ */
+function createGitHubHeaders(token) {
+    return {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.github+json',
+        "X-GitHub-Api-Version": gitHubApiVersion
+    };
+}
+
+/**
+ * Utility function to sleep for a specified number of milliseconds
+ * @param {number} ms - Milliseconds to sleep
+ * @returns {Promise<void>}
+ */
+async function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Adds an issue to the issues array with standard format
+ * @param {Array} issues - Issues array to add to
+ * @param {string} id - Issue identifier
+ * @param {string} severity - Issue severity (warning, error)
+ * @param {string} message - Issue message
+ * @param {Object} [details] - Optional details object
+ */
+function addIssue(issues, id, severity, message, details = null) {
+    const issue = {
+        id,
+        severity,
+        message
+    };
+    
+    if (details) {
+        issue.details = details;
+    } else if (arguments.length > 4 && arguments[4] !== null) {
+        issue.error = arguments[4];
+    }
+    
+    issues.push(issue);
+}
 
 async function getOSSFScore(context, workflowToken, workflowUrl, workflowFile, templateOwnerRepo, requestGuid, minScore, issues, compliance) {
 
     context.log(`Minimum score: ${minScore.toFixed(1)}`); // This will log "7.0"
 
     if (!workflowToken || typeof workflowToken !== 'string') {
-        issues.push({
-            id: 'ossf-score-invalid-workflow-token',
-            severity: 'warning',
-            message: 'Invalid workflow token for OSSF score.'
-        });
+        addIssue(issues, 'ossf-score-invalid-workflow-token', 'warning', 'Invalid workflow token for OSSF score.');
         return;
     }
     if (!workflowUrl || typeof workflowUrl !== 'string' || workflowUrl.indexOf('/') === -1) {
-        issues.push({
-            id: 'ossf-score-invalid-workflow-repo',
-            severity: 'warning',
-            message: 'Invalid workflow URL for OSSF score. Use owner/repo format.'
-        });
+        addIssue(issues, 'ossf-score-invalid-workflow-repo', 'warning', 'Invalid workflow URL for OSSF score. Use owner/repo format.');
         return;
     }
 
     if (!workflowFile || typeof workflowFile !== 'string') {
-        issues.push({
-            id: 'ossf-score-invalid-workflow-file',
-            severity: 'warning',
-            message: 'Invalid workflow file for OSSF score. '
-        });
+        addIssue(issues, 'ossf-score-invalid-workflow-file', 'warning', 'Invalid workflow file for OSSF score. ');
         return;
     }
 
     // templateOwnerRepo should be in the form 'owner/repo'
     if (!templateOwnerRepo || typeof templateOwnerRepo !== 'string' || templateOwnerRepo.indexOf('/') === -1) {
-        issues.push({
-            id: 'ossf-score-invalid-template-repo',
-            severity: 'warning',
-            message: 'Invalid template repo string for OSSF score. Use owner/repo format.'
-        });
+        addIssue(issues, 'ossf-score-invalid-template-repo', 'warning', 'Invalid template repo string for OSSF score. Use owner/repo format.');
         return;
     }
 
     if (!requestGuid || typeof requestGuid !== 'string') {
-        issues.push({
-            id: 'ossf-score-invalid-request-guid',
-            severity: 'warning',
-            message: 'Invalid request GUID for OSSF score.'
-        });
+        addIssue(issues, 'ossf-score-invalid-request-guid', 'warning', 'Invalid request GUID for OSSF score.');
         return;
     }
 
     try {
         const client = typeof ScorecardClient !== 'undefined' ? new ScorecardClient(context, undefined, workflowToken, workflowUrl, workflowFile) : null;
         if (!client) {
-            issues.push({
-                id: 'ossf-score-workflow-trigger-failed',
-                severity: 'warning',
-                message: `ScorecardClient client can't be created`
-            });
+            addIssue(issues, 'ossf-score-workflow-trigger-failed', 'warning', `ScorecardClient client can't be created`);
             return;
         }
 
         const triggeredResponse = await client.triggerWorkflow(templateOwnerRepo, requestGuid);
         if (!triggeredResponse || !triggeredResponse.ok) {
-            issues.push({
-                id: 'ossf-score-workflow-trigger-failed',
-                severity: 'warning',
-                message: `ScorecardClient workflow not triggered. GitHub API response: ${triggeredResponse ? triggeredResponse.status : 'unknown'}`
-            });
+            addIssue(issues, 'ossf-score-workflow-trigger-failed', 'warning', 
+                `ScorecardClient workflow not triggered. GitHub API response: ${triggeredResponse ? triggeredResponse.status : 'unknown'}`);
             return;
         }
 
-        // delay 3 seconds - give workflow time to start
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // delay after workflow trigger - give workflow time to start
+        await sleep(initialDelayAfterTrigger);
 
-        // poll github artifacts for repo for up to 2 minutes (120 seconds)
+        // poll github artifacts for repo for up to the polling timeout
         const pollStart = Date.now();
-        const pollTimeout = 120000; // 2 minutes in ms
         let runStatus = undefined;
-        while (Date.now() - pollStart < pollTimeout) {
+        let attempt = 0;
+        while (Date.now() - pollStart < pollingTimeout) {
             runStatus = await client.getArtifactsListItem(requestGuid);
             if (runStatus !== undefined && runStatus !== null) {
                 break;
             }
-            context.log(`Waiting for ${templateOwnerRepo} artifact with request GUID: ${requestGuid}`);
-            // wait 10 seconds before polling again
-            await new Promise(res => setTimeout(res, 10000));
+            
+            // Calculate delay using exponential backoff with jitter
+            attempt++;
+            const baseDelay = Math.min(pollingInterval * Math.pow(backoffMultiplier, attempt - 1), maxPollingDelay);
+            const jitter = Math.floor(baseDelay * jitterFactor * Math.random());
+            const delay = baseDelay + jitter;
+            
+            context.log(`Waiting for ${templateOwnerRepo} artifact with request GUID: ${requestGuid} (attempt ${attempt}, next retry in ${Math.round(delay/1000)}s)`);
+            // wait with exponential backoff before polling again
+            await sleep(delay);
         }
         if (!runStatus) {
-            issues.push({
-                id: 'ossf-score-artifact-failed',
-                severity: 'warning',
-                message: 'Workflow artifact failed for request GUID',
-                details: { workflowUrl, workflowFile, templateOwnerRepo, requestGuid }
-            });
+            addIssue(issues, 'ossf-score-artifact-failed', 'warning', 'Workflow artifact failed for request GUID', 
+                { workflowUrl, workflowFile, templateOwnerRepo, requestGuid });
             return;
         }
 
         // if the run completed but concluded with non-success, record a warning
         if (runStatus && (!runStatus.archive_download_url || runStatus.archive_download_url.length < 5)) {
-            issues.push({
-                id: 'ossf-score-artifact-download-failed',
-                severity: 'warning',
-                message: `OSSF workflow concluded without finding artifact download URL`,
-                details: runStatus
-            });
+            addIssue(issues, 'ossf-score-artifact-download-failed', 'warning', 
+                `OSSF workflow concluded without finding artifact download URL`, runStatus);
             return;
         }
         const scoreRaw = runStatus.name.split('_score_')[1];
         if (!scoreRaw) {
-            issues.push({
-                id: 'ossf-score-value-not-found',
-                severity: 'warning',
-                message: `OSSF workflow concluded without finding score value: ${runStatus.url}`,
-                details: runStatus
-            });
+            addIssue(issues, 'ossf-score-value-not-found', 'warning', 
+                `OSSF workflow concluded without finding score value: ${runStatus.url}`, runStatus);
             return;
         }
 
@@ -128,23 +151,16 @@ async function getOSSFScore(context, workflowToken, workflowUrl, workflowFile, t
                 details: { templateOwnerRepo: templateOwnerRepo, score: score.toFixed(1), minScore: minScore, artifact: runStatus }
             });
         } else {
-            issues.push({
-                id: 'ossf-score-below-minimum',
-                severity: 'warning',
-                message: `OSSF workflow concluded with score ${score.toFixed(1)} < ${minScore.toFixed(1)}: ${runStatus.url}`,
-                details: { templateOwnerRepo: templateOwnerRepo, score: score.toFixed(1), minScore: minScore.toFixed(1), artifact: runStatus }
-            });
+            addIssue(issues, 'ossf-score-below-minimum', 'warning', 
+                `OSSF workflow concluded with score ${score.toFixed(1)} < ${minScore.toFixed(1)}: ${runStatus.url}`,
+                { templateOwnerRepo: templateOwnerRepo, score: score.toFixed(1), minScore: minScore.toFixed(1), artifact: runStatus });
         }
 
 
     } catch (err) {
-        console.error('Error fetching Scorecard:', err);
-        issues.push({
-            id: 'ossf-score-error',
-            severity: 'warning',
-            message: 'Failed to fetch OSSF Scorecard',
-            error: err instanceof Error ? err.message : String(err)
-        });
+        context.error('Error fetching Scorecard:', err);
+        addIssue(issues, 'ossf-score-error', 'warning', 'Failed to fetch OSSF Scorecard', 
+                { error: err instanceof Error ? err.message : String(err) });
     }
 }
 class ScorecardClient {
@@ -162,6 +178,25 @@ class ScorecardClient {
             this.workflowId = workflowId;
         }
         this.context = context ? context : { log: (str) => { console.log(str) } };
+    }
+
+    /**
+     * Creates a fetch request with GitHub API headers
+     * @param {string} url - The URL to fetch
+     * @param {Object} options - Additional fetch options
+     * @returns {Promise<Response>} - The fetch response
+     */
+    async fetchWithGitHubAuth(url, options = {}) {
+        const requestOptions = {
+            ...options,
+            headers: {
+                ...createGitHubHeaders(this.token),
+                ...(options.headers || {})
+            },
+            signal: AbortSignal.timeout(options.timeout || fetchTimeout)
+        };
+
+        return fetch(url, requestOptions);
     }
 
     async triggerWorkflow(templateOwnerRep, incomingGuid) {
@@ -186,20 +221,12 @@ class ScorecardClient {
                 }
             };
 
-            const params = {
+            const response = await this.fetchWithGitHubAuth(url, {
                 method: 'POST',
                 headers: {
-                    Authorization: `Bearer ${this.token}`,
-                    Accept: 'application/vnd.github+json',
-                    "X-GitHub-Api-Version": "2022-11-28"
+                    'Content-Type': 'application/json'
                 },
-                body: JSON.stringify(body),
-            };
-            this.context.log('Workflow dispatch parameters', params);
-
-            const response = await fetch(url, {
-                ...params,
-                signal: AbortSignal.timeout(30000) // 30 second timeout
+                body: JSON.stringify(body)
             });
 
             if (!response.ok) {
@@ -216,21 +243,13 @@ class ScorecardClient {
     }
     async getArtifactsListItem(inputGuid) {
         try {
-
             if (!inputGuid || typeof inputGuid !== 'string') {
                 throw new Error('Invalid GUID provided for artifact search');
             }
 
             const url = `${this.baseUrl}/repos/${this.workflowOwnerRepo}/actions/artifacts`;
 
-            const resp = await fetch(url, {
-                headers: {
-                    Authorization: `Bearer ${this.token}`,
-                    Accept: 'application/vnd.github+json',
-                    "X-GitHub-Api-Version": "2022-11-28"
-                },
-                signal: AbortSignal.timeout(30000) // 30 second timeout
-            });
+            const resp = await this.fetchWithGitHubAuth(url);
             if (!resp.ok) {
                 return undefined;
             }
@@ -256,18 +275,10 @@ class ScorecardClient {
      * @returns {Promise<ArrayBuffer>} - The artifact contents as binary data
      */
     async getArtifactDownload(downloadUrl) {
-
         try {
-
-            const response = await fetch(downloadUrl, {
+            const response = await this.fetchWithGitHubAuth(downloadUrl, {
                 method: 'GET',
-                headers: {
-                    Authorization: `Bearer ${this.token}`,
-                    Accept: 'application/vnd.github+json',
-                    "X-GitHub-Api-Version": "2022-11-28"
-                },
-                redirect: 'manual', // we want to handle the redirect ourselves
-                signal: AbortSignal.timeout(30000) // 30 second timeout
+                redirect: 'manual' // we want to handle the redirect ourselves
             });
 
             // If GitHub returned a redirect, follow it manually WITHOUT Authorization
@@ -283,7 +294,7 @@ class ScorecardClient {
                         // do NOT include Authorization here
                         Accept: 'application/octet-stream'
                     },
-                    signal: AbortSignal.timeout(60000) // 60 second timeout for larger downloads
+                    signal: AbortSignal.timeout(fetchTimeout)
                 });
 
                 if (!fileResp.ok) {
@@ -311,22 +322,21 @@ class ScorecardClient {
 
     /**
      * Triggers workflow with retry capability for improved resilience
-     * @param {Object} context - Azure Functions context for logging
      * @param {string} templateOwnerRep - Repository in owner/repo format
      * @param {string} incomingGuid - Unique identifier for this run
      * @param {number} maxRetries - Maximum number of retry attempts
      * @returns {Promise<Response>} - The final response from the workflow trigger
      */
-    async triggerWorkflowWithRetry(context, templateOwnerRep, incomingGuid, maxRetries = 3) {
+    async triggerWorkflowWithRetry(templateOwnerRep, incomingGuid, maxRetries = 3) {
         let lastError;
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                return await this.triggerWorkflow(context, templateOwnerRep, incomingGuid);
+                return await this.triggerWorkflow(templateOwnerRep, incomingGuid);
             } catch (err) {
                 lastError = err;
                 this.context.log(`Attempt ${attempt} failed: ${err.message}`);
                 if (attempt < maxRetries) {
-                    await new Promise(r => setTimeout(r, 1000 * attempt)); // Exponential backoff
+                    await sleep(retryDelayMultiplier * attempt); // Exponential backoff
                 }
             }
         }
