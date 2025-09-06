@@ -1,0 +1,18 @@
+@token = {{$dotenv %GITHUB_TOKEN }}
+@workflowRepo = diberry/template-doctor
+@workflowFile = validate-ossf-score.yml
+@repoAnalyzeScore = azure-samples/azure-search-static-web-app
+
+POST https://api.github.com/repos/{{workflowRepo}}/actions/workflows/{{workflowFile}}/dispatches
+Authorization: Bearer {{token}}
+Accept: application/vnd.github+json
+X-GitHub-Api-Version: 2022-11-28
+Content-Type: application/json
+
+{
+    "ref": "main",
+    "inputs": {
+        "repo": "{{repoAnalyzeScore}}",
+        "id": "{{$guid}}"
+    }
+}
