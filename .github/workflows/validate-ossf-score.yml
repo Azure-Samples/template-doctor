@@ -19,10 +19,6 @@ on:
         description: 'Unique identifier for the workflow run (for tracking purposes)'
         required: true
         default: ''
-      checks:
-        description: 'Comma-separated checks to run (optional)'
-        required: false
-        default: ''
 
 # read access is required for retrieving repository metadata if using the default GITHUB_TOKEN
 permissions:
@@ -34,9 +30,10 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       artifact_name: ${{ steps.set-id.outputs.artifact_name }}
-      aggregate_score: ${{ steps.run-score.outputs.aggregate_score }}
-      analysis_b64: ${{ steps.run-score.outputs.analysis_b64 }}
-      artifact_download_url: ${{ steps.get-artifact-url.outputs.download_url }}
+      aggregate_score: ${{ steps.process-results.outputs.aggregate_score }}
+      analysis_b64: ${{ steps.validate-json.outputs.analysis_b64 }}
+      analysis_truncated: ${{ steps.validate-json.outputs.analysis_truncated }}
+      artifact_run_id: ${{ github.run_id }}
 
     steps:
 
@@ -157,8 +154,15 @@ jobs:
             DOCKER_ENV_ARGS+=( -e GITHUB_AUTH_TOKEN="$TOKEN" )
           fi
 
+          echo "Running OSSF Scorecard on ${{ steps.normalize-repo.outputs.repo_arg }}..." | tee "${{ steps.prepare-output.outputs.result_log }}"
+          echo "Command: docker run --rm [AUTH_TOKEN_HIDDEN] gcr.io/openssf/scorecard:stable --format=json --repo=\"${{ steps.normalize-repo.outputs.repo_arg }}\"" >> "${{ steps.prepare-output.outputs.result_log }}"
+          echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") Started analysis" >> "${{ steps.prepare-output.outputs.result_log }}"
+          
           docker run --rm "${DOCKER_ENV_ARGS[@]}" gcr.io/openssf/scorecard:stable --format=json --repo="${{ steps.normalize-repo.outputs.repo_arg }}" > "${{ steps.prepare-output.outputs.result_file }}" 2> "${{ steps.prepare-output.outputs.stderr_file }}"
-          echo "docker_exit_code=$?" >> "$GITHUB_OUTPUT"
+          DOCKER_EXIT=$?
+          echo "docker_exit_code=$DOCKER_EXIT" >> "$GITHUB_OUTPUT"
+          
+          echo "$(date -u +"%Y-%m-%dT%H:%M:%SZ") Completed analysis with exit code: $DOCKER_EXIT" >> "${{ steps.prepare-output.outputs.result_log }}"
 
       - name: Validate JSON Output
         id: validate-json
@@ -166,6 +170,14 @@ jobs:
           RESULT_FILE="${{ steps.prepare-output.outputs.result_file }}"
           if jq -e . "$RESULT_FILE" >/dev/null 2>&1; then
             echo "is_json=true" >> "$GITHUB_OUTPUT"
+            # Add base64 encoding of the JSON for smaller files
+            if [ "$(wc -c < "$RESULT_FILE")" -lt 10000 ]; then
+              echo "analysis_b64=$(base64 -w0 "$RESULT_FILE")" >> "$GITHUB_OUTPUT"
+              echo "analysis_truncated=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "analysis_truncated=true" >> "$GITHUB_OUTPUT"
+              echo "Analysis file too large for base64 encoding in outputs ($(wc -c < "$RESULT_FILE") bytes)" >> "$GITHUB_STEP_SUMMARY"
+            fi
           else
             echo "is_json=false" >> "$GITHUB_OUTPUT"
           fi
@@ -188,6 +200,7 @@ jobs:
           echo "aggregate_score=$AGG_SCORE" >> "$GITHUB_OUTPUT"
 
       - name: Upload Artifacts
+        id: upload-artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.process-results.outputs.artifact_name }}
@@ -196,34 +209,21 @@ jobs:
             ${{ steps.prepare-output.outputs.result_log }}
             ${{ steps.prepare-output.outputs.stderr_file }}
 
-      - name: Get artifact download URL
-        id: get-artifact-url
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          # Ensure jq and curl are available
-          sudo apt-get update && sudo apt-get install -y jq curl
-
-          ARTIFACT_NAME="${{ steps.run-score.outputs.artifact_name }}"
-          echo "Looking up artifact named: $ARTIFACT_NAME"
-
-          RESP=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts")
-          DOWNLOAD_URL=$(echo "$RESP" | jq -r --arg name "$ARTIFACT_NAME" '.artifacts[] | select(.name==$name) | .archive_download_url' | head -n1)
-
-          if [ -n "$DOWNLOAD_URL" ] && [ "$DOWNLOAD_URL" != "null" ]; then
-            echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
-            mkdir -p ossf-scorecard-output
-            echo "$DOWNLOAD_URL" > ossf-scorecard-output/artifact_download_url.txt
-          else
-            echo "download_url=" >> $GITHUB_OUTPUT
-            echo "warning: artifact not found in run artifacts" >&2
-          fi
-
       - name: Show short summary
         run: |
           echo "Workflow input run: ${{ steps.set-id.outputs.id }}"
-          echo "Artifact: ${{ steps.run-score.outputs.artifact_name }}"
-          echo "Artifact URL: ${{ steps.get-artifact-url.outputs.download_url }}"
-          echo "Scorecard FileName: ${{ steps.run-score.outputs.result_file}}"
-          echo "Aggregate score: ${{ steps.run-score.outputs.aggregate_score }}"
+          echo "Workflow input repo: ${{ github.event.inputs.repo }}"
+          echo "Workflow run ID: ${{ github.run_id }}"
+          echo "Artifact: ${{ steps.process-results.outputs.artifact_name }}"
+          echo "Scorecard FileName: ${{ steps.prepare-output.outputs.result_file }}"
+          echo "Aggregate score: ${{ steps.process-results.outputs.aggregate_score }}"
+          echo "Docker exit code: ${{ steps.run-docker.outputs.docker_exit_code }}"
+          
+          # Add detailed info to step summary
+          echo "## OSSF Scorecard Analysis Results" >> $GITHUB_STEP_SUMMARY
+          echo "* **Repository:** ${{ github.event.inputs.repo }}" >> $GITHUB_STEP_SUMMARY
+          echo "* **Run ID:** ${{ steps.set-id.outputs.id }}" >> $GITHUB_STEP_SUMMARY
+          echo "* **Workflow Run ID:** ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "* **Artifact Name:** ${{ steps.process-results.outputs.artifact_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "* **Aggregate Score:** ${{ steps.process-results.outputs.aggregate_score }}" >> $GITHUB_STEP_SUMMARY
+          echo "* **Docker Exit Code:** ${{ steps.run-docker.outputs.docker_exit_code }}" >> $GITHUB_STEP_SUMMARY
