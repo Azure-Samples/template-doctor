@@ -14,6 +14,7 @@ import './scripts/report-loader';
 import './scripts/dashboard-renderer';
 // Minimal scanned templates renderer shim (temporary until full app.js migration)
 import './scripts/template-list';
+import './scripts/template-card-view-handler';
 // TODO: migrate and add remaining legacy scripts progressively.
 
 // Simple runtime confirmation that the module graph executed.
