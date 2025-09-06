@@ -4,9 +4,10 @@ import { Octokit } from '@octokit/rest';
 /**
  * issue-create (Azure Function v4 HTTP)
  * POST /v4/issue-create
- * Body: { owner, repo, title, body, labels?: string[], assignCopilot?: boolean }
+ * Body: { owner, repo, title, body, labels?: string[], assignCopilot?: boolean, childIssues?: { title: string; body: string; labels?: string[] }[] }
  * Uses a server-side GitHub token (GH_WORKFLOW_TOKEN) to ensure labels then create an issue.
- * Returns: { issueNumber, htmlUrl, labelsEnsured: string[], labelsCreated: string[], copilotAssigned?: boolean }
+ * If childIssues provided, will create each child after main (best-effort, errors collected but do not fail main unless main creation fails).
+ * Returns: { issueNumber, htmlUrl, labelsEnsured: string[], labelsCreated: string[], copilotAssigned?: boolean, childResults?: { title: string; issueNumber?: number; error?: string }[] }
  */
 export async function issueCreateHandler(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const corsHeaders = {
@@ -34,7 +35,7 @@ export async function issueCreateHandler(request: HttpRequest, context: Invocati
     return { status: 400, headers: corsHeaders, jsonBody: { error: 'Invalid JSON body' } };
   }
 
-  const { owner, repo, title, body: issueBody, labels = [], assignCopilot = false } = body || {};
+  const { owner, repo, title, body: issueBody, labels = [], assignCopilot = false, childIssues = [] } = body || {};
   if (!owner || !repo || !title) {
     return { status: 400, headers: corsHeaders, jsonBody: { error: 'Missing required: owner, repo, title' } };
   }
@@ -79,6 +80,7 @@ export async function issueCreateHandler(request: HttpRequest, context: Invocati
   }
 
   let copilotAssigned: boolean | undefined;
+  const childResults: { title: string; issueNumber?: number; error?: string }[] = [];
   if (assignCopilot && issueNumber) {
     try {
       // Heuristic: attempt to add github-copilot as assignee if present. If fails, ignore.
@@ -90,6 +92,37 @@ export async function issueCreateHandler(request: HttpRequest, context: Invocati
     }
   }
 
+  // Create child issues with limited concurrency for performance
+  if (issueNumber && Array.isArray(childIssues) && childIssues.length) {
+    const CONCURRENCY = 4;
+    let index = 0;
+    async function worker() {
+      while (index < childIssues.length) {
+        const c = childIssues[index++];
+        if (!c?.title) continue;
+        const labelsChild = Array.isArray(c.labels) ? c.labels.filter((l: any) => typeof l === 'string') : [];
+        // Ensure child labels
+        for (const label of labelsChild) {
+          try {
+            await (octokit as any).issues.getLabel({ owner, repo, name: label });
+          } catch (e: any) {
+            if (e?.status === 404) {
+              try { await (octokit as any).issues.createLabel({ owner, repo, name: label, color: hashColor(label) }); } catch {}
+            }
+          }
+        }
+        try {
+          const childResp = await octokit.issues.create({ owner, repo, title: c.title, body: c.body, labels: labelsChild });
+          childResults.push({ title: c.title, issueNumber: childResp.data.number });
+        } catch (e: any) {
+          childResults.push({ title: c.title, error: e?.message || 'Failed to create child issue' });
+        }
+      }
+    }
+    const workers = Array.from({ length: Math.min(CONCURRENCY, childIssues.length) }, () => worker());
+    await Promise.all(workers);
+  }
+
   return {
     status: 201,
     headers: corsHeaders,
@@ -98,7 +131,8 @@ export async function issueCreateHandler(request: HttpRequest, context: Invocati
       htmlUrl: issueUrl,
       labelsEnsured: ensured,
       labelsCreated: created,
-      copilotAssigned
+      copilotAssigned,
+      childResults: childResults.length ? childResults : undefined
     }
   };
 }

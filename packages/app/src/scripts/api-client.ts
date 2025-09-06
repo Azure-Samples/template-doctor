@@ -3,12 +3,14 @@
 
 interface IssueCreateRequest {
   owner: string; repo: string; title: string; body?: string; labels?: string[]; assignCopilot?: boolean;
+  childIssues?: { title: string; body: string; labels?: string[] }[];
 }
 interface IssueCreateResponse {
   issueNumber: number; htmlUrl: string; labelsEnsured: string[]; labelsCreated: string[]; copilotAssigned?: boolean;
+  childResults?: { title: string; issueNumber?: number; error?: string }[];
 }
 interface ForkRequest { sourceOwner: string; sourceRepo: string; targetOwner?: string; waitForReady?: boolean; }
-interface ForkResponse { forkOwner: string; repo: string; htmlUrl?: string; ready: boolean; attemptedCreate: boolean; }
+interface ForkResponse { forkOwner: string; repo: string; htmlUrl?: string; ready: boolean; attemptedCreate: boolean; samlRequired?: boolean; documentationUrl?: string; authorizeUrl?: string; error?: string; }
 
 const backendEnabled = () => (window as any).TemplateDoctorConfig?.features?.backendMigration === true;
 const apiBase = () => (window as any).TemplateDoctorConfig?.apiBase || '/api';
@@ -21,7 +23,10 @@ async function httpJson(path: string, init: RequestInit): Promise<any> {
   if (!res.ok) {
     let detail: any = undefined;
     try { detail = await res.json(); } catch {}
-    throw new Error(`HTTP ${res.status} ${path} ${(detail && detail.error) || ''}`);
+    const err: any = new Error(`HTTP ${res.status} ${path} ${(detail && detail.error) || ''}`);
+    if (detail) Object.assign(err, detail);
+    err.status = res.status;
+    throw err;
   }
   return res.json();
 }
@@ -46,12 +51,42 @@ export const ApiClient = {
   },
   async forkRepository(req: ForkRequest): Promise<ForkResponse> {
     if (backendEnabled()) {
-      return httpJson('/v4/repo-fork', { method: 'POST', body: JSON.stringify(req) });
+      try {
+        return await httpJson('/v4/repo-fork', { method: 'POST', body: JSON.stringify(req) });
+      } catch (e: any) {
+        // If SAML required, propagate structured object
+        if (e?.samlRequired) {
+          try {
+            const ns = (window as any).NotificationSystem;
+            if (ns && typeof ns.show === 'function') {
+              ns.show({
+                title: 'SAML Authorization Required',
+                message: 'This repository requires SAML SSO authorization before forking. Use the authorization link if provided.',
+                type: 'warning',
+                duration: 12000,
+                actions: e.authorizeUrl ? [{ label: 'Authorize SAML', primary: true, onClick: () => window.open(e.authorizeUrl,'_blank') }] : []
+              });
+            }
+          } catch(_) {}
+          return { forkOwner: req.targetOwner || 'unknown', repo: req.sourceRepo, htmlUrl: undefined, ready: false, attemptedCreate: false, samlRequired: true, documentationUrl: e.documentationUrl, authorizeUrl: e.authorizeUrl, error: e.error };
+        }
+        throw e;
+      }
     }
     const gh: any = (window as any).GitHubClient;
     if (!gh) throw new Error('GitHubClient not ready');
     const result = await gh.forkRepository(req.sourceOwner, req.sourceRepo);
     return { forkOwner: result.forkOwner, repo: req.sourceRepo, htmlUrl: result.htmlUrl, ready: true, attemptedCreate: true };
+  },
+  async startBatchScan(repos: string[], mode?: string): Promise<{ batchId: string; acceptedCount: number; }> {
+    if (!backendEnabled()) throw new Error('Backend feature disabled');
+    return httpJson('/v4/batch-scan-start', { method: 'POST', body: JSON.stringify({ repos, mode }) });
+  },
+  async getBatchStatus(batchId: string): Promise<any> {
+    if (!backendEnabled()) throw new Error('Backend feature disabled');
+    const res = await fetch(apiBase().replace(/\/$/, '') + '/v4/batch-scan-status?batchId=' + encodeURIComponent(batchId));
+    if (!res.ok) throw new Error('HTTP ' + res.status + ' batch-scan-status');
+    return res.json();
   }
 };
 

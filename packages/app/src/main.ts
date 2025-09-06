@@ -19,6 +19,8 @@ import './scripts/template-list';
 import './scripts/template-card-view-handler';
 import './scripts/search';
 import './scripts/api-client';
+import './scripts/issue-service';
+import './scripts/batch-scan';
 // TODO: migrate and add remaining legacy scripts progressively.
 
 // Simple runtime confirmation that the module graph executed.

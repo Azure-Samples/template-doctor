@@ -55,210 +55,7 @@ function debugReportData(label, data) {
   console.groupEnd();
 }
 
-/**
- * Checks if a repository belongs to any of the specified organizations
- * and offers to replace with the current user's fork
- * @param {string} repoUrl - Original repository URL
- * @returns {Promise<string>} - New repository URL (might be the same or a user fork)
- */
-async function checkAndUpdateRepoUrl(repoUrl) {
-  // If no URL or not a GitHub URL, return as is
-  if (!repoUrl || !repoUrl.includes('github.com/')) {
-    return repoUrl;
-  }
-
-  // Check if user is logged in
-  if (!window.GitHubClient || !window.GitHubClient.auth.isAuthenticated()) {
-    debug('app', 'User not logged in, cannot fork repositories');
-    return repoUrl;
-  }
-
-  // Get current username
-  const currentUsername = window.GitHubClient.auth.getUsername();
-  if (!currentUsername) {
-    debug('app', 'Cannot get current username');
-    return repoUrl;
-  }
-
-  // Extract owner and repo from URL
-  try {
-    const urlParts = repoUrl.split('github.com/')[1].split('/');
-    const owner = urlParts[0];
-    const repo = urlParts[1];
-
-    if (!owner || !repo) {
-      throw new Error('Invalid repository URL format');
-    }
-
-    // Check if the owner is one of the organizations that might need forking
-    const needsFork = ORGANIZATIONS_CONFIG.organizationsToFork.some(
-      (org) => owner.toLowerCase() === org.toLowerCase(),
-    );
-
-    if (!needsFork) {
-      debug('app', `Repository ${owner}/${repo} does not need forking`);
-      return repoUrl;
-    }
-
-    // Construct potential fork URL
-    const potentialForkUrl = `https://github.com/${currentUsername}/${repo}`;
-    debug('app', `Original repo: ${repoUrl}, potential fork: ${potentialForkUrl}`);
-
-    // Show confirmation dialog if configured
-    if (ORGANIZATIONS_CONFIG.requireConfirmationForFork) {
-      // Use notification system if available
-      if (window.Notifications) {
-        const result = await new Promise((resolve) => {
-          window.Notifications.confirm(
-            'Repository Fork',
-            `This repository belongs to ${owner}. Would you like to check if you have a fork of this repository and use that instead?`,
-            {
-              confirmLabel: 'Check For Fork',
-              cancelLabel: 'Use Original',
-              onConfirm: () => resolve(true),
-              onCancel: () => resolve(false),
-            },
-          );
-        });
-
-        if (!result) {
-          return repoUrl; // User declined, use original URL
-        }
-      } else {
-        // Fallback to native confirm
-        if (
-          !confirm(
-            `This repository belongs to ${owner}. Would you like to check if you have a fork of this repository and use that instead?`,
-          )
-        ) {
-          return repoUrl; // User declined, use original URL
-        }
-      }
-    }
-
-    // Check if the user already has a fork
-    try {
-      debug('app', `Checking if user ${currentUsername} has a fork of ${owner}/${repo}`);
-      const response = await fetch(`https://api.github.com/repos/${currentUsername}/${repo}`, {
-        headers: {
-          Authorization: `token ${window.GitHubClient.auth.getToken()}`,
-        },
-      });
-
-      if (response.ok) {
-        // User has a fork, use it
-        debug('app', `User has a fork of ${owner}/${repo}`);
-        if (window.NotificationSystem) {
-          window.NotificationSystem.showInfo(
-            'Using Your Fork',
-            `Using your fork of ${owner}/${repo} for analysis`,
-            3000,
-          );
-        }
-        return potentialForkUrl;
-      } else if (response.status === 404) {
-        // User doesn't have a fork, ask if they want to create one
-        let shouldCreateFork = false;
-
-        if (window.Notifications) {
-          shouldCreateFork = await new Promise((resolve) => {
-            window.Notifications.confirm(
-              'Create Fork',
-              `You don't have a fork of ${owner}/${repo}. Would you like to create one now?`,
-              {
-                confirmLabel: 'Create Fork',
-                cancelLabel: 'Use Original',
-                onConfirm: () => resolve(true),
-                onCancel: () => resolve(false),
-              },
-            );
-          });
-        } else {
-          // Fallback to native confirm if notification system is not available
-          if (window.NotificationSystem) {
-            await new Promise((resolve) => {
-              window.NotificationSystem.showConfirmation(
-                'Create Fork',
-                `You don't have a fork of ${owner}/${repo}. Would you like to create one now?`,
-                'Create Fork',
-                'Use Original',
-                (confirmed) => {
-                  shouldCreateFork = confirmed;
-                  resolve();
-                },
-              );
-            });
-          } else {
-            shouldCreateFork = confirm(
-              `You don't have a fork of ${owner}/${repo}. Would you like to create one now?`,
-            );
-          }
-        }
-
-        if (shouldCreateFork) {
-          try {
-            debug('app', `Creating fork of ${owner}/${repo}`);
-            if (window.NotificationSystem) {
-              window.NotificationSystem.showInfo(
-                'Creating Fork',
-                `Creating a fork of ${owner}/${repo}...`,
-                3000,
-              );
-            }
-
-            const forkResponse = await fetch(
-              `https://api.github.com/repos/${owner}/${repo}/forks`,
-              {
-                method: 'POST',
-                headers: {
-                  Authorization: `token ${window.GitHubClient.auth.getToken()}`,
-                },
-              },
-            );
-
-            if (forkResponse.ok) {
-              const forkData = await forkResponse.json();
-              debug('app', `Fork created: ${forkData.html_url}`);
-              if (window.NotificationSystem) {
-                window.NotificationSystem.showSuccess(
-                  'Fork Created',
-                  `Successfully forked ${owner}/${repo}`,
-                  3000,
-                );
-              }
-              return forkData.html_url;
-            } else {
-              throw new Error(
-                `Failed to create fork: ${forkResponse.status} ${forkResponse.statusText}`,
-              );
-            }
-          } catch (forkError) {
-            debug('app', `Error creating fork: ${forkError.message}`, forkError);
-            if (window.NotificationSystem) {
-              window.NotificationSystem.showError(
-                'Fork Error',
-                `Failed to create fork: ${forkError.message}`,
-                5000,
-              );
-            }
-            return repoUrl; // Use original URL as fallback
-          }
-        } else {
-          return repoUrl; // User declined to fork, use original URL
-        }
-      } else {
-        // Other error occurred
-        throw new Error(`Error checking fork: ${response.status} ${response.statusText}`);
-      }
-    } catch (error) {
-      debug('app', `Error checking/creating fork: ${error.message}`, error);
-      return repoUrl; // Use original URL as fallback
-    }
-  } catch (parseError) {
-    debug('app', `Error parsing repository URL: ${parseError.message}`, parseError);
-    return repoUrl; // Use original URL as fallback
-  }
-}
+// (Legacy fork substitution helper removed; backend + ApiClient handles forks & SAML notifications.)
 
 // Direct data loading function - uses direct loading with a script tag
 function directLoadDataFile(folderName, dataFileName, successCallback, errorCallback) {
@@ -840,200 +637,80 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Process each URL sequentially
       for (let i = 0; i < urls.length; i++) {
-        // Check if the batch was cancelled
-        if (batchCancelled) {
-          debug('app', 'Batch scan cancelled, stopping further processing');
-          break;
-        }
-
+        if (batchCancelled) break;
         const url = urls[i];
         const itemElement = document.getElementById(`batch-item-${i}`);
+        if (!itemElement) continue;
 
-        // Skip already successful items in resume mode
-        if (resumeMode) {
-          const existingItem = existingProgress.find((p) => p.url === url);
-          if (existingItem && existingItem.status === 'success') {
-            debug('app', `Skipping already successful item ${i + 1}/${urls.length}: ${url}`);
-            continue;
-          }
-        }
-
-        // Update UI to show processing
+        // Mark processing
         itemElement.className = 'batch-item processing';
         itemElement.querySelector('.batch-item-status').textContent = 'Processing';
-        itemElement.querySelector('.batch-item-message').textContent =
-          'Checking repository status...';
+        itemElement.querySelector('.batch-item-message').textContent = 'Analyzing...';
+
+        let processedUrl = url;
+        try {
+          processedUrl = await checkAndUpdateRepoUrl(url);
+        } catch (forkError) {
+          debug('app', `Fork substitution skipped: ${forkError.message}`);
+        }
 
         try {
-          debug('app', `Processing batch item ${i + 1}/${urls.length}: ${url}`);
-
-          // First check if the repository needs to be forked
-          let processedUrl = url;
-          try {
-            processedUrl = await checkAndUpdateRepoUrl(url);
-
-            if (processedUrl !== url) {
-              itemElement.querySelector('.batch-item-message').textContent =
-                'Using fork of the repository...';
-            } else {
-              itemElement.querySelector('.batch-item-message').textContent =
-                'Analyzing repository...';
-            }
-          } catch (forkError) {
-            debug('app', `Error during fork check: ${forkError.message}`, forkError);
-            itemElement.querySelector('.batch-item-message').textContent =
-              'Proceeding with original repository...';
-          }
-
-          // Process with the obtained URL (original or forked)
           const result = await appAnalyzer.analyzeTemplate(processedUrl, 'dod');
-
-          // Update item UI to show success
           itemElement.className = 'batch-item success';
           itemElement.querySelector('.batch-item-status').textContent = 'Completed';
           itemElement.querySelector('.batch-item-message').textContent =
             `Analysis complete: ${result.compliance.issues.length} issues, ${result.compliance.compliant.length} passed`;
 
-          // Update buttons
+          // Enable view button
           const viewBtn = itemElement.querySelector('.view-btn');
-          viewBtn.disabled = false;
+          const retryBtn = itemElement.querySelector('.retry-btn');
+            if (viewBtn) {
+            viewBtn.disabled = false;
+            viewBtn.addEventListener('click', () => displayBatchItemResults(result));
+          }
+          if (retryBtn) retryBtn.disabled = true;
 
-          // Add click handler for view button
-          viewBtn.addEventListener('click', () => {
-            // Display the results for this specific repository
-            displayBatchItemResults(result);
-          });
-
-          // Save successful result to IndexedDB
+          // Persist success
           try {
             await saveBatchProgress(`repo-${i}`, url, 'success', result);
-            debug('app', `Saved successful result for ${url} to IndexedDB`);
-          } catch (dbError) {
-            debug('app', `Error saving to IndexedDB: ${dbError.message}`, dbError);
-          } // Submit analysis results to GitHub for PR creation
-          if (window.submitAnalysisToGitHub && window.GitHubClient?.auth?.isAuthenticated()) {
-            try {
-              // Get current username
-              const username = window.GitHubClient.auth.getUsername();
-
-              if (username) {
-                debug('app', `Submitting batch item analysis to GitHub with username: ${username}`);
-
-                itemElement.querySelector('.batch-item-message').textContent =
-                  'Creating PR with results...';
-
-                const submitResult = await window.submitAnalysisToGitHub(result, username);
-
-                if (submitResult.success) {
-                  debug('app', 'Batch item analysis submitted successfully to GitHub');
-                  itemElement.querySelector('.batch-item-message').textContent =
-                    `Analysis complete: ${result.compliance.issues.length} issues, ${result.compliance.compliant.length} passed. PR created.`;
-                } else {
-                  debug('app', `Error submitting batch item analysis: ${submitResult.error}`);
-                  itemElement.querySelector('.batch-item-message').textContent =
-                    `Analysis complete: ${result.compliance.issues.length} issues, ${result.compliance.compliant.length} passed. PR creation failed.`;
-                }
-              }
-            } catch (submitErr) {
-              debug(
-                'app',
-                `Error in GitHub submission for batch item: ${submitErr.message}`,
-                submitErr,
-              );
-              itemElement.querySelector('.batch-item-message').textContent =
-                `Analysis complete but PR creation failed: ${submitErr.message}`;
-            }
+          } catch (dbErr) {
+            debug('app', `Failed saving batch success: ${dbErr.message}`);
           }
-        } catch (error) {
-          debug('app', `Error processing batch item ${i + 1}: ${error.message}`, error);
-
-          // Update item UI to show error
+        } catch (analysisErr) {
           itemElement.className = 'batch-item error';
           itemElement.querySelector('.batch-item-status').textContent = 'Error';
-          itemElement.querySelector('.batch-item-message').textContent =
-            error.message || 'An unknown error occurred';
-
-          // Save error state to IndexedDB
-          try {
-            await saveBatchProgress(`repo-${i}`, url, 'error');
-            debug('app', `Saved error state for ${url} to IndexedDB`);
-          } catch (dbError) {
-            debug('app', `Error saving error state to IndexedDB: ${dbError.message}`, dbError);
-          }
-
-          // Enable retry button
+          itemElement.querySelector('.batch-item-message').textContent = analysisErr.message || 'Analysis failed';
           const retryBtn = itemElement.querySelector('.retry-btn');
-          retryBtn.disabled = false;
-
-          // Add click handler for retry button
-          retryBtn.addEventListener('click', async () => {
-            // Reset this item and retry
-            itemElement.className = 'batch-item processing';
-            itemElement.querySelector('.batch-item-status').textContent = 'Processing';
-            itemElement.querySelector('.batch-item-message').textContent = 'Retrying...';
-            retryBtn.disabled = true;
-
-            try {
-              // Retry the forking check and analysis
-              let processedUrl = url;
+          if (retryBtn){
+            retryBtn.disabled = false;
+            retryBtn.addEventListener('click', async () => {
+              retryBtn.disabled = true;
+              itemElement.className = 'batch-item processing';
+              itemElement.querySelector('.batch-item-status').textContent = 'Processing';
+              itemElement.querySelector('.batch-item-message').textContent = 'Retrying...';
               try {
-                processedUrl = await checkAndUpdateRepoUrl(url);
-              } catch (forkError) {
-                debug('app', `Error during retry fork check: ${forkError.message}`, forkError);
+                const retryResult = await appAnalyzer.analyzeTemplate(processedUrl, 'dod');
+                itemElement.className = 'batch-item success';
+                itemElement.querySelector('.batch-item-status').textContent = 'Completed';
+                itemElement.querySelector('.batch-item-message').textContent = `Analysis complete: ${retryResult.compliance.issues.length} issues, ${retryResult.compliance.compliant.length} passed`;
+                const viewBtn = itemElement.querySelector('.view-btn');
+                if (viewBtn){
+                  viewBtn.disabled = false;
+                  viewBtn.addEventListener('click', () => displayBatchItemResults(retryResult));
+                }
+                try { await saveBatchProgress(`repo-${i}`, url, 'success', retryResult);} catch{}
+              } catch(retryErr){
+                itemElement.className = 'batch-item error';
+                itemElement.querySelector('.batch-item-status').textContent = 'Error';
+                itemElement.querySelector('.batch-item-message').textContent = retryErr.message || 'Retry failed';
+                retryBtn.disabled = false;
+                try { await saveBatchProgress(`repo-${i}`, url, 'error'); } catch{}
               }
-
-              const retryResult = await appAnalyzer.analyzeTemplate(processedUrl, 'dod');
-
-              // Update item UI to show success
-              itemElement.className = 'batch-item success';
-              itemElement.querySelector('.batch-item-status').textContent = 'Completed';
-              itemElement.querySelector('.batch-item-message').textContent =
-                `Analysis complete: ${retryResult.compliance.issues.length} issues, ${retryResult.compliance.compliant.length} passed`;
-
-              // Enable view button
-              const viewBtn = itemElement.querySelector('.view-btn');
-              viewBtn.disabled = false;
-
-              // Add click handler for view button
-              viewBtn.addEventListener('click', () => {
-                displayBatchItemResults(retryResult);
-              });
-
-              // Save successful retry result to IndexedDB
-              try {
-                await saveBatchProgress(`repo-${i}`, url, 'success', retryResult);
-                debug('app', `Saved successful retry result for ${url} to IndexedDB`);
-              } catch (dbError) {
-                debug('app', `Error saving retry result to IndexedDB: ${dbError.message}`, dbError);
-              }
-            } catch (retryError) {
-              debug('app', `Error during retry of batch item: ${retryError.message}`, retryError);
-
-              // Update item UI to show error
-              itemElement.className = 'batch-item error';
-              itemElement.querySelector('.batch-item-status').textContent = 'Error';
-              itemElement.querySelector('.batch-item-message').textContent =
-                retryError.message || 'An unknown error occurred during retry';
-
-              // Re-enable retry button
-              retryBtn.disabled = false;
-
-              // Save retry error state to IndexedDB
-              try {
-                await saveBatchProgress(`repo-${i}`, url, 'error');
-                debug('app', `Saved retry error state for ${url} to IndexedDB`);
-              } catch (dbError) {
-                debug(
-                  'app',
-                  `Error saving retry error state to IndexedDB: ${dbError.message}`,
-                  dbError,
-                );
-              }
-            }
-          });
+            });
+          }
+          try { await saveBatchProgress(`repo-${i}`, url, 'error'); } catch{}
         }
 
-        // Update progress
         batchProcessedCount++;
         const progressPercentage = (batchProcessedCount / urls.length) * 100;
         batchProgressBar.style.width = `${progressPercentage}%`;
@@ -1953,7 +1630,8 @@ document.addEventListener('DOMContentLoaded', () => {
               debug('app', `Error loading report: ${errorMsg}`);
               loadingContainer.style.display = 'none';
               errorSection.style.display = 'block';
-              errorMessage.textContent = errorMsg || 'An unknown error occurred loading the report';
+              errorMessage.textContent =
+                errorMsg || 'An unknown error occurred loading the report';
             },
           );
         } else {
@@ -1965,6 +1643,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         scrollAndHighlightTemplate(templateId);
+        highlightRescanButton(templateId);
       });
 
       div.querySelector('.rescan-btn').addEventListener('click', async () => {
@@ -2426,23 +2105,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     // First verify we have necessary modules initialized
-    if (!appAnalyzer || !appDashboard) {
-      debug('app', 'Required services not available, attempting to reinitialize');
-
-      // Try to reinitialize all services
-      const servicesAvailable = tryReinitializeServices();
-
-      if (!servicesAvailable) {
-        if (window.NotificationSystem) {
-          window.NotificationSystem.showError(
-            'Services Not Ready',
-            'Some required services are not available. Please wait a moment or refresh the page to try again.',
-            5000,
-          );
-        }
-        debug('app', 'Required services still unavailable after reinitialization attempt');
-        return;
+    const servicesAvailable = tryReinitializeServices();
+    if (!servicesAvailable) {
+      if (window.NotificationSystem) {
+        window.NotificationSystem.showError(
+          'Services Not Ready',
+          'Some required services are not available. Please wait a moment or refresh the page to try again.',
+          5000,
+        );
       }
+      debug('app', 'Required services still unavailable after reinitialization attempt');
+      return;
     }
     
     // Determine whether to use server-side or client-side analysis
@@ -2737,7 +2410,7 @@ document.addEventListener('DOMContentLoaded', () => {
               } else {
                 // Create a new fork
                 console.log(`[App] Attempting to create a new fork of ${owner}/${repo}`);
-                const forkResult = await window.GitHubClient.forkRepository(owner, repo);
+                const forkResult = await window.forkRepositoryUnified(owner, repo);
 
                 if (!forkResult || !forkResult.html_url) {
                   throw new Error('Failed to create fork - no URL returned');
@@ -3017,3 +2690,14 @@ document.addEventListener('template-analyzer-ready', () => {
     debug('app', 'Template analyzer still not available after ready event');
   }
 });
+
+// Minimal delegator for tests; prefers ApiClient logic (which shows SAML notification itself)
+window.forkRepositoryUnified = async function(owner, repo){
+  if(window.TemplateDoctorApiClient){
+    return window.TemplateDoctorApiClient.forkRepository({ sourceOwner: owner, sourceRepo: repo });
+  }
+  if(window.GitHubClient){
+    return window.GitHubClient.forkRepository(owner, repo);
+  }
+  throw new Error('No fork mechanism available');
+};

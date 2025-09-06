@@ -14,6 +14,7 @@ import { addTemplatePrHandler } from './functions/add-template-pr.js';
 import { pingHandler } from './functions/ping.js';
 import { issueCreateHandler } from './functions/issue-create.js';
 import { repoForkHandler } from './functions/repo-fork.js';
+import { batchScanStartHandler, batchScanStatusHandler } from './functions/batch-scan-start.js';
 
 // Centralized registrations
 // DEBUG MODE: All registrations commented out to isolate syntax/registration issues.
@@ -109,4 +110,18 @@ app.http('repo-fork', {
 	authLevel: 'anonymous',
 	route: 'v4/repo-fork',
 	handler: repoForkHandler
+});
+// 14. batch-scan-start
+app.http('batch-scan-start', {
+	methods: ['POST', 'OPTIONS'],
+	authLevel: 'anonymous',
+	route: 'v4/batch-scan-start',
+	handler: batchScanStartHandler
+});
+// 15. batch-scan-status
+app.http('batch-scan-status', {
+	methods: ['GET', 'OPTIONS'],
+	authLevel: 'anonymous',
+	route: 'v4/batch-scan-status',
+	handler: batchScanStatusHandler
 });

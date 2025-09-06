@@ -7,6 +7,7 @@ import { Octokit } from '@octokit/rest';
  * Body: { sourceOwner, sourceRepo, targetOwner?: string, waitForReady?: boolean }
  * Uses GH_WORKFLOW_TOKEN to initiate a fork into authenticated token's user/org (default) or provided targetOwner (if permissions allow).
  * Returns: { forkOwner, repo, htmlUrl, ready, attemptedCreate: boolean }
+ * On SAML SSO authorization required: HTTP 403 { error, samlRequired: true, documentationUrl?, authorizeUrl? }
  */
 export async function repoForkHandler(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   const cors = {
@@ -55,8 +56,20 @@ export async function repoForkHandler(request: HttpRequest, context: InvocationC
     const forkResp = await octokit.repos.createFork({ owner: sourceOwner, repo: sourceRepo, organization: targetOwner });
     forkHtml = forkResp.data?.html_url;
   } catch (err: any) {
-    context.log('Fork creation failed:', err?.message || err);
-    return { status: 502, headers: cors, jsonBody: { error: 'Failed to initiate fork', details: err?.message } };
+    const docUrl: string | undefined = err?.response?.data?.documentation_url || err?.documentation_url || err?.data?.documentation_url;
+    const message: string = err?.message || 'Fork failed';
+    // Detect SAML requirement (GitHub returns 403 with documentation_url containing /saml-single-sign-on/)
+    if (err?.status === 403 && docUrl && /\/saml-single-sign-on\//i.test(docUrl)) {
+      context.log('Fork blocked by SAML SSO requirement');
+      return { status: 403, headers: cors, jsonBody: {
+        error: 'SAML SSO authorization required to fork this repository',
+        samlRequired: true,
+        documentationUrl: docUrl,
+        authorizeUrl: docUrl // surface same URL (frontend may present link)
+      }};
+    }
+    context.log('Fork creation failed:', message);
+    return { status: 502, headers: cors, jsonBody: { error: 'Failed to initiate fork', details: message, documentationUrl: docUrl } };
   }
 
   if (!waitForReady) {
