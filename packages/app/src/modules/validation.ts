@@ -205,6 +205,14 @@ export function initValidation(options: ValidationInitOptions): UnifiedValidatio
     maxAttempts: mode === 'workflow' ? 60 : 30,
     ...merged.polling,
   };
+  // Test harness overrides (non-production) for faster polling / edge-case simulation
+  try {
+    const overrides: any = (window as any).__ValidationTestOverrides;
+    if (overrides?.polling) {
+      if (typeof overrides.polling.intervalMs === 'number') polling.intervalMs = overrides.polling.intervalMs;
+      if (typeof overrides.polling.maxAttempts === 'number') polling.maxAttempts = overrides.polling.maxAttempts;
+    }
+  } catch {/* ignore */}
   const ctx: InternalContext = {
     opts: { ...merged, mode, features, polling } as any,
     containerEl: resolveContainer(merged.container),
@@ -214,6 +222,12 @@ export function initValidation(options: ValidationInitOptions): UnifiedValidatio
   };
   injectBaseStylesOnce();
   ctx.ui = buildUI(ctx.containerEl, mode, features);
+  // Accessibility refinements
+  if (ctx.ui?.summary) {
+    ctx.ui.summary.setAttribute('role','region');
+    ctx.ui.summary.setAttribute('aria-live','polite');
+    ctx.ui.summary.setAttribute('aria-label','Validation summary');
+  }
 
   // Bind start/cancel buttons
   ctx.ui.startBtn?.addEventListener('click', () => {
@@ -224,6 +238,22 @@ export function initValidation(options: ValidationInitOptions): UnifiedValidatio
   ctx.ui.cancelBtn?.addEventListener('click', () => {
     if (features.cancellation) cancelValidation(ctx).catch((e) => console.error('[validation] cancel error', e));
   });
+
+  // Resume last run if available and appears incomplete (fresh within 2h) and no new run initiated yet
+  try {
+    const stored = localStorage.getItem('lastValidationRunInfo');
+    if (stored) {
+      const info = JSON.parse(stored);
+      if (info?.runId && info.ts && Date.now() - info.ts < 2 * 60 * 60 * 1000) { // 2 hours freshness window
+        ctx.runId = info.runId;
+        ctx.githubRunId = info.githubRunId;
+        ctx.state = 'triggered';
+        transition(ctx, 'running', 'Resuming previous validation run…');
+        if (ctx.ui?.logsWrap) ctx.ui.logsWrap.style.display = mode === 'workflow' ? 'block' : 'none';
+        schedulePoll(ctx, 0);
+      }
+    }
+  } catch {/* ignore */}
 
   return {
     start: () => startValidation(ctx),
@@ -402,6 +432,20 @@ function finalize(ctx: InternalContext, state: ValidationState, data?: any) {
   } else if (ui.details && state === 'completed-failure' && !data?.results?.details) {
     ui.details.innerHTML = `<div style="background:#f6f8fa; padding:12px; border-radius:6px;">No detailed results provided. Check GitHub run for more information.</div>`;
   }
+  // Timeout continuation button support
+  if (state === 'timeout' && ui.summary) {
+    const btnId = `td-val-continue-${ctx.runId || 'x'}`;
+    ui.summary.innerHTML += `<p><button id="${btnId}" class="btn btn-primary" style="margin-top:8px;">Continue Checking Status</button></p>`;
+    setTimeout(() => {
+      const b = document.getElementById(btnId);
+      if (b) b.addEventListener('click', () => {
+        if (!ctx.runId) return;
+        ctx.state = 'running';
+        transition(ctx, 'running', 'Continuing to poll…');
+        schedulePoll(ctx, 0);
+      });
+    }, 0);
+  }
   // Notifications
   switch (state) {
     case 'completed-success': notify('success', 'Validation Success', `Run ${ctx.runId}`, 5000); break;
@@ -435,18 +479,42 @@ function detailsTemplate(details: any[]): string {
   const failed = details.filter(d => d.status === 'fail');
   const warn = details.filter(d => d.status === 'warn');
   const pass = details.filter(d => d.status === 'pass');
-  const block = (title: string, icon: string, arr: any[], cls: string) => arr.length ? `<div style="margin-bottom:16px;">
-    <h4 style="margin:0 0 8px 0;">${icon} ${title} (${arr.length})</h4>
-    <ul>${arr.map(d => `<li><strong>${escapeHtml(d.category)}</strong>: ${escapeHtml(d.message)}${d.issues?.length ? `<ul>${d.issues.map((i:any)=>`<li>${escapeHtml(i)}</li>`).join('')}</ul>`:''}</li>`).join('')}</ul>
-  </div>` : '';
-  return block('Failed Checks','❌',failed,'fail') + block('Warnings','⚠️',warn,'warn') + block('Passed Checks','✅',pass,'pass');
+  const section = (title: string, icon: string, arr: any[], color: string) => arr.length ? `
+    <details open style="margin:0 0 12px 0; border:1px solid ${color}; border-radius:6px;">
+      <summary style="cursor:pointer; padding:8px 12px; font-weight:600; background:rgba(0,0,0,0.03);">${icon} ${title} (${arr.length})</summary>
+      <div style="padding:10px 14px; font-size:13px; line-height:1.45;">
+        ${arr.map(d => `
+          <div style="margin:0 0 12px 0;">
+            <div style="font-weight:600;">${escapeHtml(d.category)}</div>
+            <div style="margin:4px 0 6px 0;">${escapeHtml(d.message)}</div>
+            ${d.issues?.length ? `<ul style=\"margin:4px 0 0 16px; padding:0; list-style:disc;\">${d.issues.map((i:any)=>`<li style=\"margin:2px 0;\">${escapeHtml(i)}</li>`).join('')}</ul>`:''}
+          </div>
+        `).join('')}
+      </div>
+    </details>` : '';
+  return [
+    section('Failed Checks','❌',failed,'#f9d0d0'),
+    section('Warnings','⚠️',warn,'#f1e05a'),
+    section('Passed Checks','✅',pass,'#34d058')
+  ].join('');
 }
 
 function summaryTemplate(ctx: InternalContext, state: ValidationState, data: any): string {
   const runLink = data?.runUrl ? `<p><a href="${data.runUrl}" target="_blank" rel="noopener noreferrer">View workflow on GitHub</a></p>` : '';
+  // Derive check counts if available
+  let counts = '';
+  try {
+    const details = data?.results?.details;
+    if (Array.isArray(details) && details.length) {
+      const fail = details.filter((d:any)=>d.status==='fail').length;
+      const warn = details.filter((d:any)=>d.status==='warn').length;
+      const pass = details.filter((d:any)=>d.status==='pass').length;
+      counts = `<div style="margin-top:8px; font-size:12px; line-height:1.4;">Checks: <strong>${pass}</strong> pass • <strong>${warn}</strong> warn • <strong>${fail}</strong> fail</div>`;
+    }
+  } catch {/* ignore */}
   switch (state) {
-    case 'completed-success': return `<strong>Success!</strong> Template passed all checks.${runLink}`;
-    case 'completed-failure': return `<strong>Validation Failed.</strong> Issues detected.${runLink}`;
+    case 'completed-success': return `<strong>Success!</strong> Template passed all checks.${counts}${runLink}`;
+    case 'completed-failure': return `<strong>Validation Failed.</strong> Issues detected.${counts}${runLink}`;
     case 'cancelled': return `<strong>Cancelled.</strong> Workflow cancellation requested.${runLink}`;
     case 'timeout': return `<strong>Timeout.</strong> Still running in background? ${runLink}`;
     default: return `<strong>${state}</strong> ${runLink}`;
