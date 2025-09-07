@@ -141,7 +141,32 @@ export const NotificationSystem: NotificationAPI = {
 
 // Attach to window for backward compatibility (script-tag usage)
 if (typeof window !== 'undefined') {
-  (window as any).NotificationSystem = (window as any).NotificationSystem || NotificationSystem;
+  const existing: any = (window as any).NotificationSystem;
+  if (!existing || !existing.__queue) {
+    (window as any).NotificationSystem = NotificationSystem;
+  } else {
+    // Replace stub with real implementation but flush queued notifications first
+    const queued = Array.isArray(existing.__queue) ? existing.__queue.slice() : [];
+    (window as any).NotificationSystem = NotificationSystem;
+    if (queued.length) {
+      // Process asynchronously to avoid blocking load
+      setTimeout(() => {
+        queued.forEach((n: any) => {
+          try {
+            switch (n.type) {
+              case 'success': NotificationSystem.showSuccess(n.title, n.message, n.duration); break;
+              case 'error': NotificationSystem.showError(n.title, n.message, n.duration); break;
+              case 'warning': NotificationSystem.showWarning(n.title, n.message, n.duration); break;
+              default: NotificationSystem.showInfo(n.title, n.message, n.duration); break;
+            }
+          } catch (e) {
+            // eslint-disable-next-line no-console
+            console.warn('[notification-system] Failed to flush queued item', e);
+          }
+        });
+      }, 0);
+    }
+  }
 }
 
 export default NotificationSystem;

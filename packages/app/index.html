@@ -49,6 +49,38 @@
       }
     </style>
     <script src="https://d3js.org/d3.v7.min.js"></script>
+    <!-- Notification guard stub: establishes a temporary queue so legacy scripts can call notifications
+         before the TypeScript module system loads the real implementation. Removed legacy script tags below. -->
+    <script>
+      (function(){
+        if(window.NotificationSystem && !window.NotificationSystem.__queue) return; // real system already
+        var q = [];
+        function enqueue(type,title,message,duration){ q.push({type:type,title:title,message:message,duration:duration}); }
+        window.NotificationSystem = { __queue:q,
+          showSuccess:function(t,m,d){ enqueue('success',t,m,d); },
+          showError:function(t,m,d){ enqueue('error',t,m,d); },
+          showWarning:function(t,m,d){ enqueue('warning',t,m,d); },
+          showInfo:function(t,m,d){ enqueue('info',t,m,d); },
+          confirm:function(){ console.warn('[NotificationGuard] confirm invoked before system ready'); }
+        };
+        // Legacy Notifications facade (subset) maps to queue
+        if(!window.Notifications){
+          window.Notifications = {
+            info:function(t,m,d){ enqueue('info',t,m,d); },
+            success:function(t,m,d){ enqueue('success',t,m,d); },
+            warning:function(t,m,d){ enqueue('warning',t,m,d); },
+            error:function(t,m,d){ enqueue('error',t,m,d); },
+            showConfirmation:function(title,message){ enqueue('warning',title,message,0); },
+            showLoading:function(title,message){
+              var id='guard-loading';
+              enqueue('info', title||'Loading...', message||'', 0);
+              return { id:id, update:function(){}, success:function(st,sm){ enqueue('success', st||'Success', sm||'', 5000); }, error:function(et,em){ enqueue('error', et||'Error', em||'', 8000); }, close:function(){} };
+            }
+          };
+        }
+        console.debug('[notification-guard] stub initialized; queueing until real system loads');
+      })();
+    </script>
   </head>
   <body>
     <header>
@@ -276,11 +308,7 @@
 
     <!-- Debug console (press Alt+D to show) - Must load first for logging -->
     <script src="js/debug-console.js"></script>
-  <!-- Notification systems (legacy + migrated). TODO: remove legacy scripts once audited -->
-  <script src="js/notification-system.js"></script>
-  <script src="js/notifications.js"></script>
-  <script src="js/notifications-compat.js"></script>
-  <script src="js/notifications-init.js"></script>
+  <!-- Notification systems removed (legacy). Real system provided via module graph; guard stub above handles early calls. -->
   <!-- API route builder (version aware) -->
   <script src="js/api-routes.js"></script>
     <!-- GitHub OAuth handling -->
