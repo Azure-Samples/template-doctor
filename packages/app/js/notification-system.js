@@ -204,6 +204,8 @@
         break;
     }
 
+    notification.setAttribute('role', type === 'error' ? 'alert' : 'status');
+    notification.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
     notification.innerHTML = `
       ${icon}
       <button class="notification-close" aria-label="Close" onclick="document.getElementById('${notificationId}').remove()">

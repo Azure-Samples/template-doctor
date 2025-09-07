@@ -49,9 +49,13 @@ class NotificationSystem {
     const id = `${this.notificationIdPrefix}${++this.notificationCount}`;
 
     // Create notification element
-    const notification = document.createElement('div');
-    notification.id = id;
-    notification.className = `notification ${type}`;
+  const notification = document.createElement('div');
+  notification.id = id;
+  notification.className = `notification ${type}`;
+  // Accessibility
+  notification.setAttribute('role', type === 'error' ? 'alert' : 'status');
+  notification.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
+  notification.setAttribute('aria-atomic', 'true');
 
     // Add content
     notification.innerHTML = `

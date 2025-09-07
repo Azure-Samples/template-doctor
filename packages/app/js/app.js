@@ -2702,4 +2702,3 @@ document.addEventListener('template-analyzer-ready', () => {
   }
 });
 
-// forkRepositoryUnified removed (replaced by direct TemplateDoctorApiClient usage)

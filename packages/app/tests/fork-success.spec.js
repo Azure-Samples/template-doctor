@@ -1,12 +1,10 @@
 import { test, expect } from '@playwright/test';
+import { enableBackendMigration, reaffirmBackendMigration, ensureApiClientReady } from './utils/feature-flags.js';
 
 // Positive path: backend returns successful fork metadata (simulated) and notification should not be warning.
 test.describe('Fork flow - success path', () => {
   test('returns structured fork response (no SAML)', async ({ page }) => {
-    await page.addInitScript(() => {
-      window.TemplateDoctorConfig = window.TemplateDoctorConfig || {};
-      window.TemplateDoctorConfig.features = { ...(window.TemplateDoctorConfig.features||{}), backendMigration: true };
-    });
+    await enableBackendMigration(page);
 
     const successPayload = {
       forkOwner: 'tester',
@@ -19,12 +17,9 @@ test.describe('Fork flow - success path', () => {
     await page.route('**/v4/repo-fork', handler);
     await page.route('**/api/v4/repo-fork', handler);
 
-    await page.goto('/');
-    await page.waitForFunction(() => !!window.TemplateDoctorApiClient, null, { timeout: 15000 });
-    await page.evaluate(() => {
-      window.TemplateDoctorConfig = window.TemplateDoctorConfig || {};
-      window.TemplateDoctorConfig.features = { ...(window.TemplateDoctorConfig.features||{}), backendMigration: true };
-    });
+  await page.goto('/');
+  await ensureApiClientReady(page);
+  await reaffirmBackendMigration(page);
 
     const respPromise = page.waitForResponse(r => r.url().includes('/v4/repo-fork') && r.status() === 200);
     await page.evaluate(async () => {
