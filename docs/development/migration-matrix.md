@@ -16,14 +16,14 @@ Legend:
 | `notifications-init.js` | Migrated | Yes | `modules/notifications-init.ts` | Same removal batch as other notification files. |
 | `api-routes.js` | Migrated | Yes | `scripts/api-routes.ts` | Remove legacy after confirming no dynamic import references. |
 | `auth.js` | Migrated | Yes | `scripts/auth.ts` | Remove legacy. |
-| `github-client.js` / `github-client-new.js` | Obsolete | Yes | `scripts/github-client.ts` | Delete both legacy variants. Already superseded. |
+| `github-client.js` / `github-client-new.js` | Obsolete (Removed) | Yes | `scripts/github-client.ts` | Deleted legacy files in repo. |
 | `analyzer.js` | Migrated | Yes | `scripts/analyzer.ts` | Remove legacy. |
 | `report-loader.js` | Migrated | Yes | `scripts/report-loader.ts` | Remove legacy. |
 | `dashboard-renderer.js` | Migrated | Yes | `scripts/dashboard-renderer.ts` | Remove legacy. |
 | `config-loader.js` | Migrated | Yes | `scripts/config-loader.ts` | Remove after verify no inline HTML script tag references. |
 | `runtime-config.js` | Migrated | Yes | `scripts/runtime-config.ts` | Remove; ensure `TemplateDoctorConfig` still globally exposed via build. |
 | `templates-data-loader.js` | Partial | Yes (core list logic) | `scripts/template-list.ts` | Audit for extra metadata/history injection not yet ported. Create follow-up ticket to replicate missing pieces. |
-| `tooltips.js` | Legacy | No | – | Easy port: encapsulate delegation in `modules/tooltips.ts`. Good starter task. |
+| `tooltips.js` | Migrated (Removed) | Yes | `modules/tooltips.ts` | Legacy file deleted after port. |
 | `github-issue-handler.js` | Legacy | Partial (service primatives) | `scripts/issue-service.ts`, `scripts/api-client.ts` | Port UI orchestration: tie form events => issue-service. Need notifications + label creation result surfacing. |
 | `github-workflow-validation.js` | Legacy | No | – | Build TS module for dispatch + polling + notifications; may share logic with validation endpoints if backend path exists. |
 | `ruleset-modal.js` | Legacy | No | – | Self-contained; create `modules/ruleset-modal.ts`. Medium complexity (DOM + events). |
@@ -37,12 +37,16 @@ Legend:
 | `test-fork-workflow.js` | Legacy | Obsolete | Playwright specs | Delete; replaced by fork E2E tests. |
 | `app.js` | Mixed | Yes (distributed) | Multiple (`api-client.ts`, `issue-service.ts`, `batch-scan.ts`, etc.) | Progressive extraction approach: split remaining monolith concerns into focused modules. Track subtasks. |
 
+### In-Progress Extraction Notes
+- Batch Scan: Legacy IndexedDB + per-item card logic scaffolded into `scripts/batch-scan-legacy.ts` (phase 1). Next: migrate resume/retry UI fully and remove overlapping block from `app.js`.
+- Notifications: Legacy script tags still present; plan removal after confirming no late-binding global consumers. Run audit script before PR.
+
 ## Extraction Roadmap (Proposed Next Steps)
 1. Low-Hanging Ports: `tooltips.js`, `ruleset-modal.js`.
 2. High-Value Functional: `github-issue-handler.js` (user-facing issue creation UI) -> integrate with `issue-service.ts` & surface child issue results.
 3. Validation Stack: Combine `github-workflow-validation.js` + `template-validation.js` into `validation.ts` with backend integration if available.
 4. Monolith Decomposition: Incrementally peel `app.js` (batch scan polling -> `batch-scan.ts`, notification wiring -> already done, search handling -> `search.ts`).
-5. Cleanup & Deletions: Remove fully migrated notification + client + loader scripts in a single PR to reduce churn.
+5. Cleanup & Deletions: Remove fully migrated notification + loader scripts (clients & tooltips already removed). Run `scripts/legacy-script-audit.sh` before PR.
 6. Obsolescence Audit: Confirm usage of provisioning, demo, action buttons, ruleset docs; decide remove or redesign.
 
 ## Tracking Labels (Suggested)
