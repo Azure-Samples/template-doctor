@@ -20,4 +20,9 @@ declare interface Window {
   GitHubAuth?: GitHubAuthLike; // unified global auth handle
   GitHubClient?: any;          // legacy compatibility surface (now TS instance)
   GitHubClientTS?: any;        // direct reference to TS client for debugging/tests
+  showRulesetModal?: (repoUrl: string) => void; // ruleset modal launcher
+  TemplateValidation?: any; // backward compat
+  GitHubWorkflowValidation?: any; // backward compat
+  initGithubWorkflowValidation?: any;
+  runGithubWorkflowValidation?: any;
 }

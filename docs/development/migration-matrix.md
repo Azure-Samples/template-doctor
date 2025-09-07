@@ -24,12 +24,12 @@ Legend:
 | `runtime-config.js` | Migrated | Yes | `scripts/runtime-config.ts` | Remove; ensure `TemplateDoctorConfig` still globally exposed via build. |
 | `templates-data-loader.js` | Partial | Yes (core list logic) | `scripts/template-list.ts` | Audit for extra metadata/history injection not yet ported. Create follow-up ticket to replicate missing pieces. |
 | `tooltips.js` | Migrated (Removed) | Yes | `modules/tooltips.ts` | Legacy file deleted after port. |
-| `github-issue-handler.js` | Legacy | Partial (service primatives) | `scripts/issue-service.ts`, `scripts/api-client.ts` | Port UI orchestration: tie form events => issue-service. Need notifications + label creation result surfacing. |
-| `github-workflow-validation.js` | Legacy | No | – | Build TS module for dispatch + polling + notifications; may share logic with validation endpoints if backend path exists. |
-| `ruleset-modal.js` | Legacy | No | – | Self-contained; create `modules/ruleset-modal.ts`. Medium complexity (DOM + events). |
+| `github-issue-handler.js` | Obsolete (Removed) | Yes | `scripts/issue-service.ts`, `scripts/api-client.ts` | Removed stub; TS service exposes `window.createGitHubIssue`. |
+| `github-workflow-validation.js` | Migrated (Phase 1) | Yes (partial parity) | `modules/validation.ts` | Unified module created; advanced diagnostics/logs parity (rich cards, continue polling UI) slated Phase 2. |
+| `ruleset-modal.js` | Migrated | Yes | `modules/ruleset-modal.ts` | Legacy file deleted; global `showRulesetModal` preserved. |
 | `ruleset-docs/analyzer.js` | Legacy | No | – | Niche; evaluate actual usage (maybe remove or rewrite as docs enhancement). |
 | `azd-provision.js` | Legacy | No | – | Determine active usage; if unused in UI flows, mark Obsolete. |
-| `template-validation.js` | Legacy | No | – | Check overlap with `github-workflow-validation.js`; potentially merge when porting. |
+| `template-validation.js` | Migrated (Phase 1) | Yes (partial parity) | `modules/validation.ts` | Unified simple + workflow modes; synthetic progress maintained. Further accessibility/report polish Phase 2. |
 | `enable-demo-mode.js` / `demo-helper.js` | Legacy | No | – | Optional; gate behind query param; port late or drop. |
 | `saml-auto-fork.js` | Legacy | Partial (logic integrated) | `scripts/api-client.ts` (fork SAML handling) | Most behavior merged; delete after confirming no residual references. |
 | `github-action-hook.js` | Legacy | No | – | Audit: handles backend dispatch events. If backend Functions fully replace, mark Obsolete. |

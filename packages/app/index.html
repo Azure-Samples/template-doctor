@@ -314,22 +314,18 @@
     <!-- GitHub OAuth handling -->
     <script src="js/auth.js"></script>
   <!-- Legacy GitHub client fully removed (TypeScript replacement loaded via module graph) -->
-    <!-- GitHub issue handling -->
-    <!-- <script src="js/github-issue-handler.js"></script> -->
-    <script><!-- Legacy github-issue-handler.js removed; replaced by TS issue-service shim in src/scripts/issue-service.ts --></script>
+  <!-- GitHub issue handling migrated: legacy stub removed (issue-service.ts provides window.createGitHubIssue) -->
     <!-- Ruleset for Docs org -->
     <script src="js/ruleset-docs/analyzer.js"></script>
     <!-- Template data loader - loads previously scanned templates -->
     <script src="js/templates-data-loader.js"></script>
   <!-- Tooltips functionality migrated to TypeScript (modules/tooltips.ts) -->
-    <!-- Ruleset modal functionality -->
-    <script src="js/ruleset-modal.js"></script>
+  <!-- Ruleset modal migrated to TypeScript (modules/ruleset-modal.ts) -->
     <!-- GitHub Action hook for analysis submission -->
     <script src="js/github-action-hook.js"></script>
     <!-- AZD Provision functionality -->
     <script src="js/azd-provision.js"></script>
-    <!-- Template validation via GitHub workflow -->
-    <script src="js/github-workflow-validation.js?v=20250829"></script>
+  <!-- Validation scripts migrated to TypeScript (modules/validation.ts) -->
     <!-- Demo mode for presentations -->
     <script src="js/enable-demo-mode.js"></script>
     <!-- Runtime configuration -->
