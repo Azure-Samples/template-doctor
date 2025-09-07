@@ -21,6 +21,9 @@ import './scripts/search';
 import './scripts/api-client';
 import './scripts/issue-service';
 import './scripts/batch-scan';
+import './modules/tooltips';
+// Legacy batch scan UI (IndexedDB + per-item cards) extraction in progress
+import './scripts/batch-scan-legacy';
 // TODO: migrate and add remaining legacy scripts progressively.
 
 // Simple runtime confirmation that the module graph executed.

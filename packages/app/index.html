@@ -276,20 +276,16 @@
 
     <!-- Debug console (press Alt+D to show) - Must load first for logging -->
     <script src="js/debug-console.js"></script>
-    <!-- New Notification system -->
-    <script src="js/notification-system.js"></script>
-    <!-- Legacy Notification system (for backward compatibility) -->
-    <script src="js/notifications.js"></script>
-    <!-- Notification system compatibility layer -->
-    <script src="js/notifications-compat.js"></script>
-    <!-- Notification system initialization -->
-    <script src="js/notifications-init.js"></script>
+  <!-- Notification systems (legacy + migrated). TODO: remove legacy scripts once audited -->
+  <script src="js/notification-system.js"></script>
+  <script src="js/notifications.js"></script>
+  <script src="js/notifications-compat.js"></script>
+  <script src="js/notifications-init.js"></script>
   <!-- API route builder (version aware) -->
   <script src="js/api-routes.js"></script>
     <!-- GitHub OAuth handling -->
     <script src="js/auth.js"></script>
-  <!-- Removed legacy GitHub API client (now replaced by TypeScript module in /src) -->
-  <!-- <script src="js/github-client-new.js"></script> -->
+  <!-- Legacy GitHub client fully removed (TypeScript replacement loaded via module graph) -->
     <!-- GitHub issue handling -->
     <!-- <script src="js/github-issue-handler.js"></script> -->
     <script><!-- Legacy github-issue-handler.js removed; replaced by TS issue-service shim in src/scripts/issue-service.ts --></script>
@@ -297,8 +293,7 @@
     <script src="js/ruleset-docs/analyzer.js"></script>
     <!-- Template data loader - loads previously scanned templates -->
     <script src="js/templates-data-loader.js"></script>
-    <!-- Tooltips functionality -->
-    <script src="js/tooltips.js"></script>
+  <!-- Tooltips functionality migrated to TypeScript (modules/tooltips.ts) -->
     <!-- Ruleset modal functionality -->
     <script src="js/ruleset-modal.js"></script>
     <!-- GitHub Action hook for analysis submission -->
