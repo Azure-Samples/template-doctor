@@ -17,7 +17,12 @@ test.describe('Fork flow - SAML remediation', () => {
       documentationUrl: 'https://docs.github.com/en/enterprise-cloud@latest/organizations/managing-saml-single-sign-on-for-your-organization',
       authorizeUrl: 'https://github.com/orgs/example/sso?authorization_request=xyz'
     };
-    const handler = async route => route.fulfill({ status: 403, contentType: 'application/json', body: JSON.stringify(samlPayload) });
+    const handler = async route => {
+      if (route.request().method() === 'OPTIONS') {
+        return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'POST,OPTIONS', 'access-control-allow-headers': 'Content-Type' } });
+      }
+      return route.fulfill({ status: 403, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(samlPayload) });
+    };
     await page.route('**/v4/repo-fork', handler);
     await page.route('**/api/v4/repo-fork', handler);
 

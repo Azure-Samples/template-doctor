@@ -1,5 +1,25 @@
 import { test, expect } from '@playwright/test';
 
+// Helper to mock JSON endpoint with CORS + OPTIONS handling
+async function mockJson(page: import('@playwright/test').Page, pattern: string | RegExp, body: any, status = 200) {
+  await page.route(pattern, async (route: import('@playwright/test').Route) => {
+    const method = route.request().method();
+    if (method === 'OPTIONS') {
+      return route.fulfill({ status: 204, headers: {
+        'access-control-allow-origin': '*',
+        'access-control-allow-methods': 'GET,POST,OPTIONS',
+        'access-control-allow-headers': 'Content-Type, Authorization'
+      }});
+    }
+    await route.fulfill({
+      status,
+      contentType: 'application/json',
+      headers: { 'access-control-allow-origin': '*' },
+      body: JSON.stringify(body)
+    });
+  });
+}
+
 // Happy path test for migrated azd-provision module.
 // Verifies that triggering runAzdProvisionTest creates log UI, sends start + status requests,
 // and logs completion without waiting for long polling intervals.
@@ -9,35 +29,8 @@ test.describe('AZD Provision (validation workflow) module', () => {
   // by registering a listener before invoking testAzdProvision and capturing detail payload.
   // Current tests indirectly exercise start path but do not explicitly assert event emission.
   test('AZD Provision emits start custom event with run metadata', async ({ page }) => {
-    // Intercept both versioned and non-versioned forms because ApiRoutes.build may omit /v4
-    await page.route('http://localhost:7071/api/v4/validation-template', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ runId: 'RUN_EVT', githubRunId: 999, githubRunUrl: 'https://example.test/run/evt' }),
-      });
-    });
-    await page.route('http://localhost:7071/api/validation-template', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ runId: 'RUN_EVT', githubRunId: 999, githubRunUrl: 'https://example.test/run/evt' }),
-      });
-    });
-    await page.route('http://localhost:7071/api/v4/validation-status*', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ status: 'completed', conclusion: 'success', githubRunId: 999 }),
-      });
-    });
-    await page.route('http://localhost:7071/api/validation-status*', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ status: 'completed', conclusion: 'success', githubRunId: 999 }),
-      });
-    });
+    await mockJson(page, /http:\/\/localhost:7071\/api(\/v4)?\/validation-template$/, { runId: 'RUN_EVT', githubRunId: 999, githubRunUrl: 'https://example.test/run/evt' });
+    await mockJson(page, /http:\/\/localhost:7071\/api(\/v4)?\/validation-status.*/, { status: 'completed', conclusion: 'success', githubRunId: 999 });
     await page.addInitScript(() => {
       (window as any).reportData = { repoUrl: 'https://github.com/Azure-Samples/azd-template-artifacts' };
       (window as any).Notifications = { loading: () => ({ success: () => {}, error: () => {}, warning: () => {}, info: () => {} }), confirm: (_t: string, _m: string, opts: any) => opts?.onConfirm?.(), error: () => {} };
@@ -59,38 +52,19 @@ test.describe('AZD Provision (validation workflow) module', () => {
     let startCalled = false;
     let statusCalled = false;
 
-    await page.route('http://localhost:7071/api/v4/validation-template', async (route) => {
+    await page.route(/http:\/\/localhost:7071\/api(\/v4)?\/validation-template$/, async route => {
+      if (route.request().method() === 'OPTIONS') {
+        return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'POST,OPTIONS', 'access-control-allow-headers': 'Content-Type' } });
+      }
       startCalled = true;
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ runId: 'RUN123', githubRunId: 42, githubRunUrl: 'https://example.test/run/42', requestId: 'REQ1' }),
-      });
+      return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ runId: 'RUN123', githubRunId: 42, githubRunUrl: 'https://example.test/run/42', requestId: 'REQ1' }) });
     });
-    await page.route('http://localhost:7071/api/validation-template', async (route) => {
-      startCalled = true;
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ runId: 'RUN123', githubRunId: 42, githubRunUrl: 'https://example.test/run/42', requestId: 'REQ1' }),
-      });
-    });
-
-    await page.route('http://localhost:7071/api/v4/validation-status*', async (route) => {
+    await page.route(/http:\/\/localhost:7071\/api(\/v4)?\/validation-status.*/, async route => {
+      if (route.request().method() === 'OPTIONS') {
+        return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET,OPTIONS', 'access-control-allow-headers': 'Content-Type' } });
+      }
       statusCalled = true;
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ status: 'completed', conclusion: 'success', githubRunId: 42 }),
-      });
-    });
-    await page.route('http://localhost:7071/api/validation-status*', async (route) => {
-      statusCalled = true;
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ status: 'completed', conclusion: 'success', githubRunId: 42 }),
-      });
+      return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ status: 'completed', conclusion: 'success', githubRunId: 42 }) });
     });
 
     // Pre-inject required globals before any scripts execute
@@ -135,56 +109,21 @@ test.describe('AZD Provision (validation workflow) module', () => {
     let statusCalls = 0;
     let cancelCalled = false;
 
-    await page.route('http://localhost:7071/api/v4/validation-template', async (route) => {
+    await page.route(/http:\/\/localhost:7071\/api(\/v4)?\/validation-template$/, async route => {
+      if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'POST,OPTIONS', 'access-control-allow-headers': 'Content-Type' } });
       startCalled = true;
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ runId: 'RUN_CANCEL', githubRunId: 100 }),
-      });
+      return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ runId: 'RUN_CANCEL', githubRunId: 100 }) });
     });
-    await page.route('http://localhost:7071/api/validation-template', async (route) => {
-      startCalled = true;
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ runId: 'RUN_CANCEL', githubRunId: 100 }),
-      });
+    await page.route(/http:\/\/localhost:7071\/api(\/v4)?\/validation-status.*/, async route => {
+      if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET,OPTIONS', 'access-control-allow-headers': 'Content-Type' } });
+      statusCalls++;
+      return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ status: 'in_progress' }) });
     });
 
-    await page.route('http://localhost:7071/api/v4/validation-status*', async (route) => {
-      statusCalls++;
-      // Always return in-progress until cancelled
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ status: 'in_progress' }),
-      });
-    });
-    await page.route('http://localhost:7071/api/validation-status*', async (route) => {
-      statusCalls++;
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ status: 'in_progress' }),
-      });
-    });
-
-    await page.route('http://localhost:7071/api/v4/validation-cancel', async (route) => {
+    await page.route(/http:\/\/localhost:7071\/api(\/v4)?\/validation-cancel$/, async route => {
+      if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'POST,OPTIONS', 'access-control-allow-headers': 'Content-Type' } });
       cancelCalled = true;
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ githubRunId: 100 }),
-      });
-    });
-    await page.route('http://localhost:7071/api/validation-cancel', async (route) => {
-      cancelCalled = true;
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ githubRunId: 100 }),
-      });
+      return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ githubRunId: 100 }) });
     });
 
     await page.addInitScript(() => {
@@ -216,11 +155,9 @@ test.describe('AZD Provision (validation workflow) module', () => {
   });
 
   test('AZD Provision start error handling', async ({ page }) => {
-    await page.route('http://localhost:7071/api/v4/validation-template', async (route) => {
-      await route.fulfill({ status: 500, contentType: 'text/plain', body: 'boom' });
-    });
-    await page.route('http://localhost:7071/api/validation-template', async (route) => {
-      await route.fulfill({ status: 500, contentType: 'text/plain', body: 'boom' });
+    await page.route(/http:\/\/localhost:7071\/api(\/v4)?\/validation-template$/, async route => {
+      if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'POST,OPTIONS', 'access-control-allow-headers': 'Content-Type' } });
+      await route.fulfill({ status: 500, contentType: 'text/plain', headers: { 'access-control-allow-origin': '*' }, body: 'boom' });
     });
 
     await page.addInitScript(() => {
@@ -242,35 +179,14 @@ test.describe('AZD Provision (validation workflow) module', () => {
 
   test('AZD Provision timeout path (shortened)', async ({ page }) => {
     let statusCalls = 0;
-    await page.route('http://localhost:7071/api/v4/validation-template', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ runId: 'RUN_TIMEOUT' }),
-      });
+    await page.route(/http:\/\/localhost:7071\/api(\/v4)?\/validation-template$/, async route => {
+      if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'POST,OPTIONS', 'access-control-allow-headers': 'Content-Type' } });
+      await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ runId: 'RUN_TIMEOUT' }) });
     });
-    await page.route('http://localhost:7071/api/validation-template', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ runId: 'RUN_TIMEOUT' }),
-      });
-    });
-    await page.route('http://localhost:7071/api/v4/validation-status*', async (route) => {
+    await page.route(/http:\/\/localhost:7071\/api(\/v4)?\/validation-status.*/, async route => {
+      if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET,OPTIONS', 'access-control-allow-headers': 'Content-Type' } });
       statusCalls++;
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ status: 'in_progress' }),
-      });
-    });
-    await page.route('http://localhost:7071/api/validation-status*', async (route) => {
-      statusCalls++;
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ status: 'in_progress' }),
-      });
+      await route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify({ status: 'in_progress' }) });
     });
 
     await page.addInitScript(() => {

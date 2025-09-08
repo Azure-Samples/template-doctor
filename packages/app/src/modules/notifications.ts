@@ -58,6 +58,15 @@ class RichNotificationSystem {
     const el = document.createElement('div');
     el.id = id;
     el.className = `notification ${type}`;
+    // Accessibility attributes: map severity to ARIA semantics.
+    // warning/error => assertive (role=alert), success/info => polite (role=status)
+    if (type === 'warning' || type === 'error') {
+      el.setAttribute('role', 'alert');
+      el.setAttribute('aria-live', 'assertive');
+    } else {
+      el.setAttribute('role', 'status');
+      el.setAttribute('aria-live', 'polite');
+    }
     el.innerHTML = `
       <div class="notification-header">
         <h3 class="notification-title">${this.getIconForType(type)} ${title || this.getTitleForType(type)}</h3>

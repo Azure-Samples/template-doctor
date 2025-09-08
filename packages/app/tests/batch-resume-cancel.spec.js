@@ -43,7 +43,8 @@ test.describe('Batch resume and cancel', () => {
     await page.goto('/');
     await mockAuthAndDeps(page);
     // Wait for notifications so confirmation interception is reliable
-    await page.waitForFunction(() => !!(window.__notificationsReady && window.NotificationSystem && window.NotificationSystem.showConfirmation), { timeout: 5000 });
+  // Accept either explicit readiness marker or presence of a confirmation-capable notification API
+  await page.waitForFunction(() => !!( (window.__notificationsReady && window.NotificationSystem && window.NotificationSystem.showConfirmation) || (window.NotificationSystem && (window.NotificationSystem.showConfirmation || window.NotificationSystem.confirm)) || (window.Notifications && window.Notifications.confirm) ), { timeout: 5000 });
   });
 
   test('resume skips previously successful items and updates progress', async ({ page }) => {
