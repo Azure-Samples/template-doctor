@@ -9,6 +9,8 @@
      window.LegacyBatchScan.db   (debug reference)
      window.LegacyBatchScan.store (progress helpers)
 */
+// Ensure module scope so top-level symbols (e.g., `state`) don't collide with other script files (tooltips.ts etc.)
+export {};
 
 interface LegacyBatchProgressEntry { id: string; url: string; status: string; timestamp: string; result?: any }
 

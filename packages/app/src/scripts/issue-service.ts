@@ -100,6 +100,26 @@ function buildChildIssueBody(mainTitle: string, issue: ComplianceIssue, data: Re
   return body;
 }
 
+// Ensure newer formatted violation bodies still include legacy "## Context" section expected by tests
+function ensureContextWrapper(mainTitle: string, issue: ComplianceIssue, data: ReportData, existingBody: string){
+  if(/##\s*Context/i.test(existingBody)) return existingBody; // already present
+  const sev = mapSeverity(issue.severity);
+  const ruleSet = data.ruleSet || 'dod';
+  const ruleSetCap = capitalizeFirst(ruleSet);
+  let prefix = `Child issue of: ${mainTitle}\n\n`;
+  prefix += '## Context\n';
+  prefix += `Severity: ${capitalizeFirst(sev)}\n`;
+  if(ruleSet === 'custom' && data.customConfig?.gistUrl){
+    prefix += `Rule Set: ${ruleSetCap} (custom from ${data.customConfig.gistUrl})\n`;
+  } else {
+    prefix += `Rule Set: ${ruleSetCap}\n`;
+  }
+  prefix += `Problem: ${issue.message}\n`;
+  if(issue.error) prefix += `Details: ${issue.error}\n`;
+  prefix += '\n';
+  return prefix + existingBody.replace(/^\n+/,'');
+}
+
 async function createIssues(){
   const data = getReportData();
   if(!data){ return showError('Error','No report data'); }
@@ -140,7 +160,7 @@ async function createIssues(){
       const templated = c.issueTemplate;
       return {
         title: templated?.title || c.message,
-        body: templated?.body || buildChildIssueBody(issueTitle, c, data),
+        body: templated?.body ? ensureContextWrapper(issueTitle, c, data, templated.body) : buildChildIssueBody(issueTitle, c, data),
         labels: ['template-doctor','template-doctor-child-issue', rulesetLabel, `severity:${sev}`]
       };
     });
@@ -223,7 +243,7 @@ async function processIssueCreation(github: any){
       const childLabels = ['template-doctor','template-doctor-child-issue', `ruleset:${ruleSet}`, `severity:${sev}`];
       const templated = c.issueTemplate;
       const childTitle = templated?.title || c.message;
-      const childBody = templated?.body || buildChildIssueBody(issueTitle, c, data);
+      const childBody = templated?.body ? ensureContextWrapper(issueTitle, c, data, templated.body) : buildChildIssueBody(issueTitle, c, data);
       if(github.createIssueWithoutCopilot){
         await github.createIssueWithoutCopilot(owner, repo, childTitle, childBody, childLabels);
       } else if (github.createIssueGraphQL){

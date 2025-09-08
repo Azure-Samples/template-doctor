@@ -9,6 +9,7 @@ test.describe('AZD Provision (validation workflow) module', () => {
   // by registering a listener before invoking testAzdProvision and capturing detail payload.
   // Current tests indirectly exercise start path but do not explicitly assert event emission.
   test('AZD Provision emits start custom event with run metadata', async ({ page }) => {
+    // Intercept both versioned and non-versioned forms because ApiRoutes.build may omit /v4
     await page.route('http://localhost:7071/api/v4/validation-template', async (route) => {
       await route.fulfill({
         status: 200,
@@ -16,7 +17,21 @@ test.describe('AZD Provision (validation workflow) module', () => {
         body: JSON.stringify({ runId: 'RUN_EVT', githubRunId: 999, githubRunUrl: 'https://example.test/run/evt' }),
       });
     });
+    await page.route('http://localhost:7071/api/validation-template', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ runId: 'RUN_EVT', githubRunId: 999, githubRunUrl: 'https://example.test/run/evt' }),
+      });
+    });
     await page.route('http://localhost:7071/api/v4/validation-status*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'completed', conclusion: 'success', githubRunId: 999 }),
+      });
+    });
+    await page.route('http://localhost:7071/api/validation-status*', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -52,8 +67,24 @@ test.describe('AZD Provision (validation workflow) module', () => {
         body: JSON.stringify({ runId: 'RUN123', githubRunId: 42, githubRunUrl: 'https://example.test/run/42', requestId: 'REQ1' }),
       });
     });
+    await page.route('http://localhost:7071/api/validation-template', async (route) => {
+      startCalled = true;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ runId: 'RUN123', githubRunId: 42, githubRunUrl: 'https://example.test/run/42', requestId: 'REQ1' }),
+      });
+    });
 
     await page.route('http://localhost:7071/api/v4/validation-status*', async (route) => {
+      statusCalled = true;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'completed', conclusion: 'success', githubRunId: 42 }),
+      });
+    });
+    await page.route('http://localhost:7071/api/validation-status*', async (route) => {
       statusCalled = true;
       await route.fulfill({
         status: 200,
@@ -112,6 +143,14 @@ test.describe('AZD Provision (validation workflow) module', () => {
         body: JSON.stringify({ runId: 'RUN_CANCEL', githubRunId: 100 }),
       });
     });
+    await page.route('http://localhost:7071/api/validation-template', async (route) => {
+      startCalled = true;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ runId: 'RUN_CANCEL', githubRunId: 100 }),
+      });
+    });
 
     await page.route('http://localhost:7071/api/v4/validation-status*', async (route) => {
       statusCalls++;
@@ -122,8 +161,24 @@ test.describe('AZD Provision (validation workflow) module', () => {
         body: JSON.stringify({ status: 'in_progress' }),
       });
     });
+    await page.route('http://localhost:7071/api/validation-status*', async (route) => {
+      statusCalls++;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'in_progress' }),
+      });
+    });
 
     await page.route('http://localhost:7071/api/v4/validation-cancel', async (route) => {
+      cancelCalled = true;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ githubRunId: 100 }),
+      });
+    });
+    await page.route('http://localhost:7071/api/validation-cancel', async (route) => {
       cancelCalled = true;
       await route.fulfill({
         status: 200,
@@ -164,6 +219,9 @@ test.describe('AZD Provision (validation workflow) module', () => {
     await page.route('http://localhost:7071/api/v4/validation-template', async (route) => {
       await route.fulfill({ status: 500, contentType: 'text/plain', body: 'boom' });
     });
+    await page.route('http://localhost:7071/api/validation-template', async (route) => {
+      await route.fulfill({ status: 500, contentType: 'text/plain', body: 'boom' });
+    });
 
     await page.addInitScript(() => {
       (window as any).reportData = { repoUrl: 'https://github.com/Azure-Samples/azd-template-artifacts' };
@@ -191,7 +249,22 @@ test.describe('AZD Provision (validation workflow) module', () => {
         body: JSON.stringify({ runId: 'RUN_TIMEOUT' }),
       });
     });
+    await page.route('http://localhost:7071/api/validation-template', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ runId: 'RUN_TIMEOUT' }),
+      });
+    });
     await page.route('http://localhost:7071/api/v4/validation-status*', async (route) => {
+      statusCalls++;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'in_progress' }),
+      });
+    });
+    await page.route('http://localhost:7071/api/validation-status*', async (route) => {
       statusCalls++;
       await route.fulfill({
         status: 200,

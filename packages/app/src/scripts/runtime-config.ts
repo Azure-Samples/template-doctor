@@ -11,7 +11,14 @@
     archiveCollection: 'aigallery',
     dispatchTargetRepo: ''
   };
-  (window as any).TemplateDoctorConfig = Object.assign({}, DEFAULTS);
+  // Preserve any pre-injected (e.g. test) configuration & feature flags instead of clobbering
+  const existingCfg = (window as any).TemplateDoctorConfig || {};
+  const preservedFeatures = existingCfg.features ? { ...existingCfg.features } : undefined;
+  const initial = Object.assign({}, DEFAULTS, existingCfg);
+  if (preservedFeatures) {
+    (initial as any).features = preservedFeatures; // ensure features backendMigration etc. survive
+  }
+  (window as any).TemplateDoctorConfig = initial;
   (window as any).TemplateDoctorRuntime = { lastMode: 'unknown', fallbackUsed: false };
   const loadConfig = async () => {
     try {
@@ -38,7 +45,13 @@
           mapped.autoSaveResults = /^(1|true|yes|on)$/i.test(v2);
         }
         if (!mapped.apiVersion && mapped.backend && mapped.backend.apiVersion) mapped.apiVersion = mapped.backend.apiVersion;
-        (window as any).TemplateDoctorConfig = Object.assign({}, DEFAULTS, mapped);
+        // Merge without dropping existing feature flags
+        const current = (window as any).TemplateDoctorConfig || {};
+        const merged = Object.assign({}, DEFAULTS, current, mapped);
+        if (current.features || (mapped as any).features) {
+          (merged as any).features = Object.assign({}, current.features || {}, (mapped as any).features || {});
+        }
+        (window as any).TemplateDoctorConfig = merged;
         document.dispatchEvent(new CustomEvent('template-config-loaded'));
         return;
       }
@@ -56,7 +69,12 @@
             if (typeof cfg.archiveCollection === 'string') mapped.archiveCollection = cfg.archiveCollection;
             if (typeof cfg.dispatchTargetRepo === 'string') mapped.dispatchTargetRepo = cfg.dispatchTargetRepo;
             if (!mapped.apiVersion && mapped.backend && mapped.backend.apiVersion) mapped.apiVersion = mapped.backend.apiVersion;
-          (window as any).TemplateDoctorConfig = Object.assign({}, DEFAULTS, mapped);
+          const current2 = (window as any).TemplateDoctorConfig || {};
+          const merged2 = Object.assign({}, DEFAULTS, current2, mapped);
+          if (current2.features || (mapped as any).features) {
+            (merged2 as any).features = Object.assign({}, current2.features || {}, (mapped as any).features || {});
+          }
+            (window as any).TemplateDoctorConfig = merged2;
           document.dispatchEvent(new CustomEvent('template-config-loaded'));
           console.log('[runtime-config] loaded config.json');
         } else {

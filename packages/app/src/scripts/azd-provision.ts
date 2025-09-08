@@ -1,6 +1,8 @@
 // Migrated AZD Provision / validation workflow trigger (from legacy js/azd-provision.js)
 // Provides: window.testAzdProvision, window.runAzdProvisionTest, window.appendLog
 // Also exposes a typed facade at window.AzdProvision
+// NOTE: export {} ensures this file is treated as a module so the declare global augmentation below is applied.
+export {};
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 interface ValidationStartResponse {

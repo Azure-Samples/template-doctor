@@ -213,7 +213,7 @@ class RichNotificationSystem {
   }
 }
 
-import { markNotificationsReady } from './notifications-ready';
+import { markNotificationsReady } from './notifications-ready.js';
 
 function initializeIfNeeded(){
   const w: any = (window as any);
