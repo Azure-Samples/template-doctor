@@ -24,6 +24,7 @@ import './scripts/batch-scan';
 import './modules/tooltips';
 import './modules/ruleset-modal';
 import './modules/validation';
+import './css/validation.css';
 // Legacy batch scan UI (IndexedDB + per-item cards) extraction in progress
 import './scripts/batch-scan-legacy';
 // TODO: migrate and add remaining legacy scripts progressively.

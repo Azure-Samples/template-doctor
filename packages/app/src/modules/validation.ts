@@ -51,6 +51,7 @@ export interface UnifiedValidationAPI {
   cancel(): Promise<void>;
   getState(): ValidationState;
   destroy(): void;
+  resumeLastRun(): boolean; // attempts resume, returns true if resumed
 }
 
 // -------------------------------------- Internal Helpers --------------------------------------
@@ -158,33 +159,8 @@ function buildUI(container: HTMLElement, mode: ValidationMode, features: { cance
   };
 }
 
-function injectBaseStylesOnce() {
-  if (document.getElementById('td-validation-styles')) return;
-  const style = document.createElement('style');
-  style.id = 'td-validation-styles';
-  style.textContent = `
-    .td-validation { border:1px solid #ddd; border-radius:6px; padding:16px; background:#fff; margin:16px 0; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif; }
-    .td-validation h3 { margin:0 0 12px 0; font-size:16px; }
-    .td-val-controls { display:flex; gap:8px; }
-    .td-validation .btn { padding:6px 14px; font-size:14px; cursor:pointer; border-radius:6px; }
-    .td-validation .btn-primary { background:#0366d6; color:#fff; border:1px solid #035fc2; }
-    .td-validation .btn-primary:disabled { background:#7aacde; cursor:not-allowed; }
-    .td-validation .btn-danger { background:#d73a49; color:#fff; border:1px solid #cb2431; }
-    .td-val-progress-bar { width:100%; height:10px; background:#e0e0e0; border-radius:5px; overflow:hidden; margin-top:12px; }
-    .td-val-progress-inner { height:100%; background:#28a745; width:0%; transition: width .4s ease; }
-    .td-val-status { margin-top:12px; font-size:13px; color:#586069; }
-    .td-val-logs { background:#282c34; color:#abb2bf; font-family: SFMono-Regular,Consolas,"Liberation Mono",Menlo,monospace; padding:12px; border-radius:6px; margin-top:12px; max-height:200px; overflow:auto; font-size:12px; }
-    .td-val-joblogs { background:#f6f8fa; border:1px solid #e1e4e8; border-radius:6px; margin-top:12px; padding:12px; font-size:13px; }
-    .td-val-results { margin-top:18px; }
-    .td-val-summary.success { background:#f0fff4; border:1px solid #34d058; color:#22863a; padding:12px; border-radius:6px; }
-    .td-val-summary.failure { background:#ffeef0; border:1px solid #f9d0d0; color:#b31d28; padding:12px; border-radius:6px; }
-    .td-val-summary.timeout { background:#fffbdd; border:1px solid #f1e05a; color:#735c0f; padding:12px; border-radius:6px; }
-    .td-val-details { margin-top:16px; max-height:420px; overflow:auto; }
-    .td-val-details ul { padding-left:20px; }
-    .td-val-details li { margin-bottom:6px; }
-  `;
-  document.head.appendChild(style);
-}
+// Styles have been externalized to css/validation.css (imported via main bundle)
+function injectBaseStylesOnce() { /* no-op retained for backward safety */ }
 
 // -------------------------------------- Core Implementation --------------------------------------
 export function initValidation(options: ValidationInitOptions): UnifiedValidationAPI {
@@ -264,6 +240,7 @@ export function initValidation(options: ValidationInitOptions): UnifiedValidatio
       ctx.containerEl.innerHTML = '';
       ctx.state = 'idle';
     },
+    resumeLastRun: () => manualResume(ctx)
   };
 }
 
@@ -528,6 +505,24 @@ function persistRunMeta(ctx: InternalContext) {
     localStorage.setItem(`validation_${ctx.runId}`, JSON.stringify(meta));
     localStorage.setItem('lastValidationRunInfo', JSON.stringify(meta));
   } catch {/* ignore */}
+}
+
+function manualResume(ctx: InternalContext): boolean {
+  if (ctx.state !== 'idle') return false;
+  try {
+    const stored = localStorage.getItem('lastValidationRunInfo');
+    if (!stored) return false;
+    const info = JSON.parse(stored);
+    if (!info?.runId) return false;
+    ctx.runId = info.runId;
+    ctx.githubRunId = info.githubRunId;
+    ctx.pollAttempts = 0;
+    transition(ctx, 'running', 'Resuming previous validation run…');
+    schedulePoll(ctx, 0);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function safeResponseText(resp: Response) {
