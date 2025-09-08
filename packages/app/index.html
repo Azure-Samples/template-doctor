@@ -308,11 +308,7 @@
 
     <!-- Debug console (press Alt+D to show) - Must load first for logging -->
     <script src="js/debug-console.js"></script>
-  <!-- Notification systems removed (legacy). Real system provided via module graph; guard stub above handles early calls. -->
-  <!-- API route builder (version aware) -->
-  <script src="js/api-routes.js"></script>
-    <!-- GitHub OAuth handling -->
-    <script src="js/auth.js"></script>
+  <!-- Legacy api-routes.js & auth.js removed (migrated to TypeScript module graph) -->
   <!-- Legacy GitHub client fully removed (TypeScript replacement loaded via module graph) -->
   <!-- GitHub issue handling migrated: legacy stub removed (issue-service.ts provides window.createGitHubIssue) -->
     <!-- Ruleset for Docs org -->

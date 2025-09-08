@@ -14,8 +14,8 @@ Legend:
 | `notifications.js` | Migrated (Accessibility patched) | Yes | `modules/notifications.ts` | Legacy kept for backward includes; remove after search confirms no direct script tag dependence. |
 | `notifications-compat.js` | Migrated | Yes | `modules/notifications-compat.ts` | Safe to remove with above in one PR. |
 | `notifications-init.js` | Migrated | Yes | `modules/notifications-init.ts` | Same removal batch as other notification files. |
-| `api-routes.js` | Migrated | Yes | `scripts/api-routes.ts` | Remove legacy after confirming no dynamic import references. |
-| `auth.js` | Migrated | Yes | `scripts/auth.ts` | Remove legacy. |
+| `api-routes.js` | Migrated | Yes | `scripts/api-routes.ts` | HTML script tag removed; file queued for deletion cleanup batch. |
+| `auth.js` | Migrated | Yes | `scripts/auth.ts` | HTML script tag removed; file queued for deletion cleanup batch. |
 | `github-client.js` / `github-client-new.js` | Obsolete (Removed) | Yes | `scripts/github-client.ts` | Deleted legacy files in repo. |
 | `analyzer.js` | Migrated | Yes | `scripts/analyzer.ts` | Remove legacy. |
 | `report-loader.js` | Migrated | Yes | `scripts/report-loader.ts` | Remove legacy. |
