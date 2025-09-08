@@ -25,12 +25,17 @@ interface TemplateListAPI {
   init: () => void;
   render: () => void;
   isRendered: () => boolean;
+  refresh: () => void; // re-render (used if templatesData changes dynamically)
+  getCount: () => number;
 }
 
 const SECTION_ID = 'scanned-templates-section';
 const GRID_ID = 'template-grid';
+const PAGINATION_CLASS = 'pagination';
+const PAGE_SIZE = 6; // mimic legacy pagination sizing
 
 let rendered = false;
+let currentPage = 1;
 
 function ensureSection(): HTMLElement | null {
   let section = document.getElementById(SECTION_ID);
@@ -86,37 +91,93 @@ function createCard(t: ScannedTemplateEntry): HTMLElement {
       </div>
     </div>
     <div class="card-footer">
-      <button class="view-report-btn">View Report</button>
-      <button class="rescan-btn" disabled>Rescan</button>
-      <button class="validate-btn" disabled>Run Validation</button>
+      <button class="view-report-btn" data-action="view">View Report</button>
+      <button class="rescan-btn" data-action="rescan">Rescan</button>
+      <button class="validate-btn" data-action="validate">Run Validation</button>
     </div>`;
 
   // For now only stub the view button needed by near-future tests.
-  const viewBtn = card.querySelector('.view-report-btn') as HTMLButtonElement | null;
-  if (viewBtn) {
-    viewBtn.addEventListener('click', () => {
-      // Dispatch a custom event others can hook later (e.g., dashboard renderer integration)
+  const footer = card.querySelector('.card-footer');
+  footer?.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+    if (!target || target.tagName !== 'BUTTON') return;
+    const action = target.getAttribute('data-action');
+    if (action === 'view') {
       document.dispatchEvent(new CustomEvent('template-card-view', { detail: { template: t } }));
-    });
-  }
+    } else if (action === 'rescan') {
+      document.dispatchEvent(new CustomEvent('template-card-rescan', { detail: { template: t } }));
+    } else if (action === 'validate') {
+      document.dispatchEvent(new CustomEvent('template-card-validate', { detail: { template: t } }));
+    }
+  });
   return card;
 }
 
-function render() {
-  if (rendered) return;
-  if (!window.GitHubAuth || !window.GitHubAuth.isAuthenticated()) return; // mimic legacy gate
-  const data = window.templatesData;
-  if (!Array.isArray(data) || data.length === 0) return; // nothing to render yet
+function renderPage(page: number, data: ScannedTemplateEntry[], grid: Element) {
+  grid.innerHTML = '';
+  const start = (page - 1) * PAGE_SIZE;
+  data.slice(start, start + PAGE_SIZE).forEach((entry) => grid.appendChild(createCard(entry)));
+}
 
+function renderPagination(total: number, section: HTMLElement) {
+  let container = section.querySelector(`.${PAGINATION_CLASS}`) as HTMLElement | null;
+  if (!container) {
+    container = document.createElement('div');
+    container.className = PAGINATION_CLASS;
+    container.innerHTML = `
+      <button class="prev-page" disabled>&laquo; Prev</button>
+      <span class="page-info"></span>
+      <button class="next-page" disabled>Next &raquo;</button>`;
+    section.appendChild(container);
+  }
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  const prev = container.querySelector('.prev-page') as HTMLButtonElement;
+  const next = container.querySelector('.next-page') as HTMLButtonElement;
+  const info = container.querySelector('.page-info') as HTMLElement;
+  info.textContent = `Page ${currentPage} of ${totalPages || 1}`;
+  prev.disabled = currentPage <= 1;
+  next.disabled = currentPage >= totalPages;
+  prev.onclick = () => {
+    if (currentPage > 1) {
+      currentPage--;
+      refresh();
+    }
+  };
+  next.onclick = () => {
+    if (currentPage < totalPages) {
+      currentPage++;
+      refresh();
+    }
+  };
+  container.style.display = totalPages > 1 ? 'flex' : 'none';
+}
+
+function render() {
+  if (!window.GitHubAuth || !window.GitHubAuth.isAuthenticated()) return;
+  const data = window.templatesData;
+  if (!Array.isArray(data) || data.length === 0) return;
   const section = ensureSection();
   const grid = section?.querySelector(`#${GRID_ID}`);
   if (!grid) return;
+  renderPage(currentPage, data, grid);
+  renderPagination(data.length, section as HTMLElement);
+  if (!rendered) {
+    rendered = true;
+    document.dispatchEvent(
+      new CustomEvent('template-cards-rendered', { detail: { count: data.length } }),
+    );
+  }
+}
 
-  grid.innerHTML = '';
-  data.forEach((entry) => grid.appendChild(createCard(entry)));
-  rendered = true;
-  // Announce completion (tests that inject templates may wait on this indirectly via the DOM)
-  document.dispatchEvent(new CustomEvent('template-cards-rendered', { detail: { count: data.length } }));
+function refresh() {
+  if (!rendered) return render();
+  const section = document.getElementById(SECTION_ID);
+  if (!section) return;
+  const grid = section.querySelector(`#${GRID_ID}`);
+  if (!grid) return;
+  if (!Array.isArray(window.templatesData)) return;
+  renderPage(currentPage, window.templatesData, grid);
+  renderPagination(window.templatesData.length, section);
 }
 
 function tryRenderSoon() {
@@ -140,17 +201,19 @@ function tryRenderSoon() {
 }
 
 function init() {
-  // Render immediately if possible
   render();
-  // Re-render (first time) when template data arrives
   document.addEventListener('template-data-loaded', () => {
     if (!rendered) render();
+    else refresh();
   });
-  // In case events fired before listener attached
+  document.addEventListener('template-data-updated', () => {
+    // external event to force refresh after data mutation
+    refresh();
+  });
   tryRenderSoon();
 }
 
-window.TemplateList = { init, render, isRendered: () => rendered };
+window.TemplateList = { init, render, isRendered: () => rendered, refresh, getCount: () => (Array.isArray(window.templatesData) ? window.templatesData.length : 0) };
 
 // Auto-init after DOM is ready if loaded late in the document lifecycle
 if (document.readyState === 'complete' || document.readyState === 'interactive') {

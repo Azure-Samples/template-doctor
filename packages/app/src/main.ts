@@ -21,6 +21,7 @@ import './scripts/template-card-view-handler';
 import './scripts/search';
 import './scripts/api-client';
 import './scripts/issue-service';
+import './scripts/github-action-hook';
 import './scripts/batch-scan';
 import './modules/tooltips';
 import './modules/ruleset-modal';
