@@ -192,6 +192,13 @@ function runAzdProvisionTest() {
     stopBtn.disabled = true;
     controls.appendChild(stopBtn);
     (logEl.parentNode as Node).insertBefore(controls, logEl);
+    // Test hook: allow immediate enablement of cancel button for deterministic automation
+    try {
+      const testCfg = (window as any).__AzdProvisionTestConfig;
+      if (testCfg && testCfg.immediateEnableCancel === true) {
+        stopBtn.disabled = false;
+      }
+    } catch {}
   } else {
     logEl.textContent = '';
   }
@@ -282,7 +289,8 @@ function runAzdProvisionTest() {
 
       const stopBtn = document.getElementById('azd-stop-btn') as HTMLButtonElement | null;
       if (stopBtn) {
-        stopBtn.disabled = false;
+        // Normal enable after start; if already enabled by test hook leave as-is
+        if (stopBtn.disabled) stopBtn.disabled = false;
         stopBtn.onclick = async () => {
           try {
             stopBtn.disabled = true;
@@ -308,9 +316,35 @@ function runAzdProvisionTest() {
             stopBtn.textContent = 'Cancel Validation';
           }
         };
+
+        // Test hook: optional automatic cancellation to avoid timing flakiness in E2E tests.
+        // Enabled by setting window.__AzdProvisionTestConfig = { autoCancel: true, autoCancelDelay?: number }
+        try {
+          const testCfg = (window as any).__AzdProvisionTestConfig;
+            if (testCfg?.autoCancel) {
+              const delay = typeof testCfg.autoCancelDelay === 'number' ? testCfg.autoCancelDelay : 10;
+              setTimeout(() => {
+                try {
+                  if (!stopBtn.disabled) stopBtn.click();
+                } catch {}
+              }, delay);
+            }
+        } catch {}
       }
 
-      const MAX_POLLING_ATTEMPTS = 60; // ~30 minutes
+      // Fire a custom DOM event so tests / external scripts can react to start deterministically.
+      try {
+        document.dispatchEvent(
+          new CustomEvent('azd-provision-started', { detail: { runId, githubRunId, githubRunUrl } }),
+        );
+      } catch {}
+
+      // Test overrides (non-production) for polling cadence
+      const __testCfg = (window as any).__AzdProvisionTestConfig || {};
+      const MAX_POLLING_ATTEMPTS: number =
+        typeof __testCfg.maxAttempts === 'number' ? __testCfg.maxAttempts : 60; // ~30 minutes default
+      const POLL_INTERVAL_MS: number =
+        typeof __testCfg.pollIntervalMs === 'number' ? __testCfg.pollIntervalMs : 30000;
       let attempts = 0;
 
       const pollOnce = async (): Promise<boolean> => {
@@ -354,7 +388,7 @@ function runAzdProvisionTest() {
       const loop = async () => {
         if (attempts === 0) appendLog(logEl!, '[info] Monitoring GitHub workflow status…');
         const done = await pollOnce();
-        if (!done && attempts < MAX_POLLING_ATTEMPTS) setTimeout(loop, 30000);
+  if (!done && attempts < MAX_POLLING_ATTEMPTS) setTimeout(loop, POLL_INTERVAL_MS);
         else if (!done) {
           appendLog(logEl!, '[warn] Timed out waiting for workflow to complete.');
           if (notification) {
