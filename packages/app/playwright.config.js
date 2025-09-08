@@ -30,7 +30,9 @@ module.exports = defineConfig({
   webServer: {
     command: 'npm run dev',
     url: 'http://localhost:8080',
-    reuseExistingServer: true,
+    // Disable reuse so refactors removing/renaming modules cannot leave a stale dev server
+    // serving an outdated graph (stale globals caused notification test flakiness).
+    reuseExistingServer: false,
     timeout: 120000,
     stdout: 'pipe',
     stderr: 'pipe',

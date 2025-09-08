@@ -65,6 +65,15 @@ function wireUI(){
     const cancel = $(batchCancelId);
     if(cancel){ cancel.parentElement && (cancel.parentElement.style.display='none'); }
   });
+  document.addEventListener('batch-cancelled', ()=>{
+    const cancel = $(batchCancelId) as HTMLButtonElement | null;
+    if(cancel){
+      cancel.disabled = true;
+      cancel.textContent = 'Cancelled';
+      setTimeout(()=>{ if(cancel.parentElement) cancel.parentElement.style.display='none'; }, 1200);
+    }
+    showInfo('Batch Scan Cancelled','Processing stopped');
+  });
 }
 
 if(typeof document !== 'undefined'){
@@ -105,7 +114,11 @@ async function poll(){
 function beginPolling(){ clearPolling(); poll(); pollHandle = window.setInterval(poll, POLL_INTERVAL); }
 function clearPolling(){ if(pollHandle){ clearInterval(pollHandle); pollHandle=null; } }
 
-export function cancelBatch(){ clearPolling(); currentBatch = null; document.dispatchEvent(new CustomEvent('batch-cancelled')); }
+export function cancelBatch(){
+  clearPolling();
+  currentBatch = null;
+  document.dispatchEvent(new CustomEvent('batch-cancelled'));
+}
 
 // Expose globally for legacy bridging
 (window as any).TemplateDoctorBatchScan = { startBatch, cancelBatch };

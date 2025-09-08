@@ -14,6 +14,7 @@
         "setup:uami": "bash ./scripts/setup.sh",
         "dev:api": "(cd packages/api && npm start)",
         "dev:frontend": "(cd packages/app && npm start)",
+            "validate:legacy": "grep -E '<script[^>]+(action-buttons-(fallback|direct)\\.js|ruleset-docs/analyzer\\.js)' packages/app/index.html >/dev/null && echo 'Found forbidden legacy script tag' && exit 1 || echo 'No forbidden legacy script tags found'",
         "test": "npm run test:frontend --",
         "test:frontend": "cd packages/app && npx playwright test",
         "test:api": "(cd packages/api && npm run test --)",

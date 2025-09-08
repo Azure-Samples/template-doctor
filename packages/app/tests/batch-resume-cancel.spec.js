@@ -36,9 +36,14 @@ async function mockAuthAndDeps(page) {
 
 test.describe('Batch resume and cancel', () => {
   test.beforeEach(async ({ page }) => {
+    // Inject feature flags & ensure notifications readiness promise BEFORE navigation
+    await page.addInitScript(() => {
+      window.TemplateDoctorConfig = { features: { backendMigration: true } };
+    });
     await page.goto('/');
     await mockAuthAndDeps(page);
-    // No need to wait for the hidden toggle; we'll force-check when needed
+    // Wait for notifications so confirmation interception is reliable
+    await page.waitForFunction(() => !!(window.__notificationsReady && window.NotificationSystem && window.NotificationSystem.showConfirmation), { timeout: 5000 });
   });
 
   test('resume skips previously successful items and updates progress', async ({ page }) => {
@@ -80,14 +85,13 @@ test.describe('Batch resume and cancel', () => {
     // The app uses NotificationSystem.showConfirmation. Ensure it exists and auto-confirm.
     await page.evaluate(() => {
       const ns = window.NotificationSystem || window.Notifications;
-      if (ns && typeof ns.showConfirmation === 'function') {
-        const orig = ns.showConfirmation.bind(ns);
-        // Auto-select primary action (Resume)
-        ns.showConfirmation = (title, message, primaryLabel, secondaryLabel, callback) => {
-          setTimeout(() => callback && callback(true), 0);
-          return orig(title, message, primaryLabel, secondaryLabel, callback);
-        };
-      }
+      if (!ns || typeof ns.showConfirmation !== 'function') return;
+      const orig = ns.showConfirmation.bind(ns);
+      ns.showConfirmation = (title, message, primaryLabel, secondaryLabel, callback) => {
+        // Immediately confirm so batch resume path proceeds
+        setTimeout(() => callback && callback(true), 0);
+        return orig(title, message, primaryLabel, secondaryLabel, callback);
+      };
     });
 
     await page.fill(

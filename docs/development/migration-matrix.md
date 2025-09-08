@@ -10,10 +10,10 @@ Legend:
 | Legacy Script | Status | TS Replacement Exists? | Replacement Module(s) | Notes / Action |
 | ------------- | ------ | ---------------------- | --------------------- | --------------- |
 | `debug-console.js` | Legacy | No | – | Dev-only helper; low priority. Decide to port or drop after core flows. |
-| `notification-system.js` | Migrated | Yes | `modules/notification-system.ts` | Keep until load order validated everywhere, then delete legacy file. |
-| `notifications.js` | Migrated (Accessibility patched) | Yes | `modules/notifications.ts` | Legacy kept for backward includes; remove after search confirms no direct script tag dependence. |
-| `notifications-compat.js` | Migrated | Yes | `modules/notifications-compat.ts` | Safe to remove with above in one PR. |
-| `notifications-init.js` | Migrated | Yes | `modules/notifications-init.ts` | Same removal batch as other notification files. |
+| `notification-system.js` | Deprecated (Superseded) | Yes | `modules/notifications.ts` (+ `modules/notifications-ready.ts`) | Legacy TS port `notification-system.ts` slated for deletion; rich system now canonical. |
+| `notifications.js` | Migrated (Accessibility patched) | Yes | `modules/notifications.ts` | Canonical rich system (flushes guard queue + readiness helper). |
+| `notifications-compat.js` | Removed | N/A | – | Functionality folded into readiness helper + rich system methods. |
+| `notifications-init.js` | Removed | N/A | – | Redundant; readiness handled centrally. |
 | `api-routes.js` | Migrated | Yes | `scripts/api-routes.ts` | HTML script tag removed; file queued for deletion cleanup batch. |
 | `auth.js` | Migrated | Yes | `scripts/auth.ts` | HTML script tag removed; file queued for deletion cleanup batch. |
 | `github-client.js` / `github-client-new.js` | Obsolete (Removed) | Yes | `scripts/github-client.ts` | Deleted legacy files in repo. |
@@ -39,7 +39,7 @@ Legend:
 
 ### In-Progress Extraction Notes
 - Batch Scan: Legacy IndexedDB + per-item card logic scaffolded into `scripts/batch-scan-legacy.ts` (phase 1). Next: migrate resume/retry UI fully and remove overlapping block from `app.js`.
-- Notifications: Legacy script tags still present; plan removal after confirming no late-binding global consumers. Run audit script before PR.
+- Notifications: Consolidated. Remaining follow-up: remove `modules/notification-system.ts` once tests + search confirm no direct imports outside rich system.
 
 ## Extraction Roadmap (Proposed Next Steps)
 1. Low-Hanging Ports: `tooltips.js`, `ruleset-modal.js`.

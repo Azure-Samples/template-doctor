@@ -51,6 +51,8 @@ class RichNotificationSystem {
   }
 
   show(opts: ShowOptions) {
+    // Defensive: ensure container exists in case initialization race prevented constructor from appending it.
+    this.initContainer();
     const { title, message, type = 'info', duration = this.defaultDuration, actions = [] } = opts;
     const id = `${this.notificationIdPrefix}${++this.notificationCount}`;
     const el = document.createElement('div');
@@ -65,8 +67,25 @@ class RichNotificationSystem {
       ${actions.length ? '<div class="notification-actions"></div>' : ''}
       <div class="notification-progress"><div class="notification-progress-bar"></div></div>
     `;
-    const container = document.querySelector(`.${this.containerSelector}`)!;
-    container.appendChild(el);
+    try {
+      const container = document.querySelector(`.${this.containerSelector}`);
+      if (!container) {
+        (window as any).__notifDiag = (window as any).__notifDiag || { missingContainer: 0, attempts: 0, errors: [] };
+        (window as any).__notifDiag.missingContainer++;
+        // Attempt to rebuild container immediately
+        this.initContainer();
+        const retry = document.querySelector(`.${this.containerSelector}`);
+        if (retry) retry.appendChild(el); else throw new Error('Container still missing after initContainer');
+      } else {
+        container.appendChild(el);
+      }
+    } catch (e:any) {
+      (window as any).__notifDiag = (window as any).__notifDiag || { missingContainer: 0, attempts: 0, errors: [] };
+      (window as any).__notifDiag.errors.push('append-failed:' + (e?.message||e));
+    } finally {
+      (window as any).__notifDiag = (window as any).__notifDiag || { missingContainer: 0, attempts: 0, errors: [] };
+      (window as any).__notifDiag.attempts++;
+    }
 
     if (actions.length) {
       const actionsContainer = el.querySelector('.notification-actions')!;
@@ -179,6 +198,8 @@ class RichNotificationSystem {
       close: () => this.close(id),
     };
   }
+  // Back-compat alias expected by some legacy tests
+  loading(t?: string, m?: string){ return this.showLoading(t, m); }
   confirm(title: string, message: string, opts: { confirmLabel?: string; cancelLabel?: string; onConfirm?: ()=>void; onCancel?: ()=>void } = {}) {
     const { confirmLabel = 'Confirm', cancelLabel = 'Cancel', onConfirm = () => {}, onCancel = () => {} } = opts;
     const id = this.show({ title, message, type: 'warning', duration: 0, actions: [
@@ -192,16 +213,70 @@ class RichNotificationSystem {
   }
 }
 
-// Initialize on DOM ready replicating legacy behavior
+import { markNotificationsReady } from './notifications-ready';
+
+function initializeIfNeeded(){
+  const w: any = (window as any);
+  // Keep references to pre-existing globals (guard stub or legacy objects)
+  const existingNotificationSystem = w.NotificationSystem;
+  const existingNotifications = w.Notifications;
+
+  const isGuardStub = (obj: any) => !!obj && (!obj.show || !!obj.__queue || typeof obj.show !== 'function');
+  // Decide if we must create the rich system (always if not present OR present but guard stub)
+  if (!existingNotifications || isGuardStub(existingNotifications)) {
+    try {
+      w.Notifications = new RichNotificationSystem();
+    } catch (e){
+      console.error('[notifications] Failed to construct rich system', e);
+      return; // Without a system we cannot proceed
+    }
+  }
+
+  // Determine which object holds a queue to flush (prefer guard with __queue)
+  const guardWithQueue = existingNotificationSystem && Array.isArray(existingNotificationSystem.__queue)
+    ? existingNotificationSystem
+    : (existingNotifications && Array.isArray(existingNotifications.__queue) ? existingNotifications : null);
+
+  if (guardWithQueue && guardWithQueue.__queue.length) {
+    const queued = guardWithQueue.__queue.slice();
+    guardWithQueue.__queue.length = 0; // clear to avoid double-flush
+    setTimeout(() => {
+      queued.forEach((n: any) => {
+        try {
+          switch(n.type){
+            case 'success': w.Notifications.showSuccess(n.title, n.message, n.duration); break;
+            case 'error': w.Notifications.showError(n.title, n.message, n.duration); break;
+            case 'warning': w.Notifications.showWarning(n.title, n.message, n.duration); break;
+            default: w.Notifications.showInfo(n.title, n.message, n.duration); break;
+          }
+        } catch(e){
+          // eslint-disable-next-line no-console
+          console.warn('[notifications] Failed to flush queued guard notification', e);
+        }
+      });
+    }, 0);
+  }
+  markNotificationsReady(w.Notifications);
+}
+
+// Initialize immediately if DOM already parsed; otherwise wait.
 if (typeof document !== 'undefined') {
-  document.addEventListener('DOMContentLoaded', () => {
-    if (!(window as any).Notifications) {
-      (window as any).Notifications = new RichNotificationSystem();
-    }
-    if (!(window as any).NotificationSystem) {
-      (window as any).NotificationSystem = (window as any).Notifications;
-    }
-  });
+  // If body not yet available, poll briefly instead of waiting full DOMContentLoaded (speeds up tests)
+  const fastInit = () => {
+    try {
+      if (document.body) { initializeIfNeeded(); return true; }
+      return false;
+    } catch { return false; }
+  };
+  if (!fastInit()) {
+    let attempts = 0;
+    const int = setInterval(() => {
+      attempts++;
+      if (fastInit() || attempts > 20) { // up to ~2s worst case
+        clearInterval(int);
+      }
+    }, 100);
+  }
 }
 
 export default RichNotificationSystem;

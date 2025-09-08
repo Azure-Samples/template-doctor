@@ -5,8 +5,10 @@ import { enableBackendMigration, reaffirmBackendMigration, ensureApiClientReady 
 
 test.describe('Fork flow - SAML remediation', () => {
   test('surfaces SAML notification when backend returns samlRequired', async ({ page }) => {
-    // Initial hint; runtime-config will overwrite but we re-apply later
-    await enableBackendMigration(page);
+    // Inject backend migration + any flags BEFORE navigation
+    await page.addInitScript(() => {
+      window.TemplateDoctorConfig = { features: { backendMigration: true } };
+    });
 
     // Mock backend response with SAML 403 (covering both potential base path variants)
     const samlPayload = {
@@ -20,9 +22,7 @@ test.describe('Fork flow - SAML remediation', () => {
     await page.route('**/api/v4/repo-fork', handler);
 
     await page.goto('/');
-
-  await ensureApiClientReady(page);
-    await reaffirmBackendMigration(page);
+    await ensureApiClientReady(page);
 
     const respPromise = page.waitForResponse(r => r.url().includes('/v4/repo-fork') && r.status() === 403);
 

@@ -309,7 +309,10 @@ async function mockDashboardRenderer(page) {
  */
 test.describe('Server-side analysis', () => {
   test.beforeEach(async ({ page }) => {
-    // Navigate to the app
+    // Inject configuration & any feature flags BEFORE navigation so early modules see them
+    await page.addInitScript(() => {
+      window.TemplateDoctorConfig = { analysis: { useServerSide: true }, apiBase: 'http://localhost:8080' };
+    });
     await page.goto('/');
     
     // Mock authentication
@@ -338,12 +341,18 @@ test.describe('Server-side analysis', () => {
   });
   
   test('should work when enabled', async ({ page }) => {
-    // Setup the config to use server-side analysis
+    // Config already injected pre-navigation; ensure analyzer convenience shim
     await page.evaluate(() => {
-      window.TemplateDoctorConfig = {
-        analysis: { useServerSide: true },
-        apiBase: 'http://localhost:8080'
-      };
+      if (!window.analyzeRepo && window.TemplateAnalyzer) {
+        window.analyzeRepo = (url, ruleSet) => window.TemplateAnalyzer.analyzeTemplate(url, ruleSet).then(res => {
+          if (window.DashboardRenderer) {
+            const container = document.getElementById('dashboard') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'dashboard' }));
+            window.DashboardRenderer.render(res, container);
+          }
+          window.lastRenderedData = res;
+          return res;
+        });
+      }
     });
     
     // Setup the analyzer with server-side enabled and working
@@ -379,15 +388,11 @@ test.describe('Server-side analysis', () => {
   // Removed fallback test: fallback path no longer supported.
   
   test('should use client-side when disabled', async ({ page }) => {
-    // Setup the config to NOT use server-side analysis
-    await page.evaluate(() => {
-      window.TemplateDoctorConfig = {
-        analysis: { useServerSide: false }
-      };
-    });
+    // Override config to disable server-side for this test scenario
+    await page.evaluate(() => { window.TemplateDoctorConfig.analysis.useServerSide = false; });
     
-    // Setup the analyzer with server-side enabled (but it shouldn't be called)
-    await mockTemplateAnalyzer(page, { serverSideEnabled: false });
+  // Setup the analyzer with server-side disabled
+  await mockTemplateAnalyzer(page, { serverSideEnabled: false });
       // Reinitialize services so the app uses the mocked analyzer
       await page.evaluate(() => {
         if (typeof window.tryReinitializeServices === 'function') {

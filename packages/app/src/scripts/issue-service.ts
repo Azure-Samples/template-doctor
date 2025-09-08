@@ -1,7 +1,8 @@
 /* Issue creation UI + backend integration (feature-flag aware) */
 import { ApiClient } from './api-client';
+import { mapAnalyzerIssueToViolation, formatViolationAsIssue } from './issue-format';
 
-interface ComplianceIssue { id: string; message: string; severity?: string; error?: string; }
+interface ComplianceIssue { id: string; message: string; severity?: string; error?: string; filePath?: string; snippet?: string; issueTemplate?: { title: string; body: string }; }
 interface ReportData {
   repoUrl: string;
   compliance: { issues: ComplianceIssue[]; compliant: any[]; summary?: string };
@@ -119,12 +120,27 @@ async function createIssues(){
   let button = document.getElementById('create-github-issue-btn') as HTMLButtonElement | null;
   const restore = button ? prepButtonLoading(button,'Creating Issues...') : () => {};
   try {
+    // Lazy enrichment: if analyzer didn't run client-side enrichment (tests injecting raw issues)
+    const percentageCompliant = data.compliance?.compliant?.find(c => c.details && typeof c.details.percentageCompliant === 'number')?.details?.percentageCompliant;
+    for (const raw of issues){
+      if(!raw.issueTemplate){
+        try {
+          const v = mapAnalyzerIssueToViolation(raw as any);
+          if(v){
+            if(raw.filePath && !v.filePath) v.filePath = raw.filePath;
+            if(raw.snippet && !v.snippet) v.snippet = raw.snippet;
+            raw.issueTemplate = formatViolationAsIssue(v, { compliancePercentage: percentageCompliant });
+          }
+        } catch { /* swallow individual enrichment errors */ }
+      }
+    }
     // Build child issue descriptors for backend (now supported). Keep client-only creation in legacy shim.
     const childIssues = issues.map(c => {
       const sev = mapSeverity(c.severity);
+      const templated = c.issueTemplate;
       return {
-        title: c.message,
-        body: buildChildIssueBody(issueTitle, c, data),
+        title: templated?.title || c.message,
+        body: templated?.body || buildChildIssueBody(issueTitle, c, data),
         labels: ['template-doctor','template-doctor-child-issue', rulesetLabel, `severity:${sev}`]
       };
     });
@@ -170,6 +186,22 @@ async function processIssueCreation(github: any){
   const { owner, repo } = parseOwnerRepo(data.repoUrl);
   if(!owner || !repo) return;
   const issues = data.compliance?.issues || [];
+  // Lazy enrichment for legacy path (mirrors createIssues enrichment)
+  try {
+    const percentageCompliant = data.compliance?.compliant?.find(c => c.details && typeof c.details.percentageCompliant === 'number')?.details?.percentageCompliant;
+    for (const raw of issues){
+      if(!raw.issueTemplate){
+        try {
+          const v = mapAnalyzerIssueToViolation(raw as any);
+          if(v){
+            if(raw.filePath && !v.filePath) v.filePath = raw.filePath;
+            if(raw.snippet && !v.snippet) v.snippet = raw.snippet;
+            raw.issueTemplate = formatViolationAsIssue(v, { compliancePercentage: percentageCompliant });
+          }
+        } catch {/* ignore individual mapping errors */}
+      }
+    }
+  } catch {/* ignore enrichment wrapper errors */}
   const ruleSet = data.ruleSet || 'dod';
   const today = new Date().toISOString().split('T')[0];
   const summary = data.compliance?.summary || 'Template Doctor Analysis';
@@ -189,11 +221,13 @@ async function processIssueCreation(github: any){
     for(const c of issues){
       const sev = mapSeverity(c.severity);
       const childLabels = ['template-doctor','template-doctor-child-issue', `ruleset:${ruleSet}`, `severity:${sev}`];
-      const childBody = buildChildIssueBody(issueTitle, c, data);
+      const templated = c.issueTemplate;
+      const childTitle = templated?.title || c.message;
+      const childBody = templated?.body || buildChildIssueBody(issueTitle, c, data);
       if(github.createIssueWithoutCopilot){
-        await github.createIssueWithoutCopilot(owner, repo, c.message, childBody, childLabels);
+        await github.createIssueWithoutCopilot(owner, repo, childTitle, childBody, childLabels);
       } else if (github.createIssueGraphQL){
-        await github.createIssueGraphQL(owner, repo, c.message, childBody, childLabels);
+        await github.createIssueGraphQL(owner, repo, childTitle, childBody, childLabels);
       }
     }
     return mainIssue;

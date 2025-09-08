@@ -61,7 +61,18 @@
           showError:function(t,m,d){ enqueue('error',t,m,d); },
           showWarning:function(t,m,d){ enqueue('warning',t,m,d); },
           showInfo:function(t,m,d){ enqueue('info',t,m,d); },
-          confirm:function(){ console.warn('[NotificationGuard] confirm invoked before system ready'); }
+          confirm:function(){ console.warn('[NotificationGuard] confirm invoked before system ready'); },
+          // Provide loading alias expected by tests; returns a minimal handle that simply enqueues follow-up status notifications
+          loading:function(t,m){
+            var baseTitle = t || 'Loading...';
+            enqueue('info', baseTitle, m||'', 0);
+            return {
+              update:function(nt,nm){ /* no-op in guard; rich system will replace */ },
+              success:function(st,sm,d){ enqueue('success', st||'Success', sm||'', d||4000); },
+              error:function(et,em,d){ enqueue('error', et||'Error', em||'', d||8000); },
+              close:function(){}
+            };
+          }
         };
         // Legacy Notifications facade (subset) maps to queue
         if(!window.Notifications){
@@ -78,6 +89,7 @@
             }
           };
         }
+        try { document.dispatchEvent(new Event('notifications-ready')); } catch(e){}
         console.debug('[notification-guard] stub initialized; queueing until real system loads');
       })();
     </script>
@@ -312,7 +324,7 @@
   <!-- Legacy GitHub client fully removed (TypeScript replacement loaded via module graph) -->
   <!-- GitHub issue handling migrated: legacy stub removed (issue-service.ts provides window.createGitHubIssue) -->
     <!-- Ruleset for Docs org -->
-    <script src="js/ruleset-docs/analyzer.js"></script>
+  <!-- Removed legacy docs ruleset analyzer (js/ruleset-docs/analyzer.js) - functionality either deprecated or to be reintroduced via TS module if needed -->
   <!-- Template data loader migrated to TypeScript (scripts/templates-data-loader.ts) -->
   <!-- Tooltips functionality migrated to TypeScript (modules/tooltips.ts) -->
   <!-- Ruleset modal migrated to TypeScript (modules/ruleset-modal.ts) -->

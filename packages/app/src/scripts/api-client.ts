@@ -56,16 +56,29 @@ export const ApiClient = {
       } catch (e: any) {
         // If SAML required, propagate structured object
         if (e?.samlRequired) {
+          // Always surface a warning notification even if the notification system
+          // is not yet initialized when the 403 response is handled. We defer
+          // rendering until 'notifications-ready' if needed to avoid race flakiness
+          // observed in Playwright tests.
           try {
-            const ns = (window as any).NotificationSystem;
-            if (ns && typeof ns.show === 'function') {
-              ns.show({
-                title: 'SAML Authorization Required',
-                message: 'This repository requires SAML SSO authorization before forking. Use the authorization link if provided.',
-                type: 'warning',
-                duration: 12000,
-                actions: e.authorizeUrl ? [{ label: 'Authorize SAML', primary: true, onClick: () => window.open(e.authorizeUrl,'_blank') }] : []
-              });
+            const showSamlNotification = () => {
+              try {
+                const ns = (window as any).NotificationSystem;
+                if (ns && typeof ns.show === 'function') {
+                  ns.show({
+                    title: 'SAML Authorization Required',
+                    message: 'This repository requires SAML SSO authorization before forking. Use the authorization link if provided.',
+                    type: 'warning',
+                    duration: 12000,
+                    actions: e.authorizeUrl ? [{ label: 'Authorize SAML', primary: true, onClick: () => window.open(e.authorizeUrl,'_blank') }] : []
+                  });
+                }
+              } catch(_) {}
+            };
+            if ((window as any).NotificationSystem && typeof (window as any).NotificationSystem.show === 'function') {
+              showSamlNotification();
+            } else {
+              document.addEventListener('notifications-ready', showSamlNotification, { once: true });
             }
           } catch(_) {}
           return { forkOwner: req.targetOwner || 'unknown', repo: req.sourceRepo, htmlUrl: undefined, ready: false, attemptedCreate: false, samlRequired: true, documentationUrl: e.documentationUrl, authorizeUrl: e.authorizeUrl, error: e.error };

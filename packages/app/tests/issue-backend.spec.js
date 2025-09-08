@@ -5,13 +5,12 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Backend Issue Creation (feature flag)', () => {
   test('should trigger backend issue creation flow', async ({ page }) => {
-    // Placeholder: navigate & ensure feature flag is enabled via config injection.
-    await page.goto('/');
-    // Simulate presence of reportData for button wiring
-    await page.addInitScript(() => {
-      window.reportData = { repoUrl: 'https://github.com/example/repo', compliance:{ issues:[{id:'1', message:'Sample problem'}], compliant:[] }, ruleSet:'dod' };
-      window.TemplateDoctorConfig = { features: { backendMigration: true } };
-    });
+      // Inject globals BEFORE navigation so renderer sees them
+      await page.addInitScript(() => {
+        window.reportData = { repoUrl: 'https://github.com/example/repo', compliance:{ issues:[{id:'1', message:'Sample problem'}], compliant:[] }, ruleSet:'dod' };
+        window.TemplateDoctorConfig = { features: { backendMigration: true } };
+      });
+      await page.goto('/');
     // Wait for button (assumes existing id in page)
     const button = page.locator('#create-github-issue-btn');
     await expect(button).toBeVisible();

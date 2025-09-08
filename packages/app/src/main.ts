@@ -1,18 +1,21 @@
-// Aggregated entry importing migrated modules in original approximate order.
-// As migration proceeds, add remaining modules here to allow bundling.
+// Aggregated entry importing migrated modules.
+// ORDER MATTERS for test stability:
+// Notifications first so that tests depending on NotificationSystem always see real implementation
+// even if analyzer (below) throws early.
+import './modules/notifications'; // Rich notification system (flushes guard stub queue + readiness)
+// Import analyzer normally; wrap its top-level runtime-dependent code in the analyzer itself (preferred).
+// If we still want isolation, we can later convert analyzer to expose an init() we call in try/catch.
+import './scripts/analyzer';
+
+// Config & data loaders
 import './scripts/config-loader';
 import './scripts/api-routes';
 import './scripts/runtime-config';
 import './scripts/templates-data-loader';
-import './modules/notification-system';
-import './modules/notifications';
-import './modules/notifications-compat';
-import './modules/notifications-init';
 import './scripts/auth';
 // New TypeScript GitHub client wrapper (phase 1) – placed before analyzer so it can attach immediately
 import './scripts/github-client';
-// Newly migrated core analytic & rendering modules
-import './scripts/analyzer';
+// Remaining analytic & rendering modules (analyzer already loaded above)
 import './scripts/report-loader';
 import './scripts/dashboard-renderer';
 // Minimal scanned templates renderer shim (temporary until full app.js migration)
