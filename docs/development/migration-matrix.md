@@ -22,7 +22,7 @@ Legend:
 | `dashboard-renderer.js` | Migrated | Yes | `scripts/dashboard-renderer.ts` | Remove legacy. |
 | `config-loader.js` | Migrated | Yes | `scripts/config-loader.ts` | Remove after verify no inline HTML script tag references. |
 | `runtime-config.js` | Migrated | Yes | `scripts/runtime-config.ts` | Remove; ensure `TemplateDoctorConfig` still globally exposed via build. |
-| `templates-data-loader.js` | Partial | Yes (core list logic) | `scripts/template-list.ts` | Audit for extra metadata/history injection not yet ported. Create follow-up ticket to replicate missing pieces. |
+| `templates-data-loader.js` | Migrated | Yes | `scripts/templates-data-loader.ts`, `scripts/template-list.ts` | Loader fully migrated; TS module loads `results/index-data.js`, dispatches event, adds diagnostic API. Legacy script tag removed. |
 | `tooltips.js` | Migrated (Removed) | Yes | `modules/tooltips.ts` | Legacy file deleted after port. |
 | `github-issue-handler.js` | Obsolete (Removed) | Yes | `scripts/issue-service.ts`, `scripts/api-client.ts` | Removed stub; TS service exposes `window.createGitHubIssue`. |
 | `github-workflow-validation.js` | Migrated (Phase 2) | Yes | `modules/validation.ts` | Unified module w/ diagnostics grouping, collapsible sections, resume, timeout continue, counts, accessibility, tests. |

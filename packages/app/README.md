@@ -49,7 +49,7 @@ This feature enhances the Template Doctor by showing previously scanned template
 
 ## Development Notes
 
-- The data is loaded asynchronously via the `templates-data-loader.js` script
+- The data is loaded asynchronously (now via the migrated TypeScript module `scripts/templates-data-loader.ts`, formerly `templates-data-loader.js`) which injects `results/index-data.js` when the user is authenticated
 - Templates are rendered in a responsive grid layout
 - Ruleset configurations are loaded from the `configs/` directory
 

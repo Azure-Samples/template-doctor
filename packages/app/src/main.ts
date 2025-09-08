@@ -3,6 +3,7 @@
 import './scripts/config-loader';
 import './scripts/api-routes';
 import './scripts/runtime-config';
+import './scripts/templates-data-loader';
 import './modules/notification-system';
 import './modules/notifications';
 import './modules/notifications-compat';
