@@ -5,6 +5,9 @@ import { test, expect } from '@playwright/test';
 // and logs completion without waiting for long polling intervals.
 
 test.describe('AZD Provision (validation workflow) module', () => {
+  // TODO(test): Add a focused test asserting the 'azd-provision-started' CustomEvent dispatch
+  // by registering a listener before invoking testAzdProvision and capturing detail payload.
+  // Current tests indirectly exercise start path but do not explicitly assert event emission.
   test('AZD Provision workflow happy path', async ({ page }) => {
     // Intercept backend calls (module targets localhost:7071 when host is localhost)
     let startCalled = false;

@@ -31,9 +31,9 @@ Legend:
 | `azd-provision.js` | Migrated | Yes | `scripts/azd-provision.ts` | TS module provides validation trigger + polling + cancel; legacy globals preserved. |
 | `template-validation.js` | Migrated (Phase 2) | Yes | `modules/validation.ts` | Simple + workflow unified; success/failure/cancel/timeout/a11y tests added; counts + collapsible detail sections. |
 | `enable-demo-mode.js` / `demo-helper.js` | Obsolete (Removed) | N/A | – | Demo mode retired; remove scripts + references. |
-| `saml-auto-fork.js` | Legacy | Partial (logic integrated) | `scripts/api-client.ts` (fork SAML handling) | Most behavior merged; delete after confirming no residual references. |
+| `saml-auto-fork.js` | Removed (Integrated) | Yes | `scripts/api-client.ts` (fork SAML handling) | Empty legacy file scheduled for deletion; SAML fork notices + authorization handled centrally. |
 | `github-action-hook.js` | Migrated | Yes | `scripts/github-action-hook.ts` | TS module provides `submitAnalysisToGitHub`; remove legacy file & script tag. |
-| `action-buttons-direct.js` / `action-buttons-fallback.js` | Legacy | No | – | Likely removable (UI polish). Validate presence in templates. |
+| `action-buttons-direct.js` / `action-buttons-fallback.js` | Removed (Superseded) | Yes | `scripts/dashboard-renderer.ts` | Legacy scripts no longer loaded; TS renderer guarantees button creation & visibility. Delete files in cleanup batch. |
 | `test-fork-workflow.js` | Legacy | Obsolete | Playwright specs | Delete; replaced by fork E2E tests. |
 | `app.js` | Mixed | Yes (distributed) | Multiple (`api-client.ts`, `issue-service.ts`, `batch-scan.ts`, etc.) | Progressive extraction approach: split remaining monolith concerns into focused modules. Track subtasks. |
 

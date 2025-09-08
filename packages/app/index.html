@@ -324,9 +324,10 @@
     <!-- runtime-config.js migrated to TypeScript (scripts/runtime-config.ts) -->
     <!-- Main application logic -->
     <script src="js/app.js"></script>
-    <!-- Fallback scripts to ensure action buttons are visible -->
-    <script src="js/action-buttons-fallback.js"></script>
-    <script src="js/action-buttons-direct.js"></script>
+    <!-- Removed legacy action button scripts (action-buttons-fallback.js / action-buttons-direct.js).
+      Action buttons are now rendered deterministically by dashboard-renderer.ts and associated
+      TypeScript modules. IDs preserved (#fixButton, #create-github-issue-btn, #testProvisionButton)
+      so existing code continues to function. -->
     <!-- Begin TypeScript migration entrypoint (Vite module graph). Safe to keep after legacy scripts so it can augment globals. -->
     <script type="module" src="/src/main.ts"></script>
     <script>
