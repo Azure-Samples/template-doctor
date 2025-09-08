@@ -28,11 +28,11 @@ Legend:
 | `github-workflow-validation.js` | Migrated (Phase 2) | Yes | `modules/validation.ts` | Unified module w/ diagnostics grouping, collapsible sections, resume, timeout continue, counts, accessibility, tests. |
 | `ruleset-modal.js` | Migrated | Yes | `modules/ruleset-modal.ts` | Legacy file deleted; global `showRulesetModal` preserved. |
 | `ruleset-docs/analyzer.js` | Legacy | No | – | Niche; evaluate actual usage (maybe remove or rewrite as docs enhancement). |
-| `azd-provision.js` | Legacy | No | – | Determine active usage; if unused in UI flows, mark Obsolete. |
+| `azd-provision.js` | Migrated | Yes | `scripts/azd-provision.ts` | TS module provides validation trigger + polling + cancel; legacy globals preserved. |
 | `template-validation.js` | Migrated (Phase 2) | Yes | `modules/validation.ts` | Simple + workflow unified; success/failure/cancel/timeout/a11y tests added; counts + collapsible detail sections. |
-| `enable-demo-mode.js` / `demo-helper.js` | Legacy | No | – | Optional; gate behind query param; port late or drop. |
+| `enable-demo-mode.js` / `demo-helper.js` | Obsolete (Removed) | N/A | – | Demo mode retired; remove scripts + references. |
 | `saml-auto-fork.js` | Legacy | Partial (logic integrated) | `scripts/api-client.ts` (fork SAML handling) | Most behavior merged; delete after confirming no residual references. |
-| `github-action-hook.js` | Legacy | No | – | Audit: handles backend dispatch events. If backend Functions fully replace, mark Obsolete. |
+| `github-action-hook.js` | Migrated | Yes | `scripts/github-action-hook.ts` | TS module provides `submitAnalysisToGitHub`; remove legacy file & script tag. |
 | `action-buttons-direct.js` / `action-buttons-fallback.js` | Legacy | No | – | Likely removable (UI polish). Validate presence in templates. |
 | `test-fork-workflow.js` | Legacy | Obsolete | Playwright specs | Delete; replaced by fork E2E tests. |
 | `app.js` | Mixed | Yes (distributed) | Multiple (`api-client.ts`, `issue-service.ts`, `batch-scan.ts`, etc.) | Progressive extraction approach: split remaining monolith concerns into focused modules. Track subtasks. |
