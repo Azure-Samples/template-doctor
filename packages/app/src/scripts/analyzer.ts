@@ -3,6 +3,56 @@
 
 import { formatViolationAsIssue, mapAnalyzerIssueToViolation } from './issue-format';
 
+// Minimal inlined TemplateAnalyzerDocs implementation (previously relied on a removed legacy global)
+class TemplateAnalyzerDocs {
+  async getConfig() {
+    const docsResponse = await fetch('./configs/docs-config.json');
+    if (!docsResponse.ok) throw new Error(`Failed to load docs config: ${docsResponse.status}`);
+    const cfg = await docsResponse.json();
+    if (cfg.requiredWorkflowFiles) {
+      cfg.requiredWorkflowFiles = cfg.requiredWorkflowFiles.map((item: any) => ({
+        pattern: new RegExp(item.pattern, 'i'),
+        message: item.message,
+      }));
+    }
+    return cfg;
+  }
+  evaluateDefaultBranchRule(config: any, _repoInfo: any, defaultBranch: string, issues: any[], compliant: any[]) {
+    const expected = config?.githubRepositoryConfiguration?.defaultBranch?.mustBe;
+    if (!expected) return;
+    const norm = (s: any) => String(s).trim();
+    if (norm(defaultBranch) !== norm(expected)) {
+      issues.push({
+        id: `default-branch-not-${expected}`,
+        severity: 'error',
+        message: `Default branch must be '${expected}'. Current default branch is '${defaultBranch}'.`,
+        error: `Default branch is '${defaultBranch}', expected '${expected}'`,
+      });
+    } else {
+      compliant.push({
+        id: `default-branch-is-${expected}`,
+        category: 'branch',
+        message: `Default branch is '${expected}'`,
+        details: { defaultBranch },
+      });
+    }
+  }
+  validateRepoConfiguration(config: any, repoInfo: any, defaultBranch: string, files: string[], issues: any[], compliant: any[]) {
+    try {
+      this.evaluateDefaultBranchRule(config, repoInfo, defaultBranch, issues, compliant);
+      // Future repo-level validations can be added here.
+    } catch (err: any) {
+      console.error('Error validating repository configuration:', err);
+      issues.push({
+        id: 'repo-configuration-validation-failed',
+        severity: 'warning',
+        message: 'Repository configuration validation failed',
+        error: err?.message || String(err),
+      });
+    }
+  }
+}
+
 class TemplateAnalyzer {
   constructor() {
     this.githubClient = (window as any).GitHubClient;

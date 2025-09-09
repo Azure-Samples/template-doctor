@@ -10,7 +10,7 @@
     "start": "python3 -m http.server 8080",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "build": "vite build",
+  "build": "vite build && mkdir -p dist/configs && cp -f configs/*.json dist/configs/",
     "typecheck": "tsc -p . --noEmit",
     "pretest": "npm run build"
   },

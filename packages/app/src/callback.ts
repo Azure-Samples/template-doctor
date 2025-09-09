@@ -79,6 +79,17 @@ async function processCallback() {
     return;
   }
 
+  // Lenient mode: proceed even if state is missing but code is present (some users reported callback with only ?code=...)
+  if (code && !state) {
+    console.warn('[callback] Authorization code received WITHOUT state parameter. Proceeding leniently.');
+    sessionStorage.setItem('gh_auth_code', code);
+    sessionStorage.setItem('gh_auth_state', 'missing');
+    sessionStorage.setItem('auth_warning', 'OAuth state parameter missing in callback');
+    if (loadingInfo) loadingInfo.textContent = 'Authorization code received (no state), redirecting...';
+    redirect(0);
+    return;
+  }
+
   // No code or explicit error => treat as error condition
   const loading = document.getElementById('loading');
   if (loading) loading.style.display = 'none';

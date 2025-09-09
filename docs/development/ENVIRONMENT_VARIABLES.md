@@ -1,6 +1,8 @@
 # Environment Variables Documentation
 
-This document provides an overview of the environment variables used in the Template Doctor project. We've consolidated the environment variables into a single `.env` file at the root of the project for easier management.
+This document provides an overview of the environment variables used in the Template Doctor project for the legacy Static Web Apps + Azure Functions architecture. For the new unified container / Azure Container Apps deployment model, see: [`ENVIRONMENT_VARIABLES_CONTAINER.md`](./ENVIRONMENT_VARIABLES_CONTAINER.md).
+
+We've consolidated the environment variables into a single `.env` file at the root of the project for easier management.
 
 ## Environment Variable Consolidation
 

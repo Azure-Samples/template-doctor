@@ -6,6 +6,8 @@ import './modules/notifications'; // Rich notification system (flushes guard stu
 // Import analyzer normally; wrap its top-level runtime-dependent code in the analyzer itself (preferred).
 // If we still want isolation, we can later convert analyzer to expose an init() we call in try/catch.
 import './scripts/analyzer';
+// Bridge providing window.analyzeRepo (replaces legacy js/app.js usage)
+import './bridge/analyze-repo-bridge';
 
 // Config & data loaders
 import './scripts/config-loader';

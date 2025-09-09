@@ -45,6 +45,25 @@ async function loadRuntimeAuthConfig(){
     if (cfg?.githubOAuth?.redirectUri && cfg.githubOAuth.redirectUri.trim() !== '') AUTH_CONFIG.redirectUri = cfg.githubOAuth.redirectUri;
   } catch (error){ console.error('Error loading runtime config:', error); }
 }
+// Edge-case helper: Sometimes GitHub may redirect directly to index.html with ?code&state instead of callback.html
+// (e.g., misconfigured redirect or older bookmarked URL). We capture that here early.
+function captureAuthParamsOnIndex(){
+  try {
+    if (!window.location.search) return;
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    const state = params.get('state');
+    if (code && !sessionStorage.getItem('gh_auth_code')){
+      console.warn('[GitHubAuth][captureAuthParamsOnIndex] Found OAuth params on index.html; stashing and cleaning URL');
+      sessionStorage.setItem('gh_auth_code', code);
+      if (state) sessionStorage.setItem('gh_auth_state', state);
+      // clean URL (remove sensitive query params) without full reload
+      const clean = window.location.origin + window.location.pathname;
+      window.history.replaceState({}, document.title, clean);
+    }
+  } catch(e){ console.debug('[GitHubAuth][captureAuthParamsOnIndex] No-op', e); }
+}
+captureAuthParamsOnIndex();
 class GitHubAuth {
   constructor(){
     debug('GitHubAuth','Initializing authentication handler');
@@ -127,7 +146,9 @@ class GitHubAuth {
     const isLocalhost = window.location.hostname === 'localhost';
     let apiUrl;
     if (isLocalhost) {
-      apiUrl = 'http://localhost:7071/api/v4/github-oauth-token';
+      apiUrl = (window.location.port === '7071')
+        ? 'http://localhost:7071/api/v4/github-oauth-token'
+        : `${window.location.origin}/v4/github-oauth-token`;
     } else if ((window as any).ApiRoutes) {
       apiUrl = (window as any).ApiRoutes.build('github-oauth-token');
     } else {
@@ -167,6 +188,11 @@ class GitHubAuth {
     debug('checkAuthentication','Checking authentication status');
     const pendingCode = sessionStorage.getItem('github_auth_code');
     const pendingTimestamp = sessionStorage.getItem('github_auth_timestamp');
+    const directCode = sessionStorage.getItem('gh_auth_code');
+    if (!this.accessToken && directCode){
+      debug('checkAuthentication','Found gh_auth_code but no access token yet. Attempting exchange now.');
+      this.exchangeCodeForToken(directCode);
+    }
     if (pendingCode && pendingTimestamp){
       const timestamp = new Date(pendingTimestamp); const now = new Date(); const secondsElapsed = (now - timestamp)/1000;
       if (secondsElapsed < 30 && !this.accessToken){ debug('checkAuthentication','Found recent pending auth code, retrying exchange'); this.exchangeCodeForToken(pendingCode); sessionStorage.removeItem('github_auth_code'); sessionStorage.removeItem('github_auth_timestamp'); }

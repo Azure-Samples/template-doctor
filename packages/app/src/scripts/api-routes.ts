@@ -9,7 +9,10 @@
     const cfg = (window as any).TemplateDoctorConfig || {};
     if (cfg.apiBase) return normalizeBase(cfg.apiBase);
     const isLocal = ['localhost','127.0.0.1'].includes(window.location.hostname);
-    if (isLocal) return 'http://localhost:7071';
+    if (isLocal) {
+      if (window.location.port === '7071') return 'http://localhost:7071';
+      return normalizeBase(window.location.origin);
+    }
     return normalizeBase(window.location.origin);
   }
   function getVersionPrefix(path, version){
@@ -27,6 +30,13 @@
     const prefix = getVersionPrefix(trimmed, version);
     const base = getApiBase();
     let url = `${base}${prefix}/${trimmed}`.replace(/([^:])\/+/, '$1/');
+    // If same-origin unified container and versioned API (v4), prefer /v4 instead of /api/v4 duplication
+    if (base === normalizeBase(window.location.origin) && version && /^v\d+/.test(version)) {
+      // Replace /api(/vN)? with /vN if not already containing /vN/
+      if (!/\/v\d+\//.test(url)) {
+        url = url.replace(/\/api(?:\/v\d+)?\//, `/${version}/`);
+      }
+    }
     const query = options && options.query;
     if (query && typeof query === 'object') {
       const qp = Object.entries(query)

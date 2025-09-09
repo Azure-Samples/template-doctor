@@ -1,7 +1,10 @@
 node_modules
+
+# secrets
 .env
 .env.consolidated
 .env.bak
+.env.container
 
 dist/
 

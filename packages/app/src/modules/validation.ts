@@ -99,7 +99,7 @@ function buildApiRoute(name: 'validation-template' | 'validation-status' | 'vali
 
   // Fallback logic: differentiate local vs hosted; default to unversioned /api endpoints
   const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-  const base = isLocal ? 'http://localhost:7071' : '';
+  const base = isLocal ? (window.location.port === '7071' ? 'http://localhost:7071' : '') : '';
   const path = `/api/${name}`; // legacy path (unversioned) for workflow script compatibility
   if (query && Object.keys(query).length) {
     const usp = new URLSearchParams();

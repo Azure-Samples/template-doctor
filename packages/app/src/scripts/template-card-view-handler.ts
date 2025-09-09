@@ -16,11 +16,25 @@ function ensureAnalysisContainers() {
     analysisSection = document.createElement('section');
     analysisSection.id = 'analysis-section';
     analysisSection.className = 'analysis-section';
-    // Insert before footer if possible, else append to body
+    analysisSection.innerHTML = `
+      <div class="analysis-header">
+        <button id="back-button" class="back-button"><i class="fas fa-arrow-left"></i> Back to Search</button>
+        <div class="repo-info">
+          <h3 id="repo-name">Repository Name</h3>
+          <span id="repo-url">Repository URL</span>
+        </div>
+      </div>
+      <div class="loading-container" id="loading-container" style="display:none">
+        <div class="loading-spinner"></div>
+        <p>Analyzing repository... This may take a moment.</p>
+      </div>
+      <div id="results-container" class="results-container" style="display:none"></div>
+      <div class="error-container" id="analysis-error" style="display:none"><p class="error-text"></p></div>
+    `;
     const footer = document.querySelector('footer, .site-footer');
     if (footer?.parentNode) footer.parentNode.insertBefore(analysisSection, footer);
     else document.body.appendChild(analysisSection);
-    console.debug('[template-card-view-handler] Created missing #analysis-section');
+    console.debug('[template-card-view-handler] Created full #analysis-section structure');
   }
 
   let resultsContainer = document.getElementById('results-container');
@@ -29,7 +43,6 @@ function ensureAnalysisContainers() {
     resultsContainer.id = 'results-container';
     resultsContainer.className = 'results-container';
     analysisSection.appendChild(resultsContainer);
-    console.debug('[template-card-view-handler] Created missing #results-container');
   }
 
   let reportDiv = document.getElementById('report');
@@ -37,15 +50,22 @@ function ensureAnalysisContainers() {
     reportDiv = document.createElement('div');
     reportDiv.id = 'report';
     resultsContainer.appendChild(reportDiv);
-    console.debug('[template-card-view-handler] Created missing #report');
   }
 
-  // Force visibility overrides (legacy inline styles may hide these)
-  (analysisSection as HTMLElement).style.display = 'block';
-  (resultsContainer as HTMLElement).style.display = 'block';
-  (reportDiv as HTMLElement).style.display = 'block';
-  (analysisSection as HTMLElement).removeAttribute('aria-hidden');
-  (resultsContainer as HTMLElement).removeAttribute('aria-hidden');
+  // Only reveal if authenticated; otherwise keep hidden until login.
+  const auth: any = (window as any).GitHubAuth;
+  const authed = auth && typeof auth.isAuthenticated === 'function' && auth.isAuthenticated();
+  if (authed) {
+    (analysisSection as HTMLElement).style.display = 'block';
+    (resultsContainer as HTMLElement).style.display = 'block';
+    (reportDiv as HTMLElement).style.display = 'block';
+    (analysisSection as HTMLElement).removeAttribute('aria-hidden');
+    (resultsContainer as HTMLElement).removeAttribute('aria-hidden');
+    try { analysisSection.setAttribute('data-auth-ready','true'); } catch {}
+  } else {
+    (analysisSection as HTMLElement).style.display = 'none';
+    (resultsContainer as HTMLElement).style.display = 'none';
+  }
 }
 
 function handleTemplateCardView(e: Event) {
@@ -58,6 +78,12 @@ function handleTemplateCardView(e: Event) {
   console.debug('[template-card-view-handler] Received event for repo', repoUrl);
 
   ensureAnalysisContainers();
+  // Abort if not authenticated
+  const auth: any = (window as any).GitHubAuth;
+  if (auth && typeof auth.isAuthenticated === 'function' && !auth.isAuthenticated()) {
+    console.debug('[template-card-view-handler] Ignoring view request while unauthenticated');
+    return;
+  }
 
   // After ensuring, safely reference nodes
   const analysisSection = document.getElementById('analysis-section');

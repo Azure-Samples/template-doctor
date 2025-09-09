@@ -105,6 +105,10 @@ Publishing results
 
 Template Doctor can also archive a small JSON metadata file to a central repository for each analysis.
 
+Environment variables:
+- Legacy / SWA + Functions reference: [docs/development/ENVIRONMENT_VARIABLES.md](docs/development/ENVIRONMENT_VARIABLES.md)
+- Container / ACA deployment reference (single Express server + optional static UI): [docs/development/ENVIRONMENT_VARIABLES_CONTAINER.md](docs/development/ENVIRONMENT_VARIABLES_CONTAINER.md)
+
 - How to enable and required variables: see
   - Env vars reference: [docs/development/ENVIRONMENT_VARIABLES.md](docs/development/ENVIRONMENT_VARIABLES.md)
   - Action setup (archive section): [docs/usage/GITHUB_ACTION_SETUP.md](docs/usage/GITHUB_ACTION_SETUP.md#6-centralized-archive-of-analysis-metadata-optional)
@@ -143,6 +147,121 @@ npm ci
 > (requires Python 3 installed in your machine. You may use a different server to your convenience)
 
 Open http://localhost:8080 for the UI. The frontend expects the API at http://localhost:7071 by default.
+
+> [!NOTE]
+> Migrating to the container architecture? See `docs/development/ENVIRONMENT_VARIABLES_CONTAINER.md` and `.env.container.example` for consolidated settings (single process serving API + frontend when `SERVE_FRONTEND=true`).
+
+## Running the unified container locally
+
+The repository includes a multi‑stage Dockerfile (`packages/server/Dockerfile`) that builds:
+1. The frontend (Vite) into `packages/app/dist`
+2. The server (Express / compiled TS) into `packages/server/dist`
+3. A minimal runtime image that serves both API + static UI when `SERVE_FRONTEND=true` (default)
+
+### 1. Create a container env file (recommended)
+
+Copy the provided example and adjust values (only the public GitHub OAuth client id is required for login):
+
+```bash
+cp .env.container.example .env.container
+# edit .env.container and set at least:
+#   GITHUB_CLIENT_ID=xxxxxxxxxxxxxxxxxxxx
+```
+
+All available variables are documented in: `docs/development/ENVIRONMENT_VARIABLES_CONTAINER.md`.
+
+### 2. Build the image
+
+From the repo root:
+
+```bash
+docker build -f packages/server/Dockerfile -t template-doctor:local .
+```
+
+### 3. Run the container
+
+```bash
+docker run --rm -it \
+  --env-file ./.env.container \
+  -p 4000:4000 \
+  --name td_local \
+  template-doctor:local
+```
+
+Then open: http://localhost:4000
+
+Health endpoints:
+- `GET /health` – liveness
+- `GET /v4/health/env` – redacted env diagnostics
+
+### 4. Hot‑updating just the frontend (optional)
+
+When you change frontend code you can rebuild and copy the new static assets into the running container (avoids full rebuild):
+
+```bash
+npm run deploy:frontend:container
+```
+
+This script:
+- Builds the frontend (`packages/app/dist`)
+- Copies `dist/index.html` and `dist/assets/*` into the running container named `td_local`
+
+If you used a different container name, either rename it to `td_local` or manually copy:
+
+```bash
+docker cp packages/app/dist/index.html <your_container>:/app/public/index.html
+docker cp packages/app/dist/assets/. <your_container>:/app/public/assets
+```
+
+### 5. Rebuilding everything
+
+If backend code or shared types changed, stop the container and repeat steps 2–3.
+
+### 6. Troubleshooting
+
+| Symptom | Likely Cause | Fix |
+|---------|--------------|-----|
+| Login button shows but clicking returns missing client id | `GITHUB_CLIENT_ID` not present in container env | Add to `.env.container`, restart container |
+| UI shows old markup (e.g., analysis section visible while logged out) | Stale `index.html` not overwritten | Run `npm run deploy:frontend:container` or rebuild image |
+| 404 for assets under `/assets/...` | Frontend not copied / build failed | Check Docker build logs for Vite build step |
+| `/v4/client-settings` 404 | Misconfigured path or env missing | Ensure server started with `SERVE_FRONTEND=true` and env file mounted |
+| Name conflict `/td_local is already in use` | Stale container with same name exists (stopped or exited) | `docker rm -f td_local` then `docker compose up` (or remove `container_name` from compose) |
+
+### 7. Minimal one‑liner (no env file)
+
+Use only for quick experiments (you will not be able to authenticate without a real client id):
+
+```bash
+docker run --rm -it -p 4000:4000 --name td_local template-doctor:local
+```
+
+### 8. Using Docker Compose
+
+The repository provides a `docker-compose.yml` for a single-service local stack.
+
+1. Ensure you have an env file:
+```bash
+cp .env.container.example .env.container
+```
+2. Bring the stack up (build + run):
+```bash
+docker compose up --build
+```
+3. Open http://localhost:4000
+
+Container name is set to `td_local`, so the hot‑reload script still works:
+```bash
+npm run deploy:frontend:container
+```
+
+Shut down:
+```bash
+docker compose down
+```
+
+If you change backend/server code, run again with `--build`.
+
+---
 
 ## Origin upstream requirement
 

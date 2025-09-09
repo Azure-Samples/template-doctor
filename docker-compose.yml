@@ -1,0 +1,31 @@
+services:
+  template-doctor:
+    container_name: td_local
+    image: template-doctor:local
+    build:
+      context: .
+      dockerfile: packages/server/Dockerfile
+    # Expose unified server (Express + static UI)
+    ports:
+      - "4000:4000"
+    # Load environment variables (GitHub OAuth client id, tokens, feature flags, etc.)
+    env_file:
+      - .env.container
+    # If you want to override or add quick vars without editing the env file, uncomment below:
+    # environment:
+    #   SERVE_FRONTEND: "true"
+    #   LOG_LEVEL: "info"
+    # Healthcheck already defined in Dockerfile; reference here only if you want to override.
+    # healthcheck:
+    #   test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4000/health"]
+    #   interval: 30s
+    #   timeout: 5s
+    #   retries: 3
+    #   start_period: 20s
+    # Optional named volume for any future persistent data (none required currently)
+    # volumes:
+    #   - results_data:/app/packages/app/results
+
+# Uncomment if you decide to persist results later
+# volumes:
+#   results_data:

@@ -269,24 +269,7 @@
         </div>
       </section>
 
-      <section id="analysis-section" class="analysis-section" style="display: none">
-        <div class="analysis-header">
-          <button id="back-button" class="back-button">
-            <i class="fas fa-arrow-left"></i> Back to Search
-          </button>
-          <div class="repo-info">
-            <h3 id="repo-name">Repository Name</h3>
-            <span id="repo-url">Repository URL</span>
-          </div>
-        </div>
-        <div class="loading-container" id="loading-container" style="display: none">
-          <div class="loading-spinner"></div>
-          <p>Analyzing repository... This may take a moment.</p>
-        </div>
-        <div id="results-container" class="results-container" style="display: none">
-          <!-- Results will be populated by JavaScript -->
-        </div>
-      </section>
+      <!-- analysis-section removed: will be created lazily after authentication or on first analysis -->
 
       <section id="error-section" class="error-section" style="display: none">
         <div class="error-container">
@@ -318,8 +301,7 @@
       </div>
     </footer>
 
-    <!-- Debug console (press Alt+D to show) - Must load first for logging -->
-    <script src="js/debug-console.js"></script>
+  <!-- Legacy debug-console.js removed (functionality not critical). -->
   <!-- Legacy api-routes.js & auth.js removed (migrated to TypeScript module graph) -->
   <!-- Legacy GitHub client fully removed (TypeScript replacement loaded via module graph) -->
   <!-- GitHub issue handling migrated: legacy stub removed (issue-service.ts provides window.createGitHubIssue) -->
@@ -334,13 +316,31 @@
     <!-- Validation scripts migrated to TypeScript (modules/validation.ts) -->
     <!-- Demo mode retired: enable-demo-mode.js & demo-helper.js removed -->
     <!-- runtime-config.js migrated to TypeScript (scripts/runtime-config.ts) -->
-    <!-- Main application logic -->
-    <script src="js/app.js"></script>
+  <!-- Legacy app.js removed; functionality migrated to TypeScript (bridge/analyze-repo-bridge + modules). -->
     <!-- Removed legacy action button scripts (action-buttons-fallback.js / action-buttons-direct.js).
       Action buttons are now rendered deterministically by dashboard-renderer.ts and associated
       TypeScript modules. IDs preserved (#fixButton, #create-github-issue-btn, #testProvisionButton)
       so existing code continues to function. -->
     <!-- Begin TypeScript migration entrypoint (Vite module graph). Safe to keep after legacy scripts so it can augment globals. -->
+    <!-- Removed CSS guard for analysis-section (lazy creation now enforces absence pre-auth) -->
+    <script>
+      // Early auth/display guard installed BEFORE module graph.
+      (function(){
+        function applyAuthClass(ev){
+          var detail = ev && ev.detail || {}; var authed = !!detail.authenticated;
+          if(authed){ document.body.classList.add('authenticated');
+            // Mark ready to allow CSS to reveal when modules set data-auth-ready
+            var sect = document.getElementById('analysis-section'); if(sect){ sect.setAttribute('data-auth-ready','true'); }
+          } else { document.body.classList.remove('authenticated'); }
+        }
+        document.addEventListener('auth-state-changed', applyAuthClass);
+        // Defensive interval to re-hide if auth lost
+        setInterval(function(){
+          var auth = (window).GitHubAuth; var authed = auth && typeof auth.isAuthenticated==='function' && auth.isAuthenticated();
+          if(!authed){ document.body.classList.remove('authenticated'); var s=document.getElementById('analysis-section'); if(s) s.style.display='none'; }
+        }, 5000);
+      })();
+    </script>
     <script type="module" src="/src/main.ts"></script>
     <script>
       (function(){

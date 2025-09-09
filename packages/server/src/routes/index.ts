@@ -13,6 +13,7 @@ import { batchScanStartRouter, batchScanStatusRouter } from './batch-scan-start.
 import { validationStatusRouter } from './validation-status.js';
 import { validationCancelRouter } from './validation-cancel.js';
 import { analyzeTemplateRouter } from './analyze-template.js';
+import { healthEnvRouter } from './health-env.js';
 
 export const apiRouter = Router();
 apiRouter.use('/ping', pingRouter);
@@ -30,3 +31,4 @@ apiRouter.use('/batch-scan-status', batchScanStatusRouter);
 apiRouter.use('/validation-status', validationStatusRouter);
 apiRouter.use('/validation-cancel', validationCancelRouter);
 apiRouter.use('/analyze-template', analyzeTemplateRouter);
+apiRouter.use('/health/env', healthEnvRouter);

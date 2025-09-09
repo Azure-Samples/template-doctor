@@ -128,7 +128,7 @@ function computeApiBase(cfg: TemplateDoctorConfigShape): string {
   const isLocalhost =
     window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   const configuredBase = cfg && cfg.apiBase ? String(cfg.apiBase || '').trim() : window.location.origin;
-  return isLocalhost ? 'http://localhost:7071' : configuredBase;
+  return isLocalhost ? (window.location.port === '7071' ? 'http://localhost:7071' : configuredBase) : configuredBase;
 }
 
 function runAzdProvisionTest() {
