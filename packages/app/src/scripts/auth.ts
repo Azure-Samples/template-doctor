@@ -47,23 +47,84 @@ async function loadRuntimeAuthConfig(){
 }
 // Edge-case helper: Sometimes GitHub may redirect directly to index.html with ?code&state instead of callback.html
 // (e.g., misconfigured redirect or older bookmarked URL). We capture that here early.
-function captureAuthParamsOnIndex(){
+// Legacy code capture for both callback.html and (if indicated) index.html
+function captureOAuthParams(forceCaptureOnIndex = false){
   try {
-    if (!window.location.search) return;
+    if (!window.location.search) return false;
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
     const state = params.get('state');
-    if (code && !sessionStorage.getItem('gh_auth_code')){
-      console.warn('[GitHubAuth][captureAuthParamsOnIndex] Found OAuth params on index.html; stashing and cleaning URL');
-      sessionStorage.setItem('gh_auth_code', code);
-      if (state) sessionStorage.setItem('gh_auth_state', state);
-      // clean URL (remove sensitive query params) without full reload
-      const clean = window.location.origin + window.location.pathname;
-      window.history.replaceState({}, document.title, clean);
+    if (!code) return false;
+    
+    const path = window.location.pathname || '';
+    const isCallback = /callback\.html$/i.test(path);
+    
+    // Only act if: 1) We're on callback.html, OR 2) We're on index with forceCaptureOnIndex=true
+    if (!isCallback && !forceCaptureOnIndex) {
+      console.warn('[GitHubAuth][oauth] Found code parameter on non-callback page; leaving intact. Set forceCaptureOnIndex=true to handle here.');
+      return false;
     }
-  } catch(e){ console.debug('[GitHubAuth][captureAuthParamsOnIndex] No-op', e); }
+    
+    // Don't overwrite existing code unless on callback (which is the "right" place)
+    if (!isCallback && sessionStorage.getItem('gh_auth_code')) {
+      console.warn('[GitHubAuth][oauth] Already have stored code; not overwriting from index.html');
+      return false;
+    }
+    
+    console.log('[GitHubAuth][oauth] Capturing OAuth params on ' + (isCallback ? 'callback page' : 'index page'));
+    sessionStorage.setItem('gh_auth_code', code);
+    if (state) sessionStorage.setItem('gh_auth_state', state);
+    
+    // Clean URL of sensitive parameters
+    const clean = window.location.origin + window.location.pathname;
+    window.history.replaceState({}, document.title, clean);
+    return true;
+  } catch(e){ 
+    console.error('[GitHubAuth][oauth] Capture error', e); 
+    return false;
+  }
 }
-captureAuthParamsOnIndex();
+
+// Check if we are on callback.html (the "right" place for param capture)
+const isCallbackPage = /callback\.html$/i.test(window.location.pathname || '');
+
+// ALWAYS capture on callback.html, and make index.html capture optional
+// This restores the original logic while allowing for potential index.html capture if needed
+const captured = captureOAuthParams(true); // Allow capture on index OR callback
+
+// If we are on callback.html, we expect to be redirected to the main page soon
+// We can help by doing it ourselves if needed
+if (isCallbackPage && captured) {
+  // Give it a very brief moment to allow other scripts to possibly redirect us
+  setTimeout(() => {
+    if (document.location.pathname.includes('callback.html')) {
+      console.log('[GitHubAuth][oauth] Still on callback page after param capture; auto-redirecting to index');
+      document.location.href = document.location.origin + 
+        document.location.pathname.replace(/callback\.html$/, '') + 
+        'index.html';
+    }
+  }, 500);
+}
+
+// Deferred exchange safety: if a code is stored (e.g., captured on callback.html) but no token yet, attempt exchange shortly after load.
+window.addEventListener('load', () => {
+  try {
+    const existingToken = localStorage.getItem('gh_access_token');
+    const pendingCode = sessionStorage.getItem('gh_auth_code');
+    if (!existingToken && pendingCode) {
+      console.log('[GitHubAuth][oauth] Detected pending auth code post-load; initiating token exchange.');
+      if ((window as any).GitHubAuth?.exchangeCodeForToken) {
+        (window as any).GitHubAuth.exchangeCodeForToken(pendingCode)
+          .catch(err => console.error('[GitHubAuth][oauth] Deferred exchange failed', err));
+      } else if (typeof (window as any).exchangeCodeForToken === 'function') {
+        (window as any).exchangeCodeForToken(pendingCode)
+          .catch(err => console.error('[GitHubAuth][oauth] Deferred exchange failed', err));
+      } else {
+        console.error('[GitHubAuth][oauth] No exchange method available');
+      }
+    }
+  } catch(e){ console.debug('[GitHubAuth][oauth] Deferred exchange check failed', e); }
+});
 class GitHubAuth {
   constructor(){
     debug('GitHubAuth','Initializing authentication handler');
@@ -212,14 +273,20 @@ class GitHubAuth {
     const userAvatar = document.getElementById('user-avatar');
     const searchSection = document.getElementById('search-section');
     const welcomeSection = document.getElementById('welcome-section');
-    if (this.accessToken && this.userInfo){
+    // New behavior: treat presence of token as authenticated immediately (even before userInfo fetch completes)
+    // to avoid forced re-login perception after redeploy / hard refresh.
+    if (this.accessToken){
       if (loginButton) loginButton.style.display = 'none';
       if (userProfile) userProfile.style.display = 'flex';
-      if (username) username.textContent = this.userInfo.name || this.userInfo.login;
-      if (userAvatar) userAvatar.src = this.userInfo.avatarUrl;
+      if (username) username.textContent = (this.userInfo && (this.userInfo.name || this.userInfo.login)) || 'Loading…';
+      if (userAvatar) userAvatar.src = (this.userInfo && this.userInfo.avatarUrl) || 'https://avatars.githubusercontent.com/u/0';
       if (searchSection) searchSection.style.display = 'block';
       if (welcomeSection) welcomeSection.style.display = 'none';
-      document.dispatchEvent(new CustomEvent('auth-state-changed', { detail: { authenticated: true }, bubbles: true, cancelable: true }));
+      document.dispatchEvent(new CustomEvent('auth-state-changed', { detail: { authenticated: true, provisional: !this.userInfo }, bubbles: true, cancelable: true }));
+      // If we have token but no user info yet, initiate fetch (idempotent) – safe because fetchUserInfo checks token.
+      if (!this.userInfo) {
+        this.fetchUserInfo();
+      }
     } else {
       if (loginButton) loginButton.style.display = 'flex';
       if (userProfile) userProfile.style.display = 'none';
@@ -263,6 +330,24 @@ class GitHubAuth {
   getUsername(){ const username = this.userInfo?.login || this.userInfo?.name; return username || null; }
   isAuthenticated(){ const authenticated = !!this.accessToken; console.log('isAuthenticated check - token exists:', authenticated); return authenticated; }
 }
-(window as any).GitHubAuth = null;
-loadRuntimeAuthConfig().catch(()=>{}).finally(()=>{ const auth = new GitHubAuth(); (window as any).GitHubAuth = auth; });
+// Immediately create the GitHubAuth instance so it's available to early consumers
+console.log('[GitHubAuth] Creating instance immediately, will update config async');
+(window as any).GitHubAuth = new GitHubAuth(); // CRITICAL: must be available synchronously
+loadRuntimeAuthConfig().catch(()=>{}).finally(()=>{ 
+  // Ensure we dispatch ready event
+  console.log('[GitHubAuth] Config loaded, dispatching ready event');
+  document.dispatchEvent(new CustomEvent('github-auth-ready'));
+});
+
+// Expose exchangeCodeForToken method so load-time listener can work
+(window as any).exchangeCodeForToken = function(code) {
+  console.log('[GitHubAuth] Global exchangeCodeForToken called with', code);
+  if ((window as any).GitHubAuth?.exchangeCodeForToken) {
+    return (window as any).GitHubAuth.exchangeCodeForToken(code);
+  } else {
+    console.error('[GitHubAuth] No GitHubAuth instance available for token exchange');
+    return Promise.reject(new Error('No GitHubAuth instance available'));
+  }
+};
+
 export {};

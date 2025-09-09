@@ -1,0 +1,11 @@
+{
+  "timestamp": "2025-07-24T16:34:48.932Z",
+  "dashboardPath": "1753374888936-dashboard.html",
+  "dataPath": "1753374888936-data.js",
+  "repoUrl": "https://github.com/anfibiacreativa/todo-nodejs-mongo-coreconf",
+  "compliance": {
+    "percentage": 52,
+    "issues": 12,
+    "passed": 13
+  }
+}

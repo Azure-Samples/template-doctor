@@ -10,7 +10,7 @@
     "start": "python3 -m http.server 8080",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-  "build": "vite build && mkdir -p dist/configs && cp -f configs/*.json dist/configs/",
+  "build": "vite build && mkdir -p dist/configs && cp -f configs/*.json dist/configs/ && cp -f config.json dist/ 2>/dev/null || true && if [ -d results ]; then mkdir -p dist/results && rsync -a --exclude '*/node_modules' --exclude '*/.git' results/ dist/results/; fi",
     "typecheck": "tsc -p . --noEmit",
     "pretest": "npm run build"
   },

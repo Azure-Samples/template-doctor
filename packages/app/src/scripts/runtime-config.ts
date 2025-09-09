@@ -29,6 +29,11 @@
         if (!mapped.apiBase && config.backend && typeof config.backend.baseUrl === 'string') {
           mapped.apiBase = config.backend.baseUrl;
         }
+          // Normalize away stale hard-coded local Functions port if present
+          if (mapped.apiBase && /localhost:7071/.test(mapped.apiBase) && window.location.port && window.location.port !== '7071') {
+            console.log('[runtime-config] normalizing stale apiBase', mapped.apiBase, '->', window.location.origin);
+            mapped.apiBase = window.location.origin;
+          }
         if (config.backend && typeof config.backend.functionKey === 'string') {
           mapped.functionKey = config.backend.functionKey;
         }
@@ -52,7 +57,8 @@
           (merged as any).features = Object.assign({}, current.features || {}, (mapped as any).features || {});
         }
         (window as any).TemplateDoctorConfig = merged;
-        document.dispatchEvent(new CustomEvent('template-config-loaded'));
+  console.debug('[runtime-config] dispatching template-config-loaded (ConfigLoader path)', { apiBase: (window as any).TemplateDoctorConfig.apiBase });
+  document.dispatchEvent(new CustomEvent('template-config-loaded'));
         return;
       }
       const response = await fetch('config.json', { cache: 'no-store' });
@@ -61,6 +67,10 @@
         if (cfg && typeof cfg === 'object') {
           const mapped: any = { ...cfg };
           if (!mapped.apiBase && cfg.backend && typeof cfg.backend.baseUrl === 'string') mapped.apiBase = cfg.backend.baseUrl;
+          if (mapped.apiBase && /localhost:7071/.test(mapped.apiBase) && window.location.port && window.location.port !== '7071') {
+            console.log('[runtime-config] normalizing stale apiBase (config.json)', mapped.apiBase, '->', window.location.origin);
+            mapped.apiBase = window.location.origin;
+          }
           if (cfg.backend && typeof cfg.backend.functionKey === 'string') mapped.functionKey = cfg.backend.functionKey;
           if (cfg.defaultRuleSet) mapped.defaultRuleSet = String(cfg.defaultRuleSet).toLowerCase();
             if (typeof cfg.requireAuthForResults === 'boolean') mapped.requireAuthForResults = cfg.requireAuthForResults;
@@ -75,15 +85,24 @@
             (merged2 as any).features = Object.assign({}, current2.features || {}, (mapped as any).features || {});
           }
             (window as any).TemplateDoctorConfig = merged2;
-          document.dispatchEvent(new CustomEvent('template-config-loaded'));
-          console.log('[runtime-config] loaded config.json');
+            console.log('[runtime-config] loaded config.json');
+            console.debug('[runtime-config] dispatching template-config-loaded (config.json path)', { apiBase: (window as any).TemplateDoctorConfig.apiBase });
+            document.dispatchEvent(new CustomEvent('template-config-loaded'));
         } else {
           console.log('[runtime-config] no config.json found, using defaults');
         }
       }
+      else {
+        console.warn('[runtime-config] config.json not found (HTTP', response.status, ') using defaults only');
+  console.debug('[runtime-config] dispatching template-config-loaded (missing config.json path)');
+  document.dispatchEvent(new CustomEvent('template-config-loaded'));
+      }
     } catch (error){
       console.error('[runtime-config] error loading config:', error);
       console.log('[runtime-config] using default configuration');
+      // Ensure event so downstream loaders (templates, search) still proceed
+  console.debug('[runtime-config] dispatching template-config-loaded (error path)');
+  document.dispatchEvent(new CustomEvent('template-config-loaded'));
     }
   };
   loadConfig().catch(()=> console.log('[runtime-config] failed to load config, using defaults'));

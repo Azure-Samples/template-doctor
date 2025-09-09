@@ -18,6 +18,20 @@
     <link rel="stylesheet" href="css/tooltips.css" />
     <link rel="stylesheet" href="css/scan-request.css" />
     <link rel="stylesheet" href="css/dashboard.css" />
+    <script>
+      (function(){
+        // Inject fallback if dashboard.css not yet applied (helps when container copy races or path changes)
+        setTimeout(function(){
+          try {
+            var found = Array.from(document.styleSheets||[]).some(function(s){ try { return s.href && s.href.indexOf('dashboard.css')!==-1; } catch(_) { return false; } });
+            if(!found){
+              var l=document.createElement('link'); l.rel='stylesheet'; l.href='css/dashboard.css'; document.head.appendChild(l);
+              console.log('[index.html] Fallback injected dashboard.css');
+            }
+          } catch(e){ console.warn('dashboard.css fallback check failed', e); }
+        }, 1500);
+      })();
+    </script>
     <link rel="stylesheet" href="css/action-buttons-fix.css" />
     <link rel="stylesheet" href="css/notifications.css" />
     <link rel="stylesheet" href="css/modal.css" />

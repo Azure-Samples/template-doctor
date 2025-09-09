@@ -88,19 +88,33 @@ async function loadEnvironmentVariables() {
 }
 
 async function loadConfigJson() {
-  try {
-    const response = await fetch('./config.json', { cache: 'no-store' });
-    if (!response.ok) {
-      console.warn('Unable to fetch config.json', response.status);
-      return {};
+  const tried: string[] = [];
+  const candidates = [
+    '/config.json', // absolute root (dist places at /index.html ; our deploy copies config.json alongside index if we add it)
+    './config.json', // relative
+    'config.json',
+    '/app/config.json' // fallback in container if mounted differently
+  ];
+  for (const url of candidates) {
+    if (tried.includes(url)) continue;
+    tried.push(url);
+    try {
+      const resp = await fetch(url, { cache: 'no-store' });
+      if (!resp.ok) { console.debug('[config-loader] config.json candidate not ok', url, resp.status); continue; }
+      const txt = await resp.text();
+      try {
+        const data = JSON.parse(txt);
+        console.log('[config-loader] Loaded config.json via', url, 'keys:', Object.keys(data));
+        return data;
+      } catch (e) {
+        console.warn('[config-loader] JSON parse failed for', url, 'first 100 chars:', txt.slice(0,100));
+      }
+    } catch (err) {
+      console.debug('[config-loader] fetch error for candidate', url, err?.message || err);
     }
-    const data = await response.json();
-    console.log('Loaded config.json:', Object.keys(data));
-    return data;
-  } catch (error) {
-    console.warn('Error loading config.json:', error);
-    return {};
   }
+  console.warn('[config-loader] All config.json candidates failed; proceeding with empty config');
+  return {};
 }
 
 async function loadConfig() {

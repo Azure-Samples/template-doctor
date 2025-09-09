@@ -39,13 +39,14 @@ let authPollAttempts = 0;
 const MAX_AUTH_POLL = 50; // ~5s at 100ms intervals (matches legacy semantics)
 
 function log(...args: any[]) {
-  // Use a namespaced debug line for easier filtering
-  console.debug('[TemplateDataLoader]', ...args);
+  // Use console.log (not debug) so messages appear under default log level filters
+  console.log('[TemplateDataLoader]', ...args);
 }
 
 function dispatchOnce() {
   if (state.dispatched) return;
   state.dispatched = true;
+  log('Dispatching template-data-loaded event. State snapshot:', JSON.stringify({ attempted: state.attempted, loaded: state.loaded, authenticatedAtLoad: state.authenticatedAtLoad, dataLength: Array.isArray((window as any).templatesData) ? (window as any).templatesData.length : 'n/a' }));
   try {
     document.dispatchEvent(new CustomEvent('template-data-loaded'));
   } catch (e) {
@@ -53,11 +54,11 @@ function dispatchOnce() {
   }
 }
 
-function ensureArray() {
+function ensureArray(markLoaded: boolean = true) {
   if (!Array.isArray(window.templatesData)) {
-    window.templatesData = [];
+    (window as any).templatesData = [];
   }
-  state.loaded = true;
+  if (markLoaded) state.loaded = true; // allow callers to skip marking fully loaded (e.g., unauth placeholder)
 }
 
 function handleLoadSuccess() {
@@ -84,12 +85,18 @@ function injectScript() {
   }
   state.attempted = true;
   state.authenticatedAtLoad = !!(window.GitHubAuth && window.GitHubAuth.isAuthenticated?.());
+  const force = /[?&]forceResults=1/.test(window.location.search);
+  if (force) {
+    log('forceResults=1 detected in query string; bypassing auth requirement');
+    state.authenticatedAtLoad = true;
+  }
   if (!state.authenticatedAtLoad) {
-    log('Not authenticated at load attempt; setting empty templatesData');
-    ensureArray();
+    log('Not authenticated at load attempt; setting placeholder templatesData (will retry after login)');
+    ensureArray(false); // do NOT mark loaded so we can retry when auth arrives
     dispatchOnce();
     return;
   }
+  log('Authenticated at load; proceeding to inject results script');
   try {
     const script = document.createElement('script');
     script.src = 'results/index-data.js';
@@ -149,15 +156,31 @@ function pollForAuthAndLoad() {
 document.addEventListener('auth-state-changed', (e: any) => {
   try {
     const authenticated = !!e?.detail?.authenticated;
-    log('auth-state-changed event received', authenticated);
-    if (authenticated && !state.loaded) {
-      // Retry loading if we previously short-circuited (not attempted or had empty array due to unauth)
-      if (!state.attempted || (state.attempted && !state.authenticatedAtLoad)) {
-        injectScript();
+    log('auth-state-changed event received', authenticated, 'current state:', { ...state });
+    if (authenticated) {
+      // If we previously dispatched placeholder (attempted while unauth), state.loaded should be false (due to change above).
+      // But if an earlier version marked it loaded, detect mismatch and reset for retry.
+      if (state.attempted && !state.authenticatedAtLoad && state.loaded) {
+        log('Adjusting legacy state: was marked loaded while unauthenticated; resetting for retry');
+        state.loaded = false;
       }
-    } else if (!authenticated && !state.loaded) {
-      ensureArray();
-      dispatchOnce();
+      if (!state.attempted || !state.authenticatedAtLoad) {
+        log('Attempting to (re)load results after authentication');
+        // Reset minimal flags (preserve dispatched so downstream listeners know new data after second event?)
+        state.attempted = false;
+        state.authenticatedAtLoad = false;
+        injectScript();
+        return;
+      }
+      if (!state.loaded && state.attempted && state.authenticatedAtLoad) {
+        log('State indicates attempt made while authenticated but not loaded; forcing reload');
+        forceReload();
+      }
+    } else {
+      if (!state.loaded) {
+        ensureArray(false);
+        dispatchOnce();
+      }
     }
   } catch (err) {
     log('Error handling auth-state-changed', err);

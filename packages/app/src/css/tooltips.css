@@ -1,0 +1,26 @@
+/* Custom tooltips */
+.tooltip {
+  position: fixed;
+  padding: 8px 12px;
+  background-color: rgba(0, 0, 0, 0.8);
+  color: white;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  z-index: 1000;
+  max-width: 300px;
+  white-space: normal;
+  word-wrap: break-word;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.tooltip.visible {
+  opacity: 1;
+}
+
+/* Add a subtle dotted underline to elements with tooltips */
+[data-tooltip] {
+  border-bottom: 1px dotted #ccc;
+  cursor: help;
+}

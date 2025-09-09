@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Template Doctor - GitHub Pages</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link rel="icon" href="/assets/templatedoctor-DFkL0nYn.svg" type="image/svg+xml" />
+    <script>
+      (function(){
+        // Inject fallback if dashboard.css not yet applied (helps when container copy races or path changes)
+        setTimeout(function(){
+          try {
+            var found = Array.from(document.styleSheets||[]).some(function(s){ try { return s.href && s.href.indexOf('dashboard.css')!==-1; } catch(_) { return false; } });
+            if(!found){
+              var l=document.createElement('link'); l.rel='stylesheet'; l.href='css/dashboard.css'; document.head.appendChild(l);
+              console.log('[index.html] Fallback injected dashboard.css');
+            }
+          } catch(e){ console.warn('dashboard.css fallback check failed', e); }
+        }, 1500);
+      })();
+    </script>
+    <style>
+      /* Inline styles for the product icon menu */
+      .product-menu {
+        width: 500px;
+        margin: 0 auto 30px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      .product-menu a {
+        display: inline-flex;
+        align-items: center;
+      }
+      .product-menu img {
+        height: 128px;
+        width: auto;
+        display: block;
+      }
+      @media (max-width: 600px) {
+        .product-menu img {
+          height: 32px;
+        }
+      }
+    </style>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <!-- Notification guard stub: establishes a temporary queue so legacy scripts can call notifications
+         before the TypeScript module system loads the real implementation. Removed legacy script tags below. -->
+    <script>
+      (function(){
+        if(window.NotificationSystem && !window.NotificationSystem.__queue) return; // real system already
+        var q = [];
+        function enqueue(type,title,message,duration){ q.push({type:type,title:title,message:message,duration:duration}); }
+        window.NotificationSystem = { __queue:q,
+          showSuccess:function(t,m,d){ enqueue('success',t,m,d); },
+          showError:function(t,m,d){ enqueue('error',t,m,d); },
+          showWarning:function(t,m,d){ enqueue('warning',t,m,d); },
+          showInfo:function(t,m,d){ enqueue('info',t,m,d); },
+          confirm:function(){ console.warn('[NotificationGuard] confirm invoked before system ready'); },
+          // Provide loading alias expected by tests; returns a minimal handle that simply enqueues follow-up status notifications
+          loading:function(t,m){
+            var baseTitle = t || 'Loading...';
+            enqueue('info', baseTitle, m||'', 0);
+            return {
+              update:function(nt,nm){ /* no-op in guard; rich system will replace */ },
+              success:function(st,sm,d){ enqueue('success', st||'Success', sm||'', d||4000); },
+              error:function(et,em,d){ enqueue('error', et||'Error', em||'', d||8000); },
+              close:function(){}
+            };
+          }
+        };
+        // Legacy Notifications facade (subset) maps to queue
+        if(!window.Notifications){
+          window.Notifications = {
+            info:function(t,m,d){ enqueue('info',t,m,d); },
+            success:function(t,m,d){ enqueue('success',t,m,d); },
+            warning:function(t,m,d){ enqueue('warning',t,m,d); },
+            error:function(t,m,d){ enqueue('error',t,m,d); },
+            showConfirmation:function(title,message){ enqueue('warning',title,message,0); },
+            showLoading:function(title,message){
+              var id='guard-loading';
+              enqueue('info', title||'Loading...', message||'', 0);
+              return { id:id, update:function(){}, success:function(st,sm){ enqueue('success', st||'Success', sm||'', 5000); }, error:function(et,em){ enqueue('error', et||'Error', em||'', 8000); }, close:function(){} };
+            }
+          };
+        }
+        try { document.dispatchEvent(new Event('notifications-ready')); } catch(e){}
+        console.debug('[notification-guard] stub initialized; queueing until real system loads');
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-B3QaMNyl.js"></script>
+    <link rel="stylesheet" crossorigin href="/css/index.css">
+  </head>
+  <body>
+    <header>
+      <div class="container header-content">
+        <div class="logo">
+          <img src="/assets/templatedoctor-DFkL0nYn.svg" alt="Template Doctor Logo" />
+          <h1>Template Doctor</h1>
+        </div>
+        <div id="user-info" class="user-info">
+          <button id="login-button" class="login-button">
+            <i class="fab fa-github"></i> Login with GitHub
+          </button>
+          <div id="user-profile" class="user-profile" style="display: none">
+            <span id="username">Not logged in</span>
+            <img id="user-avatar" src="" alt="User Avatar" />
+            <button id="logout-button" class="logout-button">
+              <i class="fas fa-sign-out-alt"></i>
+            </button>
+          </div>
+          <div id="analysis-mode-indicator" style="display:none; margin-left:12px; font-size:12px; padding:4px 8px; border-radius:4px; background:#eee; color:#333; font-weight:500;">
+            Mode: <span id="analysis-mode-text">loading…</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="container">
+      <section id="welcome-section" class="welcome-section">
+        <h2>Azure Samples and Templates Framework Suite</h2>
+        <!-- Product icon menu -->
+        <nav class="product-menu" aria-label="Related products">
+          <a
+            href="https://github.com/Azure-Samples/azd-template-artifacts"
+            class="product-link"
+            title="Template Framework"
+            aria-label="Template Framework"
+          >
+            <img src="/assets/templateframework-KbuhChaH.svg" alt="Template Framework" />
+          </a>
+          <a
+            href="https://github.com/Template-Doctor/template-framework-mcp"
+            class="product-link"
+            title="Template MCP"
+            aria-label="Template MCP"
+          >
+            <img src="/assets/templatemcp-Ct7agV9G.svg" alt="Template MCP" />
+          </a>
+          <a
+            href="https://github.com/Template-Doctor/template-doctor"
+            class="product-link"
+            title="Template Doctor"
+            aria-label="Template Doctor"
+          >
+            <img src="/assets/templatedoctor-DFkL0nYn.svg" alt="Template Doctor" />
+          </a>
+        </nav>
+
+        <p class="welcome-text">
+          Welcome to Template Doctor, part of the Templates Framework Suite! This tool helps you
+          analyze Azure samples and templates for compliance with a configurable definition of done,
+          including the official
+          <a
+            href="https://github.com/Azure-Samples/azd-template-artifacts/blob/main/docs/development-guidelines/definition-of-done.md"
+            target="_blank"
+            >Azure Developer CLI Definition of Done</a
+          >. Login with GitHub to get started, then search for a repository to analyze.
+        </p>
+
+        <div class="features-list">
+          <div class="feature-item">
+            <i class="fas fa-search"></i>
+            <h3>Find a Template</h3>
+            <p>Search for any GitHub repository containing Azure Developer CLI templates</p>
+          </div>
+          <div class="feature-item">
+            <i class="fas fa-check-circle"></i>
+            <h3>Check Compliance</h3>
+            <p>Analyze the template against a Definition of Done requirements</p>
+          </div>
+          <div class="feature-item">
+            <i class="fas fa-cloud-upload-alt"></i>
+            <h3>Test Deployment</h3>
+            <p>Get recommendations to fix compliance issues or create GitHub issues</p>
+          </div>
+          <div class="feature-item">
+            <i class="fas fa-code"></i>
+            <h3>Fix Issues</h3>
+            <p>Get recommendations to fix compliance issues or create GitHub issues</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="search-section" class="search-section" style="display: none">
+        <!-- Scan Mode Toggle -->
+        <div class="scan-mode-toggle">
+          <span>Scan Mode:</span>
+          <label class="toggle-switch">
+            <input type="checkbox" id="scan-mode-toggle" />
+            <span class="toggle-slider"></span>
+          </label>
+          <div class="toggle-label">
+            <span id="single-mode-label" class="active">Single</span>
+            <span id="batch-mode-label">Batch</span>
+          </div>
+        </div>
+
+        <!-- Single Mode Search -->
+        <div id="single-scan-container" class="search-container">
+          <input
+            type="text"
+            id="repo-search"
+            placeholder="Search for a GitHub repository (e.g., Azure-Samples/azd-templates)"
+            class="search-input"
+          />
+          <button id="search-button" class="search-button">
+            <i class="fas fa-search"></i>
+          </button>
+        </div>
+
+        <!-- Batch Mode URLs Input -->
+        <div id="batch-urls-container" class="batch-urls-container">
+          <label for="batch-urls" class="batch-urls-label"
+            >Enter repository URLs (one per line or comma-separated):</label
+          >
+          <textarea
+            id="batch-urls"
+            class="batch-urls-textarea"
+            placeholder="https://github.com/Azure-Samples/azd-templates&#10;https://github.com/Azure-Samples/todo-nodejs-mongo-aca&#10;https://github.com/Azure-Samples/todo-csharp-cosmos-sql"
+          ></textarea>
+          <div class="batch-urls-helper">
+            Enter GitHub repository URLs for batch scanning. Any repositories that are not already
+            forked will be automatically forked to your account.
+          </div>
+          <div style="margin-top: 16px; display: flex; justify-content: flex-end">
+            <button
+              id="batch-scan-button"
+              class="search-button"
+              style="border-radius: 4px; padding: 8px 16px"
+            >
+              <i class="fas fa-play"></i> Start Batch Scan
+            </button>
+          </div>
+        </div>
+
+        <!-- Results Container -->
+        <div id="search-results" class="search-results"></div>
+
+        <!-- Batch Results Container -->
+        <div id="batch-results" class="batch-results">
+          <div class="batch-results-header">
+            <h3>Batch Scan Results</h3>
+            <div class="batch-progress">
+              <div class="progress-bar-container">
+                <div class="progress-bar" id="batch-progress-bar"></div>
+              </div>
+              <span class="progress-text" id="batch-progress-text">0/0 Completed</span>
+            </div>
+          </div>
+          <div id="batch-items" class="batch-items">
+            <!-- Batch items will be populated by JavaScript -->
+          </div>
+          <div
+            style="margin-top: 20px; text-align: center; display: none"
+            id="batch-cancel-container"
+          >
+            <button id="batch-cancel-btn" class="batch-cancel-btn">
+              <i class="fas fa-stop"></i> Cancel Remaining Scans
+            </button>
+          </div>
+        </div>
+
+        <div id="recent-searches" class="recent-searches">
+          <!-- Will be populated by createRecentSearchesSection() -->
+        </div>
+      </section>
+
+      <!-- analysis-section removed: will be created lazily after authentication or on first analysis -->
+
+      <section id="error-section" class="error-section" style="display: none">
+        <div class="error-container">
+          <i class="fas fa-exclamation-triangle"></i>
+          <h3>Error</h3>
+          <p id="error-message">An error occurred.</p>
+          <button id="error-back-button" class="back-button">
+            <i class="fas fa-arrow-left"></i> Back to Search
+          </button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-content">
+        <div class="copyright">©2025 - DevDiv Microsoft</div>
+        <div class="footer-links">
+          <a href="https://aka.ms/gallery/submit" class="footer-link" target="_blank">
+            <i class="fas fa-plus-circle"></i> Submit new template to gallery
+          </a>
+          <a
+            href="https://github.com/Azure-Samples/azd-template-artifacts"
+            target="_blank"
+            class="footer-link"
+          >
+            <i class="fas fa-check-square"></i> Definition of Done
+          </a>
+        </div>
+      </div>
+    </footer>
+
+  <!-- Legacy debug-console.js removed (functionality not critical). -->
+  <!-- Legacy api-routes.js & auth.js removed (migrated to TypeScript module graph) -->
+  <!-- Legacy GitHub client fully removed (TypeScript replacement loaded via module graph) -->
+  <!-- GitHub issue handling migrated: legacy stub removed (issue-service.ts provides window.createGitHubIssue) -->
+    <!-- Ruleset for Docs org -->
+  <!-- Removed legacy docs ruleset analyzer (js/ruleset-docs/analyzer.js) - functionality either deprecated or to be reintroduced via TS module if needed -->
+  <!-- Template data loader migrated to TypeScript (scripts/templates-data-loader.ts) -->
+  <!-- Tooltips functionality migrated to TypeScript (modules/tooltips.ts) -->
+  <!-- Ruleset modal migrated to TypeScript (modules/ruleset-modal.ts) -->
+    <!-- GitHub Action hook migrated to TypeScript (scripts/github-action-hook.ts) -->
+    <!-- Legacy github-action-hook.js removed -->
+  <!-- AZD Provision migrated to TypeScript (scripts/azd-provision.ts) -->
+    <!-- Validation scripts migrated to TypeScript (modules/validation.ts) -->
+    <!-- Demo mode retired: enable-demo-mode.js & demo-helper.js removed -->
+    <!-- runtime-config.js migrated to TypeScript (scripts/runtime-config.ts) -->
+  <!-- Legacy app.js removed; functionality migrated to TypeScript (bridge/analyze-repo-bridge + modules). -->
+    <!-- Removed legacy action button scripts (action-buttons-fallback.js / action-buttons-direct.js).
+      Action buttons are now rendered deterministically by dashboard-renderer.ts and associated
+      TypeScript modules. IDs preserved (#fixButton, #create-github-issue-btn, #testProvisionButton)
+      so existing code continues to function. -->
+    <!-- Begin TypeScript migration entrypoint (Vite module graph). Safe to keep after legacy scripts so it can augment globals. -->
+    <!-- Removed CSS guard for analysis-section (lazy creation now enforces absence pre-auth) -->
+    <script>
+      // Early auth/display guard installed BEFORE module graph.
+      (function(){
+        function applyAuthClass(ev){
+          var detail = ev && ev.detail || {}; var authed = !!detail.authenticated;
+          if(authed){ document.body.classList.add('authenticated');
+            // Mark ready to allow CSS to reveal when modules set data-auth-ready
+            var sect = document.getElementById('analysis-section'); if(sect){ sect.setAttribute('data-auth-ready','true'); }
+          } else { document.body.classList.remove('authenticated'); }
+        }
+        document.addEventListener('auth-state-changed', applyAuthClass);
+        // Defensive interval to re-hide if auth lost
+        setInterval(function(){
+          var auth = (window).GitHubAuth; var authed = auth && typeof auth.isAuthenticated==='function' && auth.isAuthenticated();
+          if(!authed){ document.body.classList.remove('authenticated'); var s=document.getElementById('analysis-section'); if(s) s.style.display='none'; }
+        }, 5000);
+      })();
+    </script>
+    <script>
+      (function(){
+        const el = document.getElementById('analysis-mode-indicator');
+        const text = document.getElementById('analysis-mode-text');
+        function refresh(){
+          if(!window.TemplateDoctorConfig){ return; }
+          const cfg = window.TemplateDoctorConfig;
+          const rt = window.TemplateDoctorRuntime || {};
+          const serverPref = cfg.analysis?.useServerSide === true;
+          const version = cfg.apiVersion || (cfg.backend && cfg.backend.apiVersion) || 'legacy';
+          let modeLabel;
+          switch(rt.lastMode){
+            case 'server': modeLabel = 'Server'; break;
+            case 'server-failed': modeLabel = 'Server Failed'; break;
+            case 'client': modeLabel = 'Client'; break;
+            default: modeLabel = serverPref ? 'Server?' : 'Client?';
+          }
+          text.textContent = modeLabel + ' | v:' + version;
+          el.style.display = 'inline-block';
+          // Color coding
+          if(rt.lastMode === 'server') { el.style.background = '#e0f7e9'; el.style.color = '#0a5d2a'; }
+          else if(rt.lastMode === 'server-failed') { el.style.background = '#fdecea'; el.style.color = '#b71c1c'; }
+          else if(rt.fallbackUsed) { /* fallback removed; retain branch for legacy runtime objects but no style change */ }
+          else { el.style.background = '#e7e9f2'; el.style.color = '#2c3e50'; }
+          el.title = 'ServerPref=' + serverPref + ' apiBase=' + cfg.apiBase;
+        }
+        document.addEventListener('template-config-loaded', refresh);
+        document.addEventListener('analysis-mode-changed', refresh);
+        // periodic refresh in case events missed
+        setInterval(refresh, 5000);
+        window.addEventListener('load', ()=> setTimeout(refresh,600));
+      })();
+    </script>
+  </body>
+</html>

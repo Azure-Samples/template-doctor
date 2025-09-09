@@ -2,21 +2,11 @@
 // Extracted subset of legacy app.js logic to satisfy tests expecting .template-card elements.
 // Focus: render scanned templates from window.templatesData when available & authenticated.
 
-interface ScannedTemplateEntry {
-  repoUrl: string;
-  relativePath: string;
-  compliance: { percentage: number; issues: number; passed: number };
-  timestamp: string;
-  scannedBy?: string[];
-  ruleSet?: string; // optional for future parity
-  customConfig?: { gistUrl?: string };
-}
+// Uses the shared ScannedTemplateEntry interface from global.d.ts
 
-// Uses the shared GitHubAuthLike from global.d.ts
-
+// Extend the global Window interface for template list-specific properties
 declare global {
   interface Window {
-    templatesData?: ScannedTemplateEntry[];
     TemplateList?: TemplateListAPI;
   }
 }
@@ -105,8 +95,10 @@ function createCard(t: ScannedTemplateEntry): HTMLElement {
     if (action === 'view') {
       document.dispatchEvent(new CustomEvent('template-card-view', { detail: { template: t } }));
     } else if (action === 'rescan') {
+      console.log('[TemplateList] rescan requested', t.repoUrl);
       document.dispatchEvent(new CustomEvent('template-card-rescan', { detail: { template: t } }));
     } else if (action === 'validate') {
+      console.log('[TemplateList] validate requested', t.repoUrl);
       document.dispatchEvent(new CustomEvent('template-card-validate', { detail: { template: t } }));
     }
   });
@@ -153,29 +145,38 @@ function renderPagination(total: number, section: HTMLElement) {
 }
 
 function render() {
-  if (!window.GitHubAuth || !window.GitHubAuth.isAuthenticated()) return;
-  const data = window.templatesData;
-  if (!Array.isArray(data) || data.length === 0) return;
-  const section = ensureSection();
-  const grid = section?.querySelector(`#${GRID_ID}`);
-  if (!grid) return;
-  renderPage(currentPage, data, grid);
-  renderPagination(data.length, section as HTMLElement);
-  if (!rendered) {
-    rendered = true;
-    document.dispatchEvent(
-      new CustomEvent('template-cards-rendered', { detail: { count: data.length } }),
-    );
+  try {
+    if (!window.GitHubAuth) { console.debug('[TemplateList] render aborted: GitHubAuth missing'); return; }
+    if (!window.GitHubAuth.isAuthenticated()) { console.debug('[TemplateList] render aborted: not authenticated'); return; }
+    const data = window.templatesData;
+    if (!Array.isArray(data)) { console.debug('[TemplateList] render aborted: templatesData not an array', data); return; }
+    if (data.length === 0) { console.debug('[TemplateList] render aborted: templatesData empty'); return; }
+    console.debug('[TemplateList] rendering', { count: data.length });
+    const section = ensureSection();
+    const grid = section?.querySelector(`#${GRID_ID}`);
+    if (!grid) { console.debug('[TemplateList] render aborted: grid element missing'); return; }
+    renderPage(currentPage, data, grid);
+    renderPagination(data.length, section as HTMLElement);
+    if (!rendered) {
+      rendered = true;
+      document.dispatchEvent(
+        new CustomEvent('template-cards-rendered', { detail: { count: data.length } }),
+      );
+      console.debug('[TemplateList] render complete');
+    }
+  } catch (e) {
+    console.warn('[TemplateList] render error', e);
   }
 }
 
 function refresh() {
-  if (!rendered) return render();
+  if (!rendered) { console.debug('[TemplateList] refresh: not rendered yet; calling render'); return render(); }
   const section = document.getElementById(SECTION_ID);
   if (!section) return;
   const grid = section.querySelector(`#${GRID_ID}`);
   if (!grid) return;
   if (!Array.isArray(window.templatesData)) return;
+  console.debug('[TemplateList] refresh executing');
   renderPage(currentPage, window.templatesData, grid);
   renderPagination(window.templatesData.length, section);
 }
@@ -201,13 +202,15 @@ function tryRenderSoon() {
 }
 
 function init() {
+  console.debug('[TemplateList] init start');
   render();
   document.addEventListener('template-data-loaded', () => {
-    if (!rendered) render();
-    else refresh();
+    console.debug('[TemplateList] template-data-loaded event received');
+    if (!rendered) render(); else refresh();
   });
   document.addEventListener('template-data-updated', () => {
     // external event to force refresh after data mutation
+    console.debug('[TemplateList] template-data-updated event received');
     refresh();
   });
   tryRenderSoon();

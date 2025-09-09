@@ -19,7 +19,94 @@ document.addEventListener('DOMContentLoaded', function () {
   function DashboardRendererClass() { this.debug = function(message, data){ if (typeof (window as any).debug === 'function') { (window as any).debug('dashboard-renderer', message, data); } else { console.log(`[DashboardRenderer] ${message}`, data !== undefined ? data : ''); } }; this.debug('Dashboard renderer initialized');
     this.render = function(result, container){ this.debug('Rendering dashboard', result); if (!result || !container){ console.error('Missing result data or container element'); container.innerHTML = `<div style="padding: 20px; background: #f8d7da; border-radius: 5px; margin: 20px 0; color: #721c24;"><h3>Error: Cannot render dashboard</h3><p>Missing required data or container element</p><pre style="background: #f5f5f5; padding: 10px; border-radius: 3px;">${JSON.stringify({ resultExists: !!result, containerExists: !!container, resultType: result ? typeof result : 'undefined', containerType: container ? typeof container : 'undefined' }, null, 2)}</pre></div>`; return; }
       try { container.innerHTML=''; try { (window as any).reportDataOriginal = result; } catch(_){} const actionHtml = `<div id="action-section" class="action-footer action-header" style="background: white !important; border-radius: 5px !important; padding: 16px !important; margin-bottom: 20px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important; display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: center !important; width: 100% !important;"><div style="width: 100% !important; text-align: center !important; margin-bottom: 15px !important;"><h3 style="margin: 0 !important; padding: 0 !important; font-size: 1.2rem !important; color: #333 !important;">Template Doctor Actions</h3></div><div style="display: flex !important; flex-wrap: wrap !important; justify-content: center !important; gap: 15px !important; width: 100% !important;"><a href="#" id="fixButton" class="btn" style="opacity: 1 !important; visibility: visible !important; padding: 12px 24px !important; background-color: #0078d4 !important; color: white !important; border: none !important; border-radius: 4px !important; font-size: 1rem !important; font-weight: 500 !important; cursor: pointer !important; display: inline-flex !important; align-items: center !important; gap: 8px !important; min-width: 180px !important; justify-content: center !important; text-decoration: none !important; pointer-events: auto !important;"><i class="fas fa-code"></i> Fix with AI Agent</a><button id="create-github-issue-btn" class="btn" style="opacity: 1 !important; visibility: visible !important; padding: 12px 24px !important; background-color: #2b3137 !important; color: white !important; border: none !important; border-radius: 4px !important; font-size: 1rem !important; font-weight: 500 !important; cursor: pointer !important; display: inline-flex !important; align-items: center !important; gap: 8px !important; min-width: 180px !important; justify-content: center !important; pointer-events: auto !important;"><i class="fab fa-github"></i> Create GitHub Issue</button><button id="testProvisionButton" class="btn" style="opacity: 1 !important; visibility: visible !important; padding: 12px 24px !important; background-color: #0078d4 !important; color: white !important; border: none !important; border-radius: 4px !important; font-size: 1rem !important; font-weight: 500 !important; cursor: pointer !important; display: inline-flex !important; align-items: center !important; gap: 8px !important; min-width: 180px !important; justify-content: center !important; pointer-events: auto !important;"><i class="fas fa-rocket"></i> Test AZD Provision</button><button id="save-results-btn" class="btn" title="Opens a PR in the configured repository to save this analysis report" style="opacity: 1 !important; visibility: visible !important; padding: 12px 24px !important; background-color: #198754 !important; color: white !important; border: none !important; border-radius: 4px !important; font-size: 1rem !important; font-weight: 500 !important; cursor: pointer !important; display: inline-flex !important; align-items: center !important; gap: 8px !important; min-width: 180px !important; justify-content: center !important; pointer-events: auto !important;"><i class="fas fa-save"></i> Save Results</button></div><div id="save-results-note" style="margin-top: 8px; color: #6c757d; font-size: 0.9rem; text-align: center;"></div></div>`; const tempDiv = document.createElement('div'); tempDiv.innerHTML = actionHtml; const actionSection = tempDiv.firstElementChild; container.appendChild(actionSection); const debugSection = document.createElement('div'); debugSection.className='debug-section'; debugSection.style.cssText='margin-bottom: 30px; padding: 15px; background: #f8f9fa; border-radius: 5px; border: 1px solid #ddd;'; debugSection.innerHTML=`<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;"><h3 style="margin: 0;">Template Analysis Report</h3><div style="display: flex; align-items: center; gap: 15px;"><span style="color: #6c757d; font-size: 0.9em; font-style: italic;">Developer Tools</span><button id="toggle-raw-data" class="btn" style="padding: 5px 10px; font-size: 0.9em;"><i class="fas fa-code"></i> Raw Data</button></div></div><div id="raw-data-content" style="display: none; margin-top: 15px;"><div style="background: #2d2d2d; color: #eee; padding: 10px; border-radius: 5px; font-size: 0.9em; margin-bottom: 10px;"><i class="fas fa-info-circle"></i> This is the raw report data used to generate the dashboard.</div><pre style="background: #2d2d2d; color: #eee; padding: 15px; border-radius: 5px; max-height: 400px; overflow: auto; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace; font-size: 13px;">${JSON.stringify(result, null, 2)}</pre></div>`; container.appendChild(debugSection); setTimeout(()=>{ const toggleBtn=document.getElementById('toggle-raw-data'); const rawContent=document.getElementById('raw-data-content'); if (toggleBtn && rawContent){ toggleBtn.addEventListener('click', function(){ if (rawContent.style.display==='none'){ rawContent.style.display='block'; toggleBtn.innerHTML='<i class="fas fa-times"></i> Hide Raw Data'; toggleBtn.style.backgroundColor='#dc3545'; toggleBtn.style.color='white'; } else { rawContent.style.display='none'; toggleBtn.innerHTML='<i class="fas fa-code"></i> Raw Data'; toggleBtn.style.backgroundColor=''; toggleBtn.style.color=''; } }); } },100); const adaptedData = this.adaptResultData(result); (window as any).reportData = adaptedData; this.renderOverview(adaptedData, container); this.renderIssuesPanel(adaptedData, container); this.renderPassedPanel(adaptedData, container); this.renderActionFooter(adaptedData, container); this.addEventListeners(container); } catch (error) { console.error('Error rendering dashboard:', error); container.innerHTML=`<div style="padding: 20px; background: #f8d7da; border-radius: 5px; margin: 20px 0; color: #721c24;"><h3>Dashboard Rendering Error</h3><p>${error.message}</p><pre style="background: #f5f5f5; padding: 10px; border-radius: 3px;">${error.stack}</pre><h4 style="margin-top: 20px;">Raw Data</h4><pre style="background: #f5f5f5; padding: 10px; border-radius: 3px; max-height: 300px; overflow: auto;">${JSON.stringify(result, null, 2)}</pre></div>`; } };
-    this.adaptResultData = function(result){ const issues=[]; const compliant=[]; if (result.compliance && Array.isArray(result.compliance.issues)) { result.compliance.issues.forEach((issue)=>{ issues.push({ id: issue.id || `issue-${issues.length}`, category: issue.id ? issue.id.split('-')[0] : 'general', message: issue.message || 'Unknown issue', error: issue.error || issue.message || 'No details available', severity: issue.severity || 'warning', details: {} }); }); if (result.compliance.compliant && Array.isArray(result.compliance.compliant)) { result.compliance.compliant.forEach((item)=>{ compliant.push({ id: item.id || `passed-${compliant.length}`, category: item.id ? item.id.split('-')[0] : 'general', message: item.message || 'Passed check', error: '', details: {} }); }); } } else if (result.categories && Array.isArray(result.categories)) { result.categories.forEach((category)=>{ if (category.checks && Array.isArray(category.checks)) { category.checks.forEach((check)=>{ const item = { id: `${category.id}-${check.id}`, category: category.id, message: check.name, error: check.details || check.description, details: {} }; if (check.status === 'passed') { compliant.push(item); } else { issues.push(item); } }); } }); } const totalChecks = issues.length + compliant.length; const percentageCompliant = totalChecks > 0 ? Math.round((compliant.length / totalChecks) * 100) : 0; compliant.push({ category: 'meta', message: 'Compliance Summary', details: { percentageCompliant, totalChecks, passedChecks: compliant.length, issuesCount: issues.length, ruleSet: result.ruleSet || 'dod' } }); const adaptedData = { repoUrl: result.repoUrl || window.location.href, ruleSet: result.ruleSet || 'dod', compliance: { issues, compliant, summary: `${percentageCompliant}% compliant` }, totalIssues: issues.length, totalPassed: compliant.length }; if (result.customConfig) { adaptedData.customConfig = result.customConfig; } return adaptedData; };
+    this.adaptResultData = function(result){
+      try {
+        // If HTML fallback only, surface a minimal placeholder message
+        if (result && result.rawHtml && !result.compliance) {
+          return {
+            repoUrl: result.repoUrl || window.location.href,
+            ruleSet: result.ruleSet || 'unknown',
+            compliance: { issues: [{ id: 'raw-html-fallback', category: 'fallback', message: 'Legacy embedded HTML report – structured compliance data unavailable', error: 'Rendered from historical HTML dashboard. Re-run analysis for structured data.' }], compliant: [], summary: 'Fallback HTML' },
+            totalIssues: 1,
+            totalPassed: 0
+          };
+        }
+        const issues = [] as any[];
+        const compliant = [] as any[];
+        // Server side analyzer-core shape normalization
+        if (Array.isArray(result.categories)) {
+          result.categories.forEach((cat: any) => {
+            if (!Array.isArray(cat.checks)) return;
+            cat.checks.forEach((check: any, idx: number) => {
+              const base = {
+                id: `${cat.id || cat.name || 'cat'}-${check.id || idx}`,
+                category: cat.id || cat.name || 'general',
+                message: check.name || check.title || check.description || 'Unnamed check',
+                error: check.details || check.description || '',
+                details: check.meta || {}
+              } as any;
+              const status = (check.status || check.state || '').toLowerCase();
+              if (status === 'passed' || status === 'success' || status === 'ok') {
+                compliant.push(base);
+              } else {
+                issues.push(base);
+              }
+            });
+          });
+        }
+        // Legacy compliance shape (client analyzer)
+        if (result.compliance && Array.isArray(result.compliance.issues)) {
+          result.compliance.issues.forEach((issue: any, idx: number) => {
+            issues.push({
+              id: issue.id || `issue-${idx}`,
+              category: (issue.id ? issue.id.split('-')[0] : issue.category) || 'general',
+              message: issue.message || issue.summary || 'Unknown issue',
+              error: issue.error || issue.details || issue.message || 'No details available',
+              severity: issue.severity || 'warning',
+              details: issue.details || {}
+            });
+          });
+          if (Array.isArray(result.compliance.compliant)) {
+            result.compliance.compliant.forEach((item: any, idx: number) => {
+              compliant.push({
+                id: item.id || `passed-${idx}`,
+                category: (item.id ? item.id.split('-')[0] : item.category) || 'general',
+                message: item.message || 'Passed check',
+                error: '',
+                details: item.details || {}
+              });
+            });
+          }
+        }
+        // Deduplicate by id
+        const dedupe = (arr: any[]) => {
+          const seen = new Set();
+            return arr.filter(x => { if (seen.has(x.id)) return false; seen.add(x.id); return true; });
+        };
+        const issuesDeduped = dedupe(issues);
+        const compliantDeduped = dedupe(compliant);
+        const totalChecks = issuesDeduped.length + compliantDeduped.length;
+        const percentageCompliant = totalChecks > 0 ? Math.round((compliantDeduped.length / totalChecks) * 100) : 0;
+        compliantDeduped.push({
+          id: 'compliance-summary',
+            category: 'meta',
+            message: 'Compliance Summary',
+            details: { percentageCompliant, totalChecks, passedChecks: compliantDeduped.length, issuesCount: issuesDeduped.length, ruleSet: result.ruleSet || 'dod' }
+        });
+        const adaptedData: any = {
+          repoUrl: result.repoUrl || window.location.href,
+          ruleSet: result.ruleSet || 'dod',
+          compliance: { issues: issuesDeduped, compliant: compliantDeduped, summary: `${percentageCompliant}% compliant` },
+          totalIssues: issuesDeduped.length,
+          totalPassed: compliantDeduped.length
+        };
+        if (result.customConfig) adaptedData.customConfig = result.customConfig;
+        return adaptedData;
+      } catch (e) {
+        console.error('adaptResultData fatal error', e);
+        return { repoUrl: result?.repoUrl || window.location.href, ruleSet: result?.ruleSet || 'unknown', compliance: { issues: [{ id: 'adapter-failure', category: 'internal', message: 'Failed adapting result data', error: (e as any)?.message || String(e) }], compliant: [], summary: 'Adapter failure' }, totalIssues: 1, totalPassed: 0 };
+      }
+    };
     this.renderOverview = function(data, container){ const overviewSection=document.createElement('section'); overviewSection.className='overview'; const compliancePercentage = data.compliance.compliant.find((item)=> item.category==='meta')?.details?.percentageCompliant || 0; const ruleSet = data.ruleSet || data.compliance.compliant.find((item)=> item.category==='meta')?.details?.ruleSet || 'dod'; const ruleSetDisplay = ruleSet === 'dod' ? 'DoD' : ruleSet === 'partner' ? 'Partner' : ruleSet === 'docs' ? 'Docs' : 'Custom'; const gistUrl = data.customConfig?.gistUrl; overviewSection.innerHTML = `<h2>Compliance Overview</h2><div class="overview-header"><p class="overview-text">This dashboard provides an overview for your Azure template compliance status with the 'Azure Developer CLI Template Framework' <a href="https://github.com/Azure-Samples/azd-template-artifacts/blob/main/docs/development-guidelines/definition-of-done.md" title="Definition of Done">Definition of Done</a>. Browse the list below to fix specific issues or use the AI agent to automatically fix all compliance issues in VS Code.</p><div class="ruleset-info"><span class="ruleset-label">Configuration:</span>${ ruleSet === 'custom' && gistUrl ? `<a href="${gistUrl}" target="_blank" class="ruleset-value ${ruleSet}-badge" title="View custom ruleset on GitHub">${ruleSetDisplay} <i class="fas fa-external-link-alt fa-xs"></i></a>` : `<span class="ruleset-value ${ruleSet}-badge">${ruleSetDisplay}</span>`}<button id="change-ruleset-btn" class="btn btn-small" title="Change configuration"><i class="fas fa-sync-alt"></i></button></div></div><p>For more information about compliance and collections, go here <a href="https://github.com/Azure-Samples/azd-template-artifacts">Azure Developer CLI Template Framework Docs</a></p><div class="compliance-gauge"><div class="gauge-fill" id="complianceGauge" style="width: ${compliancePercentage}%; background-position: ${compliancePercentage}% 0;"></div><div class="gauge-label" id="compliancePercentage">${compliancePercentage}%</div></div><div class="overview-tiles"><div class="tile tile-issues"><div class="tile-icon"><i class="fas fa-exclamation-triangle"></i></div><div class="tile-value" id="issuesCount">${data.totalIssues}</div><div class="tile-title">Issues Found</div></div><div class="tile tile-passed"><div class="tile-icon"><i class="fas fa-check-circle"></i></div><div class="tile-value" id="passedCount">${data.totalPassed - 1}</div><div class="tile-title">Passed Checks</div></div><div class="tile tile-trend"><div class="tile-header"><div class="tile-icon"><i class="fas fa-chart-line"></i></div><div class="tile-title">Compliance Trend</div></div><div id="trendChart" class="trend-chart"><div class="no-data-message">Not enough historical data available yet.</div></div></div></div>`; container.appendChild(overviewSection); try { this.loadAndRenderTrend(data, overviewSection); } catch(e){ console.warn('Failed to initialize compliance trend rendering:', e); } setTimeout(()=>{ const changeRulesetBtn=document.getElementById('change-ruleset-btn'); if (changeRulesetBtn){ changeRulesetBtn.addEventListener('click', ()=>{ const repoUrl = data.repoUrl; if (repoUrl && typeof (window as any).analyzeRepo === 'function'){ (window as any).analyzeRepo(repoUrl, 'show-modal'); } else { console.error('Unable to get repository URL or analyzeRepo function'); } }); } },100); };
     this.getResultsFolderForRepo = function(repoUrl){ if (!repoUrl) return null; try { if (Array.isArray((window as any).templatesData)){ const match = (window as any).templatesData.find((t)=>{ const a = String(t.repoUrl || '').replace(/\.git$/, '').toLowerCase(); const b = String(repoUrl).replace(/\.git$/, '').toLowerCase(); return a===b; }); if (match && match.relativePath){ const folder = match.relativePath.split('/')[0]; if (folder) return folder; } } const u = new URL(repoUrl); const parts = u.pathname.split('/').filter(Boolean); if (parts.length >= 2){ return `${parts[0]}-${parts[1]}`.toLowerCase(); } } catch(_){} return null; };
     this.loadAndRenderTrend = async function(data, section){ const trendHost = section.querySelector('#trendChart'); if (!trendHost) return; const folder = this.getResultsFolderForRepo(data.repoUrl); if (!folder) return; let history = []; try { const resp = await fetch(`/results/${folder}/history.json`, { cache: 'no-store' }); if (!resp.ok) throw new Error(`HTTP ${resp.status}`); history = await resp.json(); } catch(err){ console.warn(`No history.json found for ${folder}:`, err.message); return; } if (!Array.isArray(history) || history.length < 2) { return; } const points = history.map((h)=>({ x: new Date(h.timestamp), y: Number(h.percentage) || 0 })).sort((a,b)=> a.x - b.x); this.renderTrendSVG(trendHost, points); };

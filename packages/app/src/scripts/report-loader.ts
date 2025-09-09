@@ -48,10 +48,19 @@ console.log('Loading report-loader.ts');
     };
     this.fetchReportData = async function(repoUrl: string, options: FetchOptions = {}): Promise<ReportData | null> { 
       this.debug('fetchReportData called', { repoUrl, options }); 
+      try {
+        const norm = String(repoUrl).replace(/\.git$/,'').toLowerCase();
+        const dyn = (window as any).__dynamicReports;
+        if (dyn && dyn[norm]) { 
+          this.debug('Serving report from dynamic cache');
+            return dyn[norm];
+        }
+      } catch(_) {}
       const strategies: Array<(repoUrl: string, options?: FetchOptions) => Promise<ReportData | null>> = [ 
         this.tryLatestJson.bind(this), 
         this.tryTimestampedJson.bind(this), 
-        this.tryEmbeddedScript.bind(this) 
+        this.tryEmbeddedScript.bind(this), 
+        this.tryDashboardHtml.bind(this) 
       ]; 
       for (const strat of strategies){ 
         try { 
@@ -83,6 +92,25 @@ console.log('Loading report-loader.ts');
         this.debug('tryLatestJson failed', e.message); 
         return null; 
       } 
+    };
+    this.tryDashboardHtml = async function(repoUrl: string): Promise<ReportData | null> {
+      try {
+        const folder = this.getResultsFolderForRepo(repoUrl);
+        if(!folder) return null;
+        if(Array.isArray((window as any).templatesData)){
+          const match = (window as any).templatesData.find((t:any)=> (t.repoUrl||'').replace(/\.git$/,'').toLowerCase() === repoUrl.replace(/\.git$/,'').toLowerCase());
+          if(match && match.dashboardPath){
+            const raw = await fetch(`/results/${match.relativePath}`, { cache: 'no-store' });
+            if(raw.ok){
+              const html = await raw.text();
+              // Light sanitation: strip script tags to avoid executing legacy inline logic when rendering fallback message.
+              const sanitized = html.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '<!-- stripped script -->');
+              return { rawHtml: sanitized, repoUrl, analyzerVersion: 'embedded-html' } as any;
+            }
+          }
+        }
+      } catch(_){}
+      return null;
     };
     this.tryTimestampedJson = async function(repoUrl: string): Promise<ReportData | null> { 
       try { 
@@ -150,7 +178,33 @@ console.log('Loading report-loader.ts');
         const u = new URL(repoUrl); 
         const parts = u.pathname.split('/').filter(Boolean); 
         if (parts.length >= 2){ 
-          return `${parts[0]}-${parts[1]}`.toLowerCase(); 
+          const direct = `${parts[0]}-${parts[1]}`.toLowerCase();
+          // Additional fallback: some historical result folders may have been stored under a different owner prefix (e.g., anfibiacreativa- instead of azure-samples-)
+          // Scan known results directories once and memoize.
+          if (!(window as any).__resultsFolderIndex) {
+            try {
+              // We cannot list server-side; rely on templatesData derived relativePath prefixes to build an index.
+              const idx: Record<string,string> = {};
+              if (Array.isArray((window as any).templatesData)) {
+                (window as any).templatesData.forEach((t: any) => {
+                  if (t.relativePath) {
+                    const prefix = t.relativePath.split('/')[0];
+                    if (t.repoUrl) {
+                      const key = t.repoUrl.replace(/\.git$/,'').toLowerCase();
+                      if (!idx[key]) idx[key] = prefix;
+                    }
+                  }
+                });
+              }
+              (window as any).__resultsFolderIndex = idx;
+            } catch(_) {}
+          }
+          try {
+            const key = repoUrl.replace(/\.git$/,'').toLowerCase();
+            const mapped = (window as any).__resultsFolderIndex && (window as any).__resultsFolderIndex[key];
+            if (mapped) return mapped.toLowerCase();
+          } catch(_){ }
+          return direct; 
         } 
       } catch(e: any){ 
         this.debug('getResultsFolderForRepo error', e.message); 

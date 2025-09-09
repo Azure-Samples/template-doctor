@@ -12,6 +12,24 @@ interface GitHubAuthLike {
   getUsername?: () => string | null | undefined; // optional convenience used by client
 }
 
+// Global definition for template data structure used across modules
+interface ScannedTemplateEntry {
+  repoUrl: string;
+  relativePath: string;
+  compliance: { percentage: number; issues: number; passed: number };
+  timestamp: string;
+  scannedBy?: string[];
+  ruleSet?: string; 
+  customConfig?: { gistUrl?: string; [key: string]: any };
+  description?: string;
+  languages?: string[];
+  tags?: string[];
+  dashboardPath?: string;
+  dataPath?: string;
+  collection?: string;
+  originUpstream?: string;
+}
+
 declare interface Window {
   NotificationSystem?: any;
   Notifications?: any;
@@ -25,4 +43,5 @@ declare interface Window {
   GitHubWorkflowValidation?: any; // backward compat
   initGithubWorkflowValidation?: any;
   runGithubWorkflowValidation?: any;
+  templatesData?: ScannedTemplateEntry[]; // centralized definition for the templates data
 }

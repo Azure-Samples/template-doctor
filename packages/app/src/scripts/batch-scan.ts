@@ -86,7 +86,10 @@ if(typeof document !== 'undefined'){
 
 export async function startBatch(repos: string[]){
   try {
-    const res = await fetch('/api/batch-scan/start', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ repos })});
+  // Use versioned API base (prefer config.apiBase if present)
+  const cfg: any = (window as any).TemplateDoctorConfig || {};
+  const base = cfg.apiBase || window.location.origin;
+  const res = await fetch(`${base}/v4/batch-scan-start`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ repos })});
     if(!res.ok) throw new Error('Failed to start batch');
     const data: BatchStartResponse = await res.json();
     currentBatch = data.batchId;
@@ -99,7 +102,9 @@ export async function startBatch(repos: string[]){
 async function poll(){
   if(!currentBatch) return;
   try {
-    const r = await fetch(`/api/batch-scan/status?batchId=${encodeURIComponent(currentBatch)}`);
+  const cfg: any = (window as any).TemplateDoctorConfig || {};
+  const base = cfg.apiBase || window.location.origin;
+  const r = await fetch(`${base}/v4/batch-scan-status?batchId=${encodeURIComponent(currentBatch)}`);
     if(!r.ok) throw new Error('Status failed');
     const data: BatchStatusResponse = await r.json();
     document.dispatchEvent(new CustomEvent('batch-status',{ detail: data }));

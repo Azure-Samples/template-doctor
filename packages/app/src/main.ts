@@ -1,34 +1,53 @@
 // Aggregated entry importing migrated modules.
 // ORDER MATTERS for test stability:
-// Notifications first so that tests depending on NotificationSystem always see real implementation
-// even if analyzer (below) throws early.
-import './modules/notifications'; // Rich notification system (flushes guard stub queue + readiness)
-// Import analyzer normally; wrap its top-level runtime-dependent code in the analyzer itself (preferred).
-// If we still want isolation, we can later convert analyzer to expose an init() we call in try/catch.
-import './scripts/analyzer';
-// Bridge providing window.analyzeRepo (replaces legacy js/app.js usage)
-import './bridge/analyze-repo-bridge';
-
-// Config & data loaders
+// Order adjusted: ensure configuration + auth + GitHub client load BEFORE analyzer so
+// server-side analysis has user token and TemplateDataLoader can activate early.
+// 1. Notifications (flush queue)
+import './modules/notifications';
+// 2. Config & routes (API base, runtime config)
 import './scripts/config-loader';
 import './scripts/api-routes';
 import './scripts/runtime-config';
-import './scripts/templates-data-loader';
+// 3. Auth & GitHub client BEFORE analyzer (previously analyzer loaded first causing missing token on early server calls)
 import './scripts/auth';
-// New TypeScript GitHub client wrapper (phase 1) – placed before analyzer so it can attach immediately
 import './scripts/github-client';
+// 4. Analyzer & bridge
+import './scripts/analyzer';
+import './bridge/analyze-repo-bridge';
+// Ensure core styles (previously missing in production build) are part of bundle
+// Import core legacy CSS assets so they get bundled (fallback if path changes)
+const legacyCss = [
+	'/css/style.css',
+	'/css/templates.css',
+	'/css/dashboard.css'
+];
+legacyCss.forEach(p => {
+	try {
+		// Vite will treat this as a fetch of a public asset if it exists in root public path
+		const link = document.createElement('link');
+		link.rel = 'stylesheet';
+		link.href = p;
+		document.head.appendChild(link);
+	} catch (e){
+		console.warn('[main] unable to append legacy stylesheet', p, e);
+	}
+});
+import './scripts/templates-data-loader';
 // Remaining analytic & rendering modules (analyzer already loaded above)
 import './scripts/report-loader';
 import './scripts/dashboard-renderer';
 // Minimal scanned templates renderer shim (temporary until full app.js migration)
 import './scripts/template-list';
 import './scripts/template-card-view-handler';
+import './scripts/rescan-handler';
+import './scripts/validate-handler';
 import './scripts/search';
 import './scripts/api-client';
 import './scripts/issue-service';
 import './scripts/github-action-hook';
 import './scripts/azd-provision';
 import './scripts/batch-scan';
+import './scripts/scan-mode-toggle';
 import './modules/tooltips';
 import './modules/ruleset-modal';
 import './modules/validation';

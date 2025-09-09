@@ -2,6 +2,9 @@
 FROM node:20-alpine AS build
 WORKDIR /app
 
+# Install rsync for the build process
+RUN apk add --no-cache rsync
+
 # Copy root manifests & workspace info
 COPY package.json package-lock.json* .npmrc* ./
 COPY packages/server/package.json packages/server/tsconfig.json ./packages/server/
