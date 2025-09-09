@@ -1,0 +1,91 @@
+name: Trivy image scans
+# touch
+on:
+  workflow_dispatch:
+    inputs:
+      repoOwner:
+        description: 'Repository owner'
+        required: true
+        type: string
+      repoName:
+        description: 'Repository name'
+        required: true
+        type: string
+      runId:
+        description: 'Unique identifier for the workflow run (for tracking purposes)'
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+  security-events: write # Required for uploading Trivy scan results to GitHub Security tab
+  actions: read # To read workflow run status
+
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.inputs.repoOwner }}/${{ github.event.inputs.repoName }}
+        continue-on-error: false
+
+      - name: Find container image refs
+        id: find-images
+        run: |
+          # regex that matches tags or @sha256 digests hosted on mcr or other registries
+          rg -o '([a-z0-9.-]+(?:\:[0-9]+)?/)?[A-Za-z0-9._/-]+(?::[A-Za-z0-9._-]+|@sha256:[a-f0-9]{64})' --hidden --no-ignore-vcs --glob '!.git/**' . \
+            | sort -u > images.txt
+          echo "found=$(wc -l < images.txt)" >> $GITHUB_OUTPUT
+
+      - name: Find container image refs (dedupe)
+        id: find_images
+        run: |
+          # regex that matches registry/image[:tag] or @sha256:digest
+          rg -o --hidden --no-ignore-vcs --glob '!.git/**' '([a-z0-9.-]+(?::[0-9]+)?/)?[A-Za-z0-9._/-]+(?::[A-Za-z0-9._-]+|@sha256:[a-f0-9]{64})' . \
+            | sort -u > images.txt || true
+          echo "found=$(wc -l < images.txt)" >> $GITHUB_OUTPUT
+
+      - name: Install Trivy CLI
+        run: |
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Scan discovered images
+        if: steps.find-images.outputs.found != '0'
+        run: |
+          mkdir -p trivy-output
+          while IFS= read -r img; do
+            # sanitize name for filename (replace /:@sha256 etc)
+            file=$(echo "$img" | sed -E 's/[^A-Za-z0-9._-]/_/g')
+            echo "Scanning $img -> trivy-output/${file}.json"
+            trivy image --quiet --format json -o "trivy-output/${file}.json" "$img" || echo "scan failed for $img" > "trivy-output/${file}.scan_error"
+          done < images.txt
+
+      - name: Create combined summary.json
+        if: steps.find-images.outputs.found != '0'
+        run: |
+          mkdir -p combined
+          jq -s '{images: map({file: (.[0] | . | path(.))[0]?} ) }' >/dev/null 2>&1 || true
+          # build summary: total findings, by severity, per image
+          jq -n '
+            { images: (inputs | .) }' trivy-output/*.json > /dev/null 2>&1 || true
+          # simpler: aggregate vulnerabilities
+          jq -s 'def allv: (map(.Results // []) | map(.[] | .Vulnerabilities // []) | add // []); {
+            total: (allv | length),
+            by_severity: (allv | group_by(.Severity) | map({(.[0].Severity): length}) | add // {}),
+            per_file: (map({file: input_filename, total: ((.Results[]?.Vulnerabilities // []) | length)}) )
+          }' trivy-output/*.json > summary.json || echo '{"total":0}' > summary.json
+        shell: bash
+
+      - name: Upload Trivy outputs artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-scans-${{ github.run_id }}
+          path: |
+            trivy-output/
+            summary.json
+            images.txt
