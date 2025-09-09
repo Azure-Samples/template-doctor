@@ -17,20 +17,33 @@ function toggleScanMode(isBatchMode: boolean): void {
     return;
   }
   
+  // Use direct style manipulation for instant response
   if (isBatchMode) {
+    // Update labels
     singleModeLabel.classList.remove('active');
     batchModeLabel.classList.add('active');
+    
+    // Update containers - using direct style changes for immediacy
     singleScanContainer.style.display = 'none';
     batchUrlsContainer.style.display = 'block';
     searchResults.style.display = 'none';
     batchResults.style.display = 'block';
+    
+    // Force repaint to improve perceived responsiveness
+    void batchUrlsContainer.offsetHeight;
   } else {
+    // Update labels
     singleModeLabel.classList.add('active');
     batchModeLabel.classList.remove('active');
+    
+    // Update containers - using direct style changes for immediacy
     singleScanContainer.style.display = 'flex';
     batchUrlsContainer.style.display = 'none';
     searchResults.style.display = 'block';
     batchResults.style.display = 'none';
+    
+    // Force repaint to improve perceived responsiveness
+    void singleScanContainer.offsetHeight;
   }
 }
 
@@ -45,9 +58,27 @@ function init(): void {
     return;
   }
   
-  // Add event listener
+  // Add event listener - use input event for faster response
   scanModeToggle.addEventListener('change', function() {
-    toggleScanMode(this.checked);
+    // Apply the change immediately
+    requestAnimationFrame(() => {
+      toggleScanMode(this.checked);
+    });
+  });
+  
+  // Also handle clicks on the labels for better UX
+  document.getElementById('single-mode-label')?.addEventListener('click', () => {
+    if (scanModeToggle.checked) {
+      scanModeToggle.checked = false;
+      toggleScanMode(false);
+    }
+  });
+  
+  document.getElementById('batch-mode-label')?.addEventListener('click', () => {
+    if (!scanModeToggle.checked) {
+      scanModeToggle.checked = true;
+      toggleScanMode(true);
+    }
   });
   
   // Initialize to correct state

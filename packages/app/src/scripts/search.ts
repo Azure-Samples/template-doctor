@@ -236,10 +236,15 @@ async function performSearch(query: string): Promise<void> {
       ? matchedTemplate.repoUrl.split('github.com/')[1].replace(/\.git$/, '') 
       : matchedTemplate.relativePath || matchedTemplate.repoUrl;
     
-    // Build HTML with more details
-    let html = `<div class="repo-name">${repoName}</div>`;
+    // Build HTML with more details and action buttons
+    let html = `
+      <div>
+        <div class="repo-name" title="${repoName}">
+          ${repoName}
+        </div>`;
+    
     if (matchedTemplate.description) {
-      html += `<div class="repo-description">${matchedTemplate.description}</div>`;
+      html += `<div class="repo-description" title="${matchedTemplate.description}">${matchedTemplate.description}</div>`;
     }
     
     // Add metadata if available
@@ -254,6 +259,14 @@ async function performSearch(query: string): Promise<void> {
     if (metaItems.length > 0) {
       html += `<div class="repo-meta">${metaItems.join('')}</div>`;
     }
+    
+    html += `
+      </div>
+      <div class="action-buttons">
+        <button class="analyze-btn">Scan Template</button>
+        <button class="validate-btn">Run Validation</button>
+      </div>
+    `;
     
     div.innerHTML = html;
     
@@ -336,10 +349,15 @@ async function performSearch(query: string): Promise<void> {
           ? template.repoUrl.split('github.com/')[1].replace(/\.git$/, '') 
           : template.relativePath || template.repoUrl;
         
-        // Build HTML with more details
-        let html = `<div class="repo-name">${repoName}</div>`;
+        // Build HTML with more details and action buttons
+        let html = `
+          <div>
+            <div class="repo-name" title="${repoName}">
+              ${repoName}
+            </div>`;
+        
         if (template.description) {
-          html += `<div class="repo-description">${template.description}</div>`;
+          html += `<div class="repo-description" title="${template.description}">${template.description}</div>`;
         }
         
         // Add metadata if available
@@ -354,6 +372,14 @@ async function performSearch(query: string): Promise<void> {
         if (metaItems.length > 0) {
           html += `<div class="repo-meta">${metaItems.join('')}</div>`;
         }
+        
+        html += `
+          </div>
+          <div class="action-buttons">
+            <button class="analyze-btn">Scan Template</button>
+            <button class="validate-btn">Run Validation</button>
+          </div>
+        `;
         
         div.innerHTML = html;
         
@@ -428,8 +454,18 @@ async function performSearch(query: string): Promise<void> {
       : repoUrl;
     
     div.innerHTML = `
-      <div class="repo-name">${repoName}</div>
-      <div class="repo-description">Repository not yet scanned. ${isAuthenticated ? 'Click to analyze.' : 'Please log in first to avoid GitHub API rate limits.'}</div>
+      <div>
+        <div class="repo-name" title="${repoName}">
+          ${repoName}
+        </div>
+        <div class="repo-description" title="Repository not yet scanned. ${isAuthenticated ? 'Click to analyze.' : 'Please log in first to avoid GitHub API rate limits.'}">
+          Repository not yet scanned. ${isAuthenticated ? 'Click to analyze.' : 'Please log in first to avoid GitHub API rate limits.'}
+        </div>
+      </div>
+      <div class="action-buttons">
+        <button class="analyze-btn">Scan Template</button>
+        <button class="validate-btn">Run Validation</button>
+      </div>
     `;
     
     // Add click handler
