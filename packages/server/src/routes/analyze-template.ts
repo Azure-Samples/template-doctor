@@ -1,5 +1,8 @@
 import { Router } from 'express';
 import { Octokit } from '@octokit/rest';
+import { normalizeError } from '../services/errors.js';
+import { listRepositoryFiles, getRepositoryFileContent } from '../services/repo-files.js';
+import { extractRateLimitHeaders } from '../services/github.js';
 
 // Lazy import of analyzer-core dist to mirror original function behaviour
 async function getRunAnalyzer(): Promise<(repoUrl: string, files: any[], opts: any) => Promise<any>> {
@@ -21,6 +24,9 @@ interface AnalyzeRequestBody {
 }
 
 interface GitHubFileMeta { path: string; sha: string; content?: string; type?: string; }
+
+// Ensure RepoFileMeta includes 'content' property
+// If imported from services/repo-files.js, update its definition there as well
 
 export const analyzeTemplateRouter = Router();
 
@@ -45,13 +51,21 @@ analyzeTemplateRouter.post('/', async (req, res) => {
     const repoMeta = await octokit.repos.get({ owner, repo });
     const defaultBranch = (repoMeta as any).data.default_branch;
 
-    const files = await listAllFiles(octokit, owner, repo, defaultBranch);
+  const files = await listRepositoryFiles(octokit, owner, repo, defaultBranch);
 
     // Populate subset of file contents
     const enriched: GitHubFileMeta[] = [];
     for (const f of files.slice(0, 400)) { // safety bound identical to original
       if (/\.(md|bicep|ya?ml|json)$/i.test(f.path)) {
-        try { f.content = await getFileContent(octokit, owner, repo, f.path, defaultBranch); } catch { /* ignore individual file errors */ }
+        try {
+          f.content = await getRepositoryFileContent(octokit, owner, repo, f.path, defaultBranch);
+        } catch (err) {
+          // Ignore individual file retrieval errors (network, 404, etc.)
+          // Provide optional debug logging without spamming normal output
+          if (process.env.DEBUG_ANALYZE === '1') {
+            console.warn(`[analyze-template] failed to fetch file content for ${f.path}:`, (err as any)?.message || err);
+          }
+        }
       }
       enriched.push(f);
     }
@@ -69,10 +83,10 @@ analyzeTemplateRouter.post('/', async (req, res) => {
       (result as any).archiveRequested = true;
     }
 
-    return res.status(200).json(result);
+    return res.status(200).json({ ...result, ...extractRateLimitHeaders((repoMeta as any).headers) });
   } catch (err: any) {
-    console.error('[analyze-template] error', err);
-    return res.status(500).json({ error: err?.message || 'Analyzer failure' });
+    const norm = normalizeError(err, { error: 'Analyzer failure', code: 'analyzer_failed', status: 500 });
+    return res.status(norm.status || 500).json(norm);
   }
 });
 
@@ -82,25 +96,4 @@ function extractRepoInfo(url: string): { owner: string; repo: string } {
   return { owner: m[1], repo: m[2] };
 }
 
-async function listAllFiles(octokit: Octokit, owner: string, repo: string, ref: string, path = ''): Promise<GitHubFileMeta[]> {
-  const res: any = await octokit.repos.getContent({ owner, repo, path: path || '', ref });
-  const entries = Array.isArray(res.data) ? res.data : [res.data];
-  let files: GitHubFileMeta[] = [];
-  for (const entry of entries) {
-    if (entry.type === 'file') {
-      files.push({ path: entry.path, sha: entry.sha });
-    } else if (entry.type === 'dir') {
-      const sub = await listAllFiles(octokit, owner, repo, ref, entry.path);
-      files = files.concat(sub);
-    }
-  }
-  return files;
-}
-
-async function getFileContent(octokit: Octokit, owner: string, repo: string, path: string, ref: string): Promise<string> {
-  const { data }: any = await octokit.repos.getContent({ owner, repo, path, ref });
-  if (!Array.isArray(data) && data.type === 'file' && data.content) {
-    return Buffer.from(data.content, 'base64').toString();
-  }
-  throw new Error('Unable to get content for ' + path);
-}
+// (old local listing helpers removed; logic centralized in services/repo-files.ts)

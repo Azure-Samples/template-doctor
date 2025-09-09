@@ -35,9 +35,9 @@ Legend: ✅ migrated, ☐ pending
 - Batch simulation remains memory-backed until persistent option chosen.
 - High complexity endpoints gain shared service helpers under `services/` when migrated.
 - Pending Optional Improvements (tracking list):
-	- Error normalization utility (map GitHub & internal errors to consistent { error, code, details? }).
-	- Rate limit header parsing (x-ratelimit-remaining/reset) surfaced in responses for observability (non-sensitive).
-	- Logger injection / silencer for tests to suppress retry noise.
-	- Exponential backoff variant for retry (current linear) + jitter.
-	- GitHub error classifier (status → symbolic code e.g. rate_limit, not_found, validation_failed).
-	- Shared response helper to reduce repetitive status/JSON patterns.
+	- Error normalization utility (DONE initial pass: services/errors.ts).
+	- Rate limit header parsing (PARTIAL: extractRateLimitHeaders for analyzer response).
+	- Logger injection / silencer for tests to suppress retry noise. (PENDING)
+	- Exponential backoff variant for retry (DONE with jitter in withRetry).
+	- GitHub error classifier (PARTIAL via normalizeError codes).
+	- Shared response helper (PENDING; sendNormalized helper exists but not applied globally).

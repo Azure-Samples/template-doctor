@@ -4,19 +4,34 @@ import { Octokit } from '@octokit/rest';
 export interface GhLogger { info: (...args: any[]) => void; warn: (...args: any[]) => void; error: (...args: any[]) => void; }
 const defaultLogger: GhLogger = { info: (...a) => console.log('[gh]', ...a), warn: (...a) => console.warn('[gh]', ...a), error: (...a) => console.error('[gh]', ...a) };
 
-interface RetryOpts { attempts?: number; delayMs?: number; logger?: GhLogger; }
+interface RetryOpts { attempts?: number; baseDelayMs?: number; logger?: GhLogger; jitter?: boolean; }
 
-async function withRetry<T>(fn: () => Promise<T>, { attempts = 3, delayMs = 300, logger = defaultLogger }: RetryOpts = {}): Promise<T> {
+export async function withRetry<T>(fn: () => Promise<T>, { attempts = 3, baseDelayMs = 250, jitter = true, logger = defaultLogger }: RetryOpts = {}): Promise<T> {
   let lastErr: any;
   for (let i = 0; i < attempts; i++) {
     try { return await fn(); }
     catch (err: any) {
       lastErr = err;
-      logger.warn(`Retryable GitHub op failed (attempt ${i+1}/${attempts}):`, err?.status || err?.message || err);
-      if (i < attempts - 1) await new Promise(r => setTimeout(r, delayMs * (i + 1))); // linear backoff
+      const status = err?.status || err?.response?.status;
+      logger.warn(`Retryable GitHub op failed (attempt ${i+1}/${attempts}):`, status || err?.message || err);
+      if (i < attempts - 1) {
+        const exp = baseDelayMs * Math.pow(2, i); // exponential
+        const delay = jitter ? exp / 2 + Math.random() * (exp / 2) : exp; // jitter spread 50-100% of exp
+        await new Promise(r => setTimeout(r, delay));
+      }
     }
   }
   throw lastErr;
+}
+
+export function extractRateLimitHeaders(h: Headers | Record<string,string> | undefined) {
+  if (!h) return {};
+  const get = (k: string) => (h instanceof Headers ? h.get(k) : (h as any)[k]);
+  return {
+    rateLimitRemaining: get('x-ratelimit-remaining') || undefined,
+    rateLimitReset: get('x-ratelimit-reset') || undefined,
+    rateLimitLimit: get('x-ratelimit-limit') || undefined
+  };
 }
 
 /** Retrieve required workflow token or throw */
