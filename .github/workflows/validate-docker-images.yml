@@ -39,6 +39,10 @@ name: Docker image analysis
 # MAINTENANCE NOTES:
 # - Last updated: September 2025
 # - Version: 1.0.0
+#
+# CONCERNS: 
+# - file name max length for artifacts (GitHub limit is 100 chars)
+# - file path in artifact zip (GitHub limit is 255 chars)
 # ============================================================================
 
 on:
@@ -81,6 +85,22 @@ permissions:
 # ============================================================================
 
 jobs:
+
+  create-empty-artifact:
+    name: Create empty artiface
+    runs-on: ubuntu-latest
+    steps:
+      - name: start
+        run: |
+          echo "${{ github.event.inputs.runId }} started" >> start.log
+
+      - name: Upload artifact with runId in file name
+        uses: actions/upload-artifact@v4
+        with:
+          name: scan-started-${{ github.event.inputs.runId }}
+          path: |
+            start.log
+
   find-images:
     name: Find Docker Images
     runs-on: ubuntu-latest
@@ -89,6 +109,7 @@ jobs:
       found_count: ${{ steps.count-output.outputs.found }}
       files_found: ${{ steps.count-output.outputs.files_found }}
     steps:
+
       - name: Debug log file
         run: |
           echo "Contents of trivy.log:"
