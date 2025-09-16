@@ -7,7 +7,7 @@
 # - For higher rate limits or private repos, set repository secret SCORECARD_TOKEN (falls back to GITHUB_TOKEN).
 
 name: OSSF Scorecard Analysis
-
+run-name: OSSF ${{ inputs.runId }}
 on:
   workflow_dispatch:
     inputs:

@@ -1,5 +1,5 @@
 name: Docker image analysis
-
+run-name: Trivy ${{ inputs.runId }}
 # Artifacts we want to read after this runs:
 # #1 zip: scan-repo-*
 # file: trivy-repo-scan.json
