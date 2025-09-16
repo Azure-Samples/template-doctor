@@ -103,6 +103,23 @@
     // Initialize templatesData if it doesn't exist yet
     window.templatesData = [
   {
+    "timestamp": "2025-09-16T12:33:32.377Z",
+    "dashboardPath": "1758026028777-dashboard.html",
+    "dataPath": "1758026028777-data.js",
+    "repoUrl": "https://github.com/anfibiacreativa/openai-langchainjs",
+    "collection": "aigallery",
+    "ruleSet": "dod",
+    "compliance": {
+      "percentage": 45,
+      "issues": 11,
+      "passed": 10
+    },
+    "scannedBy": [
+      "anfibiacreativa"
+    ],
+    "relativePath": "anfibiacreativa-openai-langchainjs/1758026028777-dashboard.html"
+  },
+  {
     "timestamp": "2025-09-12T10:10:15.960Z",
     "dashboardPath": "1757671832045-dashboard.html",
     "dataPath": "1757671832045-data.js",
@@ -117,6 +134,9 @@
     "scannedBy": [
       "anfibiacreativa"
     ],
+    "relativePath": "anfibiacreativa-get-started-with-ai-agents/1757671832045-dashboard.html"
+  }
+],
     "relativePath": "anfibiacreativa-get-started-with-ai-agents/1757671832045-dashboard.html"
   }
 ];
