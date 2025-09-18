@@ -123,5 +123,4 @@ The Docker image security scan results are:
 ## See Also
 
 - [GITHUB_WORKFLOWS.md](./GITHUB_WORKFLOWS.md) - Details on the workflow system architecture
-- [SECURITY_ANALYSIS.md](../usage/SECURITY_ANALYSIS.md) - Broader security analysis features
 - [Trivy Documentation](https://aquasecurity.github.io/trivy/) - The security scanner used
