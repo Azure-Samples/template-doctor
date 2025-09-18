@@ -60,11 +60,13 @@ async function getZipAsBuffer(downloadUrl, context = null) {
         throw error;
       }
 
-        context.log(`Following redirect to zip file`, {
-          operation: 'getZipAsBuffer',
-          originalUrl: downloadUrl,
-          redirectUrl: location
-        });
+        if (context && context.log) {
+          context.log(`Following redirect to zip file`, {
+            operation: 'getZipAsBuffer',
+            originalUrl: downloadUrl,
+            redirectUrl: location
+          });
+        }
 
       const fileResp = await fetch(location, {
         method: 'GET',
