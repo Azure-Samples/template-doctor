@@ -76,7 +76,7 @@ module.exports = async function (context, req) {
         templateUrl,
         runId: localRunId,
         githubRunId: runId || null,
-        githubRunUrl: localRunId ? `https://github.com/${owner}/${repo}/actions/runs/${runId}` : null,
+        githubRunUrl: runId ? `https://github.com/${owner}/${repo}/actions/runs/${runId}` : null,
         message: `${workflowFile} workflow triggered; ${localRunId} run completed`,
         details: {
           score
