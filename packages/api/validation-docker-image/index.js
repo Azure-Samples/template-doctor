@@ -194,6 +194,26 @@ function addIssue(issues, id, severity, message, details = null) {
   issues.push(issue);
 }
 
+/**
+ * Processes repository and image scan artifacts, mutating the provided issues and compliance arrays.
+ *
+ * @async
+ * @param {Object} context - The context object containing environment and configuration.
+ * @param {Object} artifactsObj - The object containing an `artifacts` array to process.
+ * @param {?string} [correlationId=null] - Optional correlation ID for tracing/logging.
+ * @param {boolean} [includeAllDetails=false] - Whether to include all details in the results.
+ * @param {Array} [issues=[]] - Array to which issues will be added (mutated).
+ * @param {Array} [compliance=[]] - Array to which compliance items will be added (mutated).
+ * @returns {Promise<Object>} An object containing processed scan results, e.g.:
+ *   {
+ *     repoScanResult: <Object|null>,
+ *     imageScanResults: <Array>,
+ *     issues: <Array>,
+ *     compliance: <Array>
+ *   }
+ * @throws {Error} If no artifacts are provided for processing.
+ * @sideEffects Mutates the `issues` and `compliance` arrays passed as arguments.
+ */
 async function processArtifacts(context, artifactsObj, correlationId = null, includeAllDetails = false, issues = [], compliance = []) {
   const artifacts = artifactsObj && artifactsObj.artifacts ? artifactsObj.artifacts : null;
 
