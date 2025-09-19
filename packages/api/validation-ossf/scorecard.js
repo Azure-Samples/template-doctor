@@ -173,6 +173,9 @@ async function getOSSFScore(context, workflowOwner, workflowRepo, workflowFile, 
         context.log.error('Error fetching OSSF Scorecard:', err);
         addIssue(issues, 'ossf-score-error', 'warning', 'Failed to fetch OSSF Scorecard', 
                 { error: err instanceof Error ? err.message : String(err) });
+        
+        // Return null values to indicate error condition
+        return { score: null, runId: null };
     }
 }
 module.exports = { 
