@@ -50,7 +50,7 @@ function addIssue(issues, id, severity, message, details = null) {
  * @param {number} minScore - Minimum acceptable score
  * @param {Array} issues - Array to add issues to
  * @param {Array} compliance - Array to add compliance items to
- * @returns {Promise<void>}
+ * @returns {Promise<{score: number|null, runId: number|null}>}
  */
 async function getOSSFScore(context, workflowOwner, workflowRepo, workflowFile, templateOwnerRepo, requestGuid, minScore, issues, compliance) {
     context.log(`Getting OSSF score using action APIs for ${templateOwnerRepo} with minimum score: ${minScore.toFixed(1)}`);
