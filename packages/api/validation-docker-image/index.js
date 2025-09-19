@@ -170,7 +170,31 @@ async function processImageArtifact(context, artifacts, correlationId = null, in
   return imagesTrivyResults;
 }
 
-async function processArtifacts(context, artifactsObj, correlationId = null, includeAllDetails = false) {
+/**
+ * Adds an issue to the issues array with standard format
+ * @param {Array} issues - Issues array to add to
+ * @param {string} id - Issue identifier
+ * @param {string} severity - Issue severity (warning, error)
+ * @param {string} message - Issue message
+ * @param {Object} [details] - Optional details object
+ */
+function addIssue(issues, id, severity, message, details = null) {
+  const issue = {
+    id,
+    severity,
+    message
+  };
+  
+  if (details) {
+    issue.details = details;
+  } else if (arguments.length > 4 && arguments[4] !== null) {
+    issue.error = arguments[4];
+  }
+  
+  issues.push(issue);
+}
+
+async function processArtifacts(context, artifactsObj, correlationId = null, includeAllDetails = false, issues = [], compliance = []) {
   const artifacts = artifactsObj && artifactsObj.artifacts ? artifactsObj.artifacts : null;
 
   if (!artifacts || !Array.isArray(artifacts) || artifacts.length === 0) {
@@ -182,6 +206,146 @@ async function processArtifacts(context, artifactsObj, correlationId = null, inc
 
   // Images
   const imageScanResults = await processImageArtifact(context, artifacts, correlationId, includeAllDetails);
+
+  // Add compliance items based on scan results
+  if (repoScanResult) {
+    // Check for critical vulnerabilities in repository
+    if (repoScanResult.criticalVulns > 0) {
+      addIssue(issues, 'docker-repo-critical-vulnerabilities', 'error', 
+        `Repository contains ${repoScanResult.criticalVulns} critical vulnerabilities`, 
+        { count: repoScanResult.criticalVulns });
+    } else {
+      compliance.push({
+        id: 'docker-repo-no-critical-vulnerabilities',
+        category: 'security',
+        message: 'Repository contains no critical vulnerabilities',
+        details: { repositoryScan: true }
+      });
+    }
+
+    // Check for high vulnerabilities in repository
+    if (repoScanResult.highVulns > 0) {
+      addIssue(issues, 'docker-repo-high-vulnerabilities', 'warning', 
+        `Repository contains ${repoScanResult.highVulns} high vulnerabilities`, 
+        { count: repoScanResult.highVulns });
+    } else {
+      compliance.push({
+        id: 'docker-repo-no-high-vulnerabilities',
+        category: 'security',
+        message: 'Repository contains no high vulnerabilities',
+        details: { repositoryScan: true }
+      });
+    }
+
+    // Check for critical misconfigurations in repository
+    if (repoScanResult.criticalMisconfigurations > 0) {
+      addIssue(issues, 'docker-repo-critical-misconfigurations', 'error', 
+        `Repository contains ${repoScanResult.criticalMisconfigurations} critical misconfigurations`, 
+        { count: repoScanResult.criticalMisconfigurations });
+    } else {
+      compliance.push({
+        id: 'docker-repo-no-critical-misconfigurations',
+        category: 'security',
+        message: 'Repository contains no critical misconfigurations',
+        details: { repositoryScan: true }
+      });
+    }
+
+    // Check for secrets in repository
+    if (repoScanResult.secretsFound > 0) {
+      addIssue(issues, 'docker-repo-secrets-found', 'error', 
+        `Repository contains ${repoScanResult.secretsFound} secrets that should be removed`, 
+        { count: repoScanResult.secretsFound });
+    } else {
+      compliance.push({
+        id: 'docker-repo-no-secrets',
+        category: 'security',
+        message: 'Repository contains no exposed secrets',
+        details: { repositoryScan: true }
+      });
+    }
+  }
+
+  // Process each Docker image scan
+  if (imageScanResults && imageScanResults.length > 0) {
+    // Track if any images have issues
+    let hasCriticalVulns = false;
+    let hasHighVulns = false;
+    let hasCriticalMisconfigs = false;
+    let hasSecrets = false;
+
+    // Check each image
+    imageScanResults.forEach((imageScan, index) => {
+      // Check for critical vulnerabilities in image
+      if (imageScan.criticalVulns > 0) {
+        hasCriticalVulns = true;
+        addIssue(issues, `docker-image-${index}-critical-vulnerabilities`, 'error', 
+          `Docker image ${imageScan.artifactName || `#${index+1}`} contains ${imageScan.criticalVulns} critical vulnerabilities`, 
+          { count: imageScan.criticalVulns, artifactName: imageScan.artifactName, repository: imageScan.repository, tag: imageScan.tag });
+      }
+
+      // Check for high vulnerabilities in image
+      if (imageScan.highVulns > 0) {
+        hasHighVulns = true;
+        addIssue(issues, `docker-image-${index}-high-vulnerabilities`, 'warning', 
+          `Docker image ${imageScan.artifactName || `#${index+1}`} contains ${imageScan.highVulns} high vulnerabilities`, 
+          { count: imageScan.highVulns, artifactName: imageScan.artifactName, repository: imageScan.repository, tag: imageScan.tag });
+      }
+
+      // Check for critical misconfigurations in image
+      if (imageScan.criticalMisconfigurations > 0) {
+        hasCriticalMisconfigs = true;
+        addIssue(issues, `docker-image-${index}-critical-misconfigurations`, 'error', 
+          `Docker image ${imageScan.artifactName || `#${index+1}`} contains ${imageScan.criticalMisconfigurations} critical misconfigurations`, 
+          { count: imageScan.criticalMisconfigurations, artifactName: imageScan.artifactName, repository: imageScan.repository, tag: imageScan.tag });
+      }
+
+      // Check for secrets in image
+      if (imageScan.secretsFound > 0) {
+        hasSecrets = true;
+        addIssue(issues, `docker-image-${index}-secrets-found`, 'error', 
+          `Docker image ${imageScan.artifactName || `#${index+1}`} contains ${imageScan.secretsFound} secrets that should be removed`, 
+          { count: imageScan.secretsFound, artifactName: imageScan.artifactName, repository: imageScan.repository, tag: imageScan.tag });
+      }
+    });
+
+    // Add overall compliance for Docker images
+    if (!hasCriticalVulns) {
+      compliance.push({
+        id: 'docker-images-no-critical-vulnerabilities',
+        category: 'security',
+        message: 'All Docker images are free of critical vulnerabilities',
+        details: { imageCount: imageScanResults.length }
+      });
+    }
+
+    if (!hasHighVulns) {
+      compliance.push({
+        id: 'docker-images-no-high-vulnerabilities',
+        category: 'security',
+        message: 'All Docker images are free of high vulnerabilities',
+        details: { imageCount: imageScanResults.length }
+      });
+    }
+
+    if (!hasCriticalMisconfigs) {
+      compliance.push({
+        id: 'docker-images-no-critical-misconfigurations',
+        category: 'security',
+        message: 'All Docker images are free of critical misconfigurations',
+        details: { imageCount: imageScanResults.length }
+      });
+    }
+
+    if (!hasSecrets) {
+      compliance.push({
+        id: 'docker-images-no-secrets',
+        category: 'security',
+        message: 'All Docker images are free of exposed secrets',
+        details: { imageCount: imageScanResults.length }
+      });
+    }
+  }
 
   return {
     repositoryScan: repoScanResult,
@@ -244,6 +408,10 @@ module.exports = async function (context, req) {
     const runRequestIdValue = correlationId;
     const [owner, repo] = templateUrl.split('/');
 
+    // Initialize issues and compliance arrays
+    const issues = [];
+    const compliance = [];
+
     const triggerWorkflowBody = {
       repoOwner: owner,
       repoName: repo,
@@ -261,12 +429,17 @@ module.exports = async function (context, req) {
         operation: 'validation-docker-image'
       });
 
+      addIssue(issues, 'docker-workflow-trigger-failed', 'error', 
+        "Failed to trigger Docker image validation workflow", 
+        { status: triggerResult.status, error: triggerResult.error || 'Unknown error' });
+
       context.res = {
         status: triggerResult.status,
         headers: { 'Access-Control-Allow-Origin': '*' },
         body: {
           error: "Validation docker image api: Failed to trigger workflow or retrieve run ID",
-          type: "WorkflowError"
+          type: "WorkflowError",
+          issues: issues
         }
       };
       return;
@@ -316,12 +489,17 @@ module.exports = async function (context, req) {
         operation: 'validation-docker-image'
       });
 
+      addIssue(issues, 'docker-workflow-timeout', 'warning', 
+        "Docker image validation workflow did not complete in expected time", 
+        { attempts, maxAttempts, status: run.status });
+
       context.res = {
         status: 504,
         headers: { 'Access-Control-Allow-Origin': '*' },
         body: {
           error: "Validation docker image api: Workflow run did not complete in expected time",
-          type: "TimeoutError"
+          type: "TimeoutError",
+          issues: issues
         }
       };
       return;
@@ -345,12 +523,16 @@ module.exports = async function (context, req) {
         operation: 'validation-docker-image'
       });
 
+      addIssue(issues, 'docker-artifact-not-found', 'warning', 
+        "No artifacts found from Docker image validation workflow run");
+
       context.res = {
         status: 500,
         headers: { 'Access-Control-Allow-Origin': '*' },
         body: {
           error: "Validation docker image api: No artifacts found from workflow run",
-          type: "ArtifactError"
+          type: "ArtifactError",
+          issues: issues
         }
       };
       return;
@@ -364,8 +546,8 @@ module.exports = async function (context, req) {
       operation: 'validation-docker-image'
     });
 
-    // Pass context and correlation ID to processArtifacts
-    const complianceResults = await processArtifacts(context, artifacts, correlationId, includeAllDetails);
+    // Pass context and correlation ID to processArtifacts along with issues and compliance arrays
+    const complianceResults = await processArtifacts(context, artifacts, correlationId, includeAllDetails, issues, compliance);
 
     context.log({
       message: 'Validation completed successfully',
@@ -384,9 +566,15 @@ module.exports = async function (context, req) {
       body: {
         templateUrl,
         runId: runRequestIdValue,
-        workflowRunUrl: `https://github.com/${workflowOwner}/${workflowRepo}/actions/runs/${runId}`,
-        complianceResults,
-        artifacts: reportableArtifacts || []
+        githubRunId: runId || null,
+        githubRunUrl: runId ? `https://github.com/${workflowOwner}/${workflowRepo}/actions/runs/${runId}` : null,
+        message: `${workflowFile} workflow triggered; ${runRequestIdValue} run completed`,
+        details: {
+          complianceResults,
+          artifacts: reportableArtifacts || []
+        },
+        issues,
+        compliance
       }
     };
   } catch (err) {
@@ -398,13 +586,25 @@ module.exports = async function (context, req) {
       operation: 'validation-docker-image'
     });
 
+    // Create issues array for the error case
+    const issues = [{
+      id: 'docker-validation-error',
+      severity: 'error',
+      message: err.message || "Unknown error occurred during Docker image validation",
+      details: {
+        type: err.type || "ServerError",
+        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+      }
+    }];
+
     context.res = {
       status: 500,
       headers: { 'Access-Control-Allow-Origin': '*' },
       body: {
         error: err.message || "Unknown error occurred",
         type: err.type || "ServerError",
-        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+        issues
       }
     };
   }

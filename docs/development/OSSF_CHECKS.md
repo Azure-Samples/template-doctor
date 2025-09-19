@@ -42,7 +42,12 @@ The OpenSSF Scorecard evaluation process consists of several key steps:
 The OpenSSF scoring system comprises these API components:
 
 - **validation-ossf/index.js**: Main API endpoint that handles requests and responses
-- **validation-ossf/scorecard.js**: Core implementation with the `ScorecardClient` class and utilities
+- **validation-ossf/scorecard.js**: Core implementation that leverages the shared action APIs
+
+The system uses the following shared action API components:
+- **action-trigger/index.js**: Triggers GitHub workflows and retrieves run IDs
+- **action-run-status/index.js**: Monitors workflow execution status
+- **action-run-artifacts/index.js**: Retrieves workflow artifacts with results
 
 ### Workflow Steps
 
@@ -121,6 +126,42 @@ If the score fails to meet the minimum threshold, an issue is recorded:
   ]
 }
 ```
+
+### API Response Structure
+
+The OSSF validation API follows a standardized response format that's shared with other validation APIs like the Docker image scanning API. A successful API response has this structure:
+
+```json
+{
+  "templateUrl": "owner/repo",
+  "runId": "abc123-unique-identifier",
+  "githubRunId": 1234567890,
+  "githubRunUrl": "https://github.com/Template-Doctor/template-doctor/actions/runs/1234567890",
+  "message": "validate-ossf-score.yml workflow triggered; abc123 run completed",
+  "details": {
+    "score": 8.2
+  },
+  "issues": [],
+  "compliance": [
+    {
+      "id": "ossf-score-meets-minimum",
+      "category": "security",
+      "message": "OpenSSF Score 8.2 >= 7.0",
+      "details": { ... }
+    }
+  ]
+}
+```
+
+Key fields in the shared response structure:
+- **templateUrl**: The repository being analyzed (owner/repo format)
+- **runId**: Unique identifier for this validation run
+- **githubRunId**: GitHub Actions workflow run ID
+- **githubRunUrl**: URL to view the workflow run on GitHub
+- **message**: Summary message about the validation
+- **details**: Validator-specific details (varies by validator type)
+- **issues**: Array of issues found during validation (each with id, severity, message, and details)
+- **compliance**: Array of compliance validations passed (each with id, category, message, and details)
 
 ## Integration with Template Doctor
 

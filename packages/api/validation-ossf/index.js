@@ -43,7 +43,6 @@ module.exports = async function (context, req) {
     const owner = process.env.GITHUB_REPO_OWNER || "Template-Doctor";
     const repo = process.env.GITHUB_REPO_NAME || "template-doctor";
     const workflowFile = process.env.GITHUB_WORKFLOW_FILE || "validate-ossf-score.yml";
-    const workflowUrl = `https://github.com/${owner}/${repo}/actions/workflows/${workflowFile}`;
     const workflowToken = process.env.GH_WORKFLOW_TOKEN;
     if (!workflowToken) throw new Error("Missing GH_WORKFLOW_TOKEN app setting");
 
@@ -58,25 +57,35 @@ module.exports = async function (context, req) {
       }, 180000);
     });
 
+    // Always use the action-* APIs implementation
+    const scorePromise = getOSSFScore(context, owner, repo, workflowFile, templateUrl, localRunId, minScore, issues, compliance);
+
     // Race the getOSSFScore call against the timeout
-    const score = await Promise.race([
-      getOSSFScore(context, workflowToken, `${owner}/${repo}`, workflowFile, templateUrl, localRunId, minScore, issues, compliance),
+    const result = await Promise.race([
+      scorePromise,
       timeout
     ]);
+
+    // securely destructure score and runId if they are returned or set to empty string or null
+    const { score = null, runId = null } = result || {};
 
     context.res = {
       status: 200,
       headers: { 'Access-Control-Allow-Origin': '*' },
       body: {
+        templateUrl,
         runId: localRunId,
-        githubRunId: localRunId || null,
-        githubRunUrl: localRunId ? `https://github.com/${owner}/${repo}/actions/runs/${localRunId}` : null,
+        githubRunId: runId || null,
+        githubRunUrl: localRunId ? `https://github.com/${owner}/${repo}/actions/runs/${runId}` : null,
         message: `${workflowFile} workflow triggered; ${localRunId} run completed`,
-        score,
+        details: {
+          score
+        },
         issues,
         compliance
       }
     };
+
   } catch (err) {
     if (process.env.NODE_ENV === "development") {
       console.error("validate-template error:", err);

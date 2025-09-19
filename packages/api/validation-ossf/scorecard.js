@@ -1,25 +1,10 @@
-const pollingTimeout = 120000; // 2 minutes in ms
-const pollingInterval = 10000; // 10 seconds in ms
-const gitHubApiVersion = "2022-11-28"; // GitHub API version for headers
-const fetchTimeout = 30000; // 30 seconds for fetch requests
-const initialDelayAfterTrigger = 3000; // 3 seconds initial delay after workflow trigger
-const maxPollingDelay = 30000; // Maximum polling delay (30 seconds)
-const jitterFactor = 0.2; // 20% jitter for exponential backoff
-const backoffMultiplier = 1.5; // Multiplier for exponential backoff
-const retryDelayMultiplier = 1000; // Base milliseconds for retry (1 second)
+const { triggerWorkflow } = require('../action-trigger/index');
+const { getWorkflowRunData } = require('../action-run-status/index');
+const { getArtifactsForRun } = require('../action-run-artifacts/index');
 
-/**
- * Creates standard GitHub API headers
- * @param {string} token - GitHub API token
- * @returns {Object} - Headers object for GitHub API requests
- */
-function createGitHubHeaders(token) {
-    return {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/vnd.github+json',
-        "X-GitHub-Api-Version": gitHubApiVersion
-    };
-}
+const maxAttempts = 30; // Maximum number of attempts to check workflow status
+const delayMs = 10000; // 10 seconds delay between status checks
+
 
 /**
  * Utility function to sleep for a specified number of milliseconds
@@ -54,25 +39,23 @@ function addIssue(issues, id, severity, message, details = null) {
     issues.push(issue);
 }
 
-async function getOSSFScore(context, workflowToken, workflowUrl, workflowFile, templateOwnerRepo, requestGuid, minScore, issues, compliance) {
+/**
+ * Gets OSSF Score using the action-* APIs
+ * @param {Object} context - Azure Functions context
+ * @param {string} workflowOwner - Owner of the workflow repository
+ * @param {string} workflowRepo - Name of the workflow repository
+ * @param {string} workflowFile - Name of the workflow file
+ * @param {string} templateOwnerRepo - Owner/repo of the template to analyze
+ * @param {string} requestGuid - Unique ID for this request
+ * @param {number} minScore - Minimum acceptable score
+ * @param {Array} issues - Array to add issues to
+ * @param {Array} compliance - Array to add compliance items to
+ * @returns {Promise<void>}
+ */
+async function getOSSFScore(context, workflowOwner, workflowRepo, workflowFile, templateOwnerRepo, requestGuid, minScore, issues, compliance) {
+    context.log(`Getting OSSF score using action APIs for ${templateOwnerRepo} with minimum score: ${minScore.toFixed(1)}`);
 
-    context.log(`Minimum score: ${minScore.toFixed(1)}`); // This will log "7.0"
-
-    if (!workflowToken || typeof workflowToken !== 'string') {
-        addIssue(issues, 'ossf-score-invalid-workflow-token', 'warning', 'Invalid workflow token for OSSF score.');
-        return;
-    }
-    if (!workflowUrl || typeof workflowUrl !== 'string' || workflowUrl.indexOf('/') === -1) {
-        addIssue(issues, 'ossf-score-invalid-workflow-repo', 'warning', 'Invalid workflow URL for OSSF score. Use owner/repo format.');
-        return;
-    }
-
-    if (!workflowFile || typeof workflowFile !== 'string') {
-        addIssue(issues, 'ossf-score-invalid-workflow-file', 'warning', 'Invalid workflow file for OSSF score. ');
-        return;
-    }
-
-    // templateOwnerRepo should be in the form 'owner/repo'
+    // Validate input parameters
     if (!templateOwnerRepo || typeof templateOwnerRepo !== 'string' || templateOwnerRepo.indexOf('/') === -1) {
         addIssue(issues, 'ossf-score-invalid-template-repo', 'warning', 'Invalid template repo string for OSSF score. Use owner/repo format.');
         return;
@@ -84,54 +67,81 @@ async function getOSSFScore(context, workflowToken, workflowUrl, workflowFile, t
     }
 
     try {
-        const client = typeof ScorecardClient !== 'undefined' ? new ScorecardClient(context, undefined, workflowToken, workflowUrl, workflowFile) : null;
-        if (!client) {
-            addIssue(issues, 'ossf-score-workflow-trigger-failed', 'warning', `ScorecardClient client can't be created`);
-            return;
-        }
+        const workflowOrgRep = `${workflowOwner}/${workflowRepo}`;
+        const workflowInput = {
+            repo: templateOwnerRepo,
+            id: requestGuid
+        };
 
-        const triggeredResponse = await client.triggerWorkflow(templateOwnerRepo, requestGuid);
-        if (!triggeredResponse || !triggeredResponse.ok) {
+        // Trigger the workflow using action-trigger API
+        const triggerResult = await triggerWorkflow(
+            workflowOwner, 
+            workflowRepo, 
+            workflowFile, 
+            workflowInput, 
+            'id',  // runIdInputProperty - the property that contains our unique ID
+            context
+        );
+
+        if (triggerResult.status !== 200 || !triggerResult.found) {
             addIssue(issues, 'ossf-score-workflow-trigger-failed', 'warning', 
-                `ScorecardClient workflow not triggered. GitHub API response: ${triggeredResponse ? triggeredResponse.status : 'unknown'}`);
+                `Failed to trigger OSSF score workflow. Status: ${triggerResult.status}, Error: ${triggerResult.error || 'Unknown error'}`);
             return;
         }
 
-        // delay after workflow trigger - give workflow time to start
-        await sleep(initialDelayAfterTrigger);
+        const runId = triggerResult.runId;
+        context.log(`OSSF score workflow triggered successfully with run ID: ${runId}`);
 
-        // poll github artifacts for repo for up to the polling timeout
-        const pollStart = Date.now();
-        let runStatus = undefined;
-        let attempt = 0;
-        while (Date.now() - pollStart < pollingTimeout) {
-            runStatus = await client.getArtifactsListItem(requestGuid);
-            if (runStatus !== undefined && runStatus !== null) {
-                break;
-            }
-            
-            // Calculate delay using exponential backoff with jitter
-            attempt++;
-            const baseDelay = Math.min(pollingInterval * Math.pow(backoffMultiplier, attempt - 1), maxPollingDelay);
-            const jitter = Math.floor(baseDelay * jitterFactor * Math.random());
-            const delay = baseDelay + jitter;
-            
-            context.log(`Waiting for ${templateOwnerRepo} artifact with request GUID: ${requestGuid} (attempt ${attempt}, next retry in ${Math.round(delay/1000)}s)`);
-            // wait with exponential backoff before polling again
-            await sleep(delay);
+        // Wait until the run is completed
+        let run;
+        let attempts = 0;
+
+        while (attempts < maxAttempts) {
+            await sleep(delayMs);
+            run = await getWorkflowRunData(workflowOwner, workflowRepo, runId, context);
+
+            context.log(`Checking OSSF workflow status: ${run.status}, attempt: ${attempts + 1}/${maxAttempts}`);
+
+            if (run.status === 'completed') break;
+            attempts++;
         }
+
+        if (run.status !== 'completed') {
+            addIssue(issues, 'ossf-score-workflow-timeout', 'warning', 
+                'OSSF score workflow did not complete in expected time');
+            return;
+        }
+
+        context.log(`OSSF score workflow completed, fetching artifacts`);
+
+        // Get the artifacts data
+        const artifacts = await getArtifactsForRun(workflowOwner, workflowRepo, runId, context);
+
+        if (!artifacts || !artifacts.artifacts || artifacts.artifacts.length === 0) {
+            addIssue(issues, 'ossf-score-artifact-not-found', 'warning', 
+                'No artifacts found from OSSF score workflow run');
+            return;
+        }
+
+        // Find the artifact with our requestGuid
+        const runStatus = artifacts.artifacts.find(artifact => 
+            typeof artifact.name === 'string' && artifact.name.includes(requestGuid));
+
         if (!runStatus) {
-            addIssue(issues, 'ossf-score-artifact-failed', 'warning', 'Workflow artifact failed for request GUID', 
-                { workflowUrl, workflowFile, templateOwnerRepo, requestGuid });
+            addIssue(issues, 'ossf-score-artifact-failed', 'warning', 
+                'OSSF score workflow artifact not found for request GUID', 
+                { workflowOrgRep, workflowFile, templateOwnerRepo, requestGuid, runId });
             return;
         }
 
-        // if the run completed but concluded with non-success, record a warning
-        if (runStatus && (!runStatus.archive_download_url || runStatus.archive_download_url.length < 5)) {
+        // Check if the artifact has a download URL
+        if (!runStatus.archive_download_url || runStatus.archive_download_url.length < 5) {
             addIssue(issues, 'ossf-score-artifact-download-failed', 'warning', 
                 `OSSF workflow concluded without finding artifact download URL`, runStatus);
             return;
         }
+
+        // Extract the score from the artifact name
         const scoreRaw = runStatus.name.split('_score_')[1];
         if (!scoreRaw) {
             addIssue(issues, 'ossf-score-value-not-found', 'warning', 
@@ -142,6 +152,7 @@ async function getOSSFScore(context, workflowToken, workflowUrl, workflowFile, t
         const scoreString = scoreRaw.replace(`_`, '.');
         const score = parseFloat(scoreString);
 
+        // Compare the score with minimum required score
         const epsilon = 1e-10; // Small tolerance value
         if (Math.abs(score - minScore) < epsilon || score > minScore) {
             compliance.push({
@@ -156,195 +167,14 @@ async function getOSSFScore(context, workflowToken, workflowUrl, workflowFile, t
                 { templateOwnerRepo: templateOwnerRepo, score: score.toFixed(1), minScore: minScore.toFixed(1), artifact: runStatus });
         }
 
+        return { score, runId };
 
     } catch (err) {
-        context.log('Error fetching Scorecard:', err);
+        context.log.error('Error fetching OSSF Scorecard:', err);
         addIssue(issues, 'ossf-score-error', 'warning', 'Failed to fetch OSSF Scorecard', 
                 { error: err instanceof Error ? err.message : String(err) });
     }
 }
-class ScorecardClient {
-    constructor(context, baseUrl = 'https://api.github.com', token = null, workflowOwnerRepo = null, workflowId = null) {
-        this.baseUrl = baseUrl.replace(/\/$/, '');
-        this.token = token;
-
-        // if worflowOwnerRepo is a full url, pull out owner/repo and workflow file
-        const matches = workflowOwnerRepo.match(/^(.*\/(.*))\/actions\/workflows\/(.*)$/);
-        if (matches) {
-            this.workflowOwnerRepo = matches[1];
-            this.workflowId = matches[3];
-        } else {
-            this.workflowOwnerRepo = workflowOwnerRepo;
-            this.workflowId = workflowId;
-        }
-        this.context = context ? context : { log: (str) => { console.log(str) } };
-    }
-
-    /**
-     * Creates a fetch request with GitHub API headers
-     * @param {string} url - The URL to fetch
-     * @param {Object} options - Additional fetch options
-     * @returns {Promise<Response>} - The fetch response
-     */
-    async fetchWithGitHubAuth(url, options = {}) {
-        const requestOptions = {
-            ...options,
-            headers: {
-                ...createGitHubHeaders(this.token),
-                ...(options.headers || {})
-            },
-            signal: AbortSignal.timeout(options.timeout || fetchTimeout)
-        };
-
-        this.context.log(`Fetching URL: ${url} with options: ${JSON.stringify(requestOptions)}`);
-        
-        return fetch(url, requestOptions);
-    }
-
-    async triggerWorkflow(templateOwnerRep, incomingGuid) {
-
-        try {
-            if (!this.token) throw new Error('GitHub token is required to trigger workflow');
-            if (!this.baseUrl) throw new Error('Base URL is required to trigger workflow');
-            if (!this.workflowOwnerRepo) throw new Error('workflowOwnerRepo is required to trigger workflow');
-            if (!this.workflowId) throw new Error('workflowId is required to trigger workflow');
-
-            if (!templateOwnerRep) throw new Error('templateOwnerRepo is required');
-            if (!incomingGuid) throw new Error('incomingGuid is required to trigger workflow');
-
-            const url = `${this.baseUrl}/repos/${this.workflowOwnerRepo}/actions/workflows/${this.workflowId}/dispatches`;
-            this.context.log(`URL: ${url}`);
-
-            const body = {
-                ref: 'main',
-                inputs: {
-                    repo: templateOwnerRep,
-                    id: incomingGuid
-                }
-            };
-
-            const response = await this.fetchWithGitHubAuth(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(body)
-            });
-
-            if (!response.ok) {
-                this.context.log(`Failed to trigger workflow: ${response.status} ${response.statusText}`);
-                throw new Error(`GitHub dispatch failed: ${response.status} ${response.statusText}`);
-            }
-
-            return response;
-        } catch (err) {
-            this.context.log(`ScorecardClient trigger workflow error: ${err.message}`);
-            throw err;
-        }
-
-    }
-    async getArtifactsListItem(inputGuid) {
-        try {
-            if (!inputGuid || typeof inputGuid !== 'string') {
-                throw new Error('Invalid GUID provided for artifact search');
-            }
-
-            const url = `${this.baseUrl}/repos/${this.workflowOwnerRepo}/actions/artifacts`;
-
-            const resp = await this.fetchWithGitHubAuth(url);
-            if (!resp.ok) {
-                return undefined;
-            }
-            const data = await resp.json();
-            if (data && Array.isArray(data.artifacts)) {
-                // Return the first artifact whose name includes the inputGuid
-                return data.artifacts.find(artifact => typeof artifact.name === 'string' && artifact.name.includes(inputGuid));
-            }
-            return null;
-        } catch (err) {
-            this.context.log(`ScorecardClient artifact list workflow error: ${err.message}`);
-            throw err;
-        }
-    }
-
-    /**
-     * Downloads an artifact from GitHub Actions.
-     * This is a two part request:
-     * 1: GitHub api to artifact with bearer token, get 302 and read location header
-     * 2: Use URL in location header without authorization
-     * @param {string} downloadUrl - The GitHub API URL for the artifact
-     * @param {Object} context - Azure Functions context for logging
-     * @returns {Promise<ArrayBuffer>} - The artifact contents as binary data
-     */
-    async getArtifactDownload(downloadUrl) {
-        try {
-            const response = await this.fetchWithGitHubAuth(downloadUrl, {
-                method: 'GET',
-                redirect: 'manual' // we want to handle the redirect ourselves
-            });
-
-            // If GitHub returned a redirect, follow it manually WITHOUT Authorization
-            if (response.status === 302 || response.status === 301 || response.status === 307 || response.status === 308) {
-                const location = response.headers.get('location');
-                if (!location) throw new Error('Redirected but no Location header');
-
-                this.context.log(`Following redirect to zip file: ${location}`);
-
-                const fileResp = await fetch(location, {
-                    method: 'GET',
-                    headers: {
-                        // do NOT include Authorization here
-                        Accept: 'application/octet-stream'
-                    },
-                    signal: AbortSignal.timeout(fetchTimeout)
-                });
-
-                if (!fileResp.ok) {
-                    const text = await fileResp.text().catch(() => '');
-                    throw new Error(`Failed to download artifact from storage: ${fileResp.status} ${fileResp.statusText} - ${text}`);
-                }
-
-                // return binary data (ArrayBuffer) so caller can save/unzip
-                const zipFilebuffer = await fileResp.arrayBuffer();
-                return zipFilebuffer;
-            }
-
-            if (response.ok) {
-                // may be JSON or binary depending on response; return ArrayBuffer for binary safety
-                return await response.arrayBuffer();
-            }
-
-            this.context.log(`Failed to download artifact: ${response.status} ${response.statusText}`);
-            throw new Error(`Failed to download artifact: ${response.status} ${response.statusText}`);
-        } catch (err) {
-            this.context.log(`ScorecardClient artifact download error: ${err.message}`);
-            throw err;
-        }
-    }
-
-    /**
-     * Triggers workflow with retry capability for improved resilience
-     * @param {string} templateOwnerRep - Repository in owner/repo format
-     * @param {string} incomingGuid - Unique identifier for this run
-     * @param {number} maxRetries - Maximum number of retry attempts
-     * @returns {Promise<Response>} - The final response from the workflow trigger
-     */
-    async triggerWorkflowWithRetry(templateOwnerRep, incomingGuid, maxRetries = 3) {
-        let lastError;
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            try {
-                return await this.triggerWorkflow(templateOwnerRep, incomingGuid);
-            } catch (err) {
-                lastError = err;
-                this.context.log(`Attempt ${attempt} failed: ${err.message}`);
-                if (attempt < maxRetries) {
-                    await sleep(retryDelayMultiplier * attempt); // Exponential backoff
-                }
-            }
-        }
-        throw lastError;
-    }
-
-}
-
-module.exports = { getOSSFScore };
+module.exports = { 
+    getOSSFScore
+};

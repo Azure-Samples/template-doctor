@@ -48,6 +48,11 @@ The Docker image scanning system comprises several API components:
 - **trivy-utils.js**: Utility functions for processing Trivy scan results
 - **zip-utils.js**: Helper for extracting scan artifacts
 
+The system uses the following shared action API components:
+- **action-trigger/index.js**: Triggers GitHub workflows and retrieves run IDs
+- **action-run-status/index.js**: Monitors workflow execution status
+- **action-run-artifacts/index.js**: Retrieves workflow artifacts with results
+
 ### Workflow Steps
 
 The `validate-docker-images.yml` workflow performs these tasks:
@@ -110,6 +115,53 @@ A successful scan produces JSON results with this structure:
   ]
 }
 ```
+
+### API Response Structure
+
+The Docker image validation API follows a standardized response format that's shared with other validation APIs like the OSSF Scorecard API. A successful API response has this structure:
+
+```json
+{
+  "templateUrl": "owner/repo",
+  "runId": "abc123-unique-identifier",
+  "githubRunId": 1234567890,
+  "githubRunUrl": "https://github.com/Template-Doctor/template-doctor/actions/runs/1234567890",
+  "message": "validate-docker-images.yml workflow triggered; abc123 run completed",
+  "details": {
+    "complianceResults": {
+      "repositoryScan": { ... },
+      "imageScans": [ ... ]
+    },
+    "artifacts": [ ... ]
+  },
+  "issues": [
+    {
+      "id": "docker-image-0-critical-vulnerabilities",
+      "severity": "error",
+      "message": "Docker image contains 2 critical vulnerabilities",
+      "details": { ... }
+    }
+  ],
+  "compliance": [
+    {
+      "id": "docker-repo-no-critical-misconfigurations",
+      "category": "security",
+      "message": "Repository contains no critical misconfigurations",
+      "details": { ... }
+    }
+  ]
+}
+```
+
+Key fields in the shared response structure:
+- **templateUrl**: The repository being analyzed (owner/repo format)
+- **runId**: Unique identifier for this validation run
+- **githubRunId**: GitHub Actions workflow run ID
+- **githubRunUrl**: URL to view the workflow run on GitHub
+- **message**: Summary message about the validation
+- **details**: Validator-specific details (varies by validator type)
+- **issues**: Array of issues found during validation (each with id, severity, message, and details)
+- **compliance**: Array of compliance validations passed (each with id, category, message, and details)
 
 ## Integration with Template Doctor
 
