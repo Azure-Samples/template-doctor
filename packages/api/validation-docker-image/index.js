@@ -153,21 +153,89 @@ async function processRepoArtifact(context, artifacts, correlationId = null, inc
   const repoTrivyResults = processTrivyResultsDetails(repoScanJsonResult, includeAllDetails);
   return repoTrivyResults;
 }
-async function processImageArtifact(context, artifacts, correlationId = null, includeAllDetails = false) {
+/**
+ * Processes image artifacts from a workflow run, downloading and analyzing them in chunks
+ * to prevent memory issues with large datasets
+ * 
+ * @param {Object} context - Azure Functions context for logging
+ * @param {Object} artifacts - Artifacts object containing artifact information 
+ * @param {string} [correlationId=null] - Optional correlation ID for tracing
+ * @param {boolean} [includeAllDetails=false] - Whether to include all details in results
+ * @param {Object} [options] - Additional processing options
+ * @param {number} [options.chunkSize=3] - Number of images to process in each chunk
+ * @returns {Promise<Array>} Array of processed image scan results
+ */
+async function processImageArtifact(context, artifacts, correlationId = null, includeAllDetails = false, options = {}) {
   const imageUrls = await getImageArtifactUrls(artifacts);
   if (!imageUrls || imageUrls.length === 0) return [];
 
-  // Start all downloads concurrently (returns an array of promises -> Promise.all waits for them)
-  const downloadPromises = imageUrls.map(url => getZipAsBuffer(url, context));
-  const buffers = await Promise.all(downloadPromises);
+  const chunkSize = options.chunkSize || 3; // Process 3 images at a time by default
+  const allResults = [];
+  
+  // Log start of processing
+  if (context && context.log) {
+    context.log(`Processing ${imageUrls.length} image artifacts in chunks of ${chunkSize}`, {
+      operation: 'processImageArtifact', 
+      imageCount: imageUrls.length,
+      chunkSize,
+      correlationId
+    });
+  }
 
-  // Extract and process each buffer (can run extractTrivyResults concurrently if it's async-safe)
-  const extractPromises = buffers.map(buf => extractTrivyResults(context, buf, correlationId));
-  const imageJsonResults = await Promise.all(extractPromises);
-
-  // Process details synchronously (or map -> processTrivyResultsDetails)
-  const imagesTrivyResults = imageJsonResults.map(r => processTrivyResultsDetails(r, includeAllDetails));
-  return imagesTrivyResults;
+  // Process in chunks to prevent memory issues
+  for (let i = 0; i < imageUrls.length; i += chunkSize) {
+    const startTime = Date.now();
+    const chunk = imageUrls.slice(i, i + chunkSize);
+    
+    if (context && context.log) {
+      context.log(`Processing image chunk ${Math.floor(i/chunkSize) + 1}/${Math.ceil(imageUrls.length/chunkSize)}`, {
+        operation: 'processImageArtifact',
+        chunkStart: i,
+        chunkSize: chunk.length,
+        correlationId
+      });
+    }
+    
+    try {
+      // Start all downloads in this chunk concurrently
+      const downloadPromises = chunk.map(url => getZipAsBuffer(url, context));
+      const buffers = await Promise.all(downloadPromises);
+      
+      // Extract and process each buffer in this chunk
+      const extractPromises = buffers.map(buf => extractTrivyResults(context, buf, correlationId));
+      const chunkJsonResults = await Promise.all(extractPromises);
+      
+      // Process details for each result in this chunk
+      const chunkProcessedResults = chunkJsonResults.map(r => processTrivyResultsDetails(r, includeAllDetails));
+      
+      // Add to overall results
+      allResults.push(...chunkProcessedResults);
+      
+      if (context && context.log) {
+        context.log(`Completed processing image chunk ${Math.floor(i/chunkSize) + 1}`, {
+          operation: 'processImageArtifact',
+          chunkProcessingTimeMs: Date.now() - startTime,
+          resultsCount: chunkProcessedResults.length,
+          correlationId
+        });
+      }
+    } catch (err) {
+      // Log error but continue with other chunks
+      if (context && context.log && context.log.error) {
+        context.log.error(`Error processing image chunk ${Math.floor(i/chunkSize) + 1}`, {
+          operation: 'processImageArtifact',
+          error: err.message,
+          stack: err.stack,
+          chunkStart: i,
+          chunkSize: chunk.length,
+          correlationId
+        });
+      }
+      // Continue with next chunk rather than failing the entire operation
+    }
+  }
+  
+  return allResults;
 }
 
 /**

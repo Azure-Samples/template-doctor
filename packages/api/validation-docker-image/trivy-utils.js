@@ -1,8 +1,7 @@
 /**
  * Trivy scanner utility functions for processing scan results and calculating security scores
  */
-const { extractFilesFromZip } = require('./zip-utils');
-
+const { extractFilesFromZip } = require('../shared/zip-utils');
 
 /**
  * Processes Trivy scan results to extract detailed information about vulnerabilities, 
@@ -254,15 +253,33 @@ function processTrivyResultsDetails(trivyResults, includeAllDetails = false) {
     }
 
     // Find the primary artifact if there are multiple results
-    let primaryArtifact = null;
-    const artifactKeys = Object.keys(artifactResults);
-    if (artifactKeys.length > 0) {
-        // Look for container or image scan first
-        primaryArtifact = artifactResults[artifactKeys.find(k =>
-            artifactResults[k].artifactType === 'container' ||
-            artifactResults[k].artifactType === 'image'
-        ) || artifactKeys[0]];
-    }
+    // This function selects the most relevant artifact based on type priority
+    const selectPrimaryArtifact = (artifacts) => {
+        // If no artifacts, return null
+        const artifactKeys = Object.keys(artifacts);
+        if (artifactKeys.length === 0) {
+            return null;
+        }
+        
+        // Priority order for artifact types
+        const priorityTypes = ['container', 'image', 'filesystem', 'repository'];
+        
+        // First, try to find artifacts by priority type
+        for (const artifactType of priorityTypes) {
+            const matchingKey = artifactKeys.find(key => 
+                artifacts[key].artifactType === artifactType
+            );
+            
+            if (matchingKey) {
+                return artifacts[matchingKey];
+            }
+        }
+        
+        // If no priority matches found, return the first artifact
+        return artifacts[artifactKeys[0]];
+    };
+    
+    const primaryArtifact = selectPrimaryArtifact(artifactResults);
 
     // Return the processed results
     return {
@@ -286,7 +303,6 @@ function processTrivyResultsDetails(trivyResults, includeAllDetails = false) {
 
         // Artifact information
         artifacts: artifactResults,
-        artifactCount: artifactKeys.length,
 
         // Primary artifact information (if available)
         artifactName: primaryArtifact ? primaryArtifact.artifactName : '',
@@ -304,54 +320,119 @@ function processTrivyResultsDetails(trivyResults, includeAllDetails = false) {
  * @param {Object} context - Azure Functions context for logging
  * @param {ArrayBuffer} zipData - The ZIP file as an ArrayBuffer
  * @param {string} [correlationId] - Optional ID to correlate logs across operations
+ * @param {Object} [options] - Optional processing options
+ * @param {number} [options.chunkSize=50] - Number of files to process in each chunk
+ * @param {number} [options.maxFileSize=10485760] - Maximum file size to process (in bytes, default 10MB)
  * @returns {Promise<Object>} - Parsed Trivy results
  */
-async function extractTrivyResults(context, zipData, correlationId = null) {
+async function extractTrivyResults(context, zipData, correlationId = null, options = {}) {
     const requestId = correlationId || `trivy-extract-${Date.now()}`;
+    const chunkSize = options.chunkSize || 50; // Process 50 files at a time by default
+    const maxFileSize = options.maxFileSize || 10 * 1024 * 1024; // 10MB default size limit
+    
+    // Safe logging helper for consistent logging structure
+    const safeLog = (level, message, data = {}) => {
+        const logData = {
+            ...data,
+            operation: 'extractTrivyResults',
+            requestId
+        };
+
+        if (level === 'error' && context?.log?.error) {
+            context.log.error(message, logData);
+        } else if (level === 'warn' && context?.log?.warn) {
+            context.log.warn(message, logData);
+        } else if (context?.log) {
+            context.log(message, logData);
+        }
+    };
     
     try {
+        // Validate input
+        if (!zipData || !(zipData instanceof ArrayBuffer)) {
+            throw new Error('Invalid zip data provided: must be an ArrayBuffer');
+        }
+        
         const files = await extractFilesFromZip(zipData, context, correlationId);
-        context.log(`Extracted ${Object.keys(files).length} files from ZIP archive`, { 
-            operation: 'extractTrivyResults',
-            fileCount: Object.keys(files).length,
-            requestId
-        });
+        const fileEntries = Object.entries(files);
+        const fileCount = fileEntries.length;
+        
+        safeLog('info', `Extracted ${fileCount} files from ZIP archive`, { fileCount });
 
         // Look for Trivy results files in the extracted files
         const trivyResults = {};
-
-        for (const [filename, content] of Object.entries(files)) {
-            // Typically Trivy outputs JSON files with scan results
-            if (filename.endsWith('.json')) {
+        const jsonFiles = fileEntries.filter(([filename]) => filename.endsWith('.json'));
+        
+        // Process files in chunks to avoid memory issues with large datasets
+        for (let i = 0; i < jsonFiles.length; i += chunkSize) {
+            const startTime = Date.now();
+            const chunk = jsonFiles.slice(i, i + chunkSize);
+            const chunkNumber = Math.floor(i / chunkSize) + 1;
+            const totalChunks = Math.ceil(jsonFiles.length / chunkSize);
+            
+            safeLog('info', `Processing JSON files chunk ${chunkNumber}/${totalChunks}`, {
+                chunkNumber,
+                totalChunks,
+                chunkSize: chunk.length,
+                startIndex: i,
+                endIndex: Math.min(i + chunkSize - 1, jsonFiles.length - 1)
+            });
+            
+            // Process each file in the chunk
+            for (const [filename, content] of chunk) {
+                // Skip oversized files
+                if (typeof content === 'string' && content.length > maxFileSize) {
+                    safeLog('warn', `Skipping oversized JSON file`, {
+                        filename,
+                        size: content.length,
+                        maxSize: maxFileSize
+                    });
+                    continue;
+                }
+                
+                // Handle both string and Buffer content types
                 try {
-                    const parsed = JSON.parse(content);
+                    let parsed;
+                    if (typeof content === 'string') {
+                        parsed = JSON.parse(content);
+                    } else if (Buffer.isBuffer(content)) {
+                        parsed = JSON.parse(content.toString('utf8'));
+                    } else {
+                        throw new Error(`Unexpected content type: ${typeof content}`);
+                    }
+                    
                     trivyResults[filename] = parsed;
                 } catch (parseErr) {
-                    context.log.warn(`Failed to parse JSON from ${filename}`, {
+                    safeLog('warn', `Failed to parse JSON from ${filename}`, {
                         error: parseErr.message,
-                        stack: parseErr.stack,
-                        filename,
-                        operation: 'extractTrivyResults',
-                        requestId
+                        filename
                     });
                 }
             }
+            
+            const chunkDuration = Date.now() - startTime;
+            safeLog('info', `Completed chunk ${chunkNumber}/${totalChunks}`, {
+                chunkNumber,
+                durationMs: chunkDuration,
+                filesProcessed: chunk.length
+            });
         }
 
-        context.log(`Found ${Object.keys(trivyResults).length} valid Trivy result files`, {
-            operation: 'extractTrivyResults',
-            validFiles: Object.keys(trivyResults).length,
-            requestId
-        });
+        const validCount = Object.keys(trivyResults).length;
+        safeLog('info', `Found ${validCount} valid Trivy result files`, { validCount });
         
         return trivyResults;
     } catch (err) {
-        context.log.error(`Error extracting Trivy results`, {
+        safeLog('error', `Error extracting Trivy results`, {
             error: err.message,
-            stack: err.stack,
-            operation: 'extractTrivyResults',
-            requestId
+            errorType: err.constructor.name
         });
+        
+        // Avoid exposing full stack traces in production
+        if (process.env.NODE_ENV === 'development') {
+            safeLog('error', 'Error stack trace', { stack: err.stack });
+        }
+        
         throw new Error(`Failed to extract Trivy results: ${err.message}`);
     }
 }

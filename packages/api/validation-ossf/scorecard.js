@@ -50,7 +50,7 @@ function addIssue(issues, id, severity, message, details = null) {
  * @param {number} minScore - Minimum acceptable score
  * @param {Array} issues - Array to add issues to
  * @param {Array} compliance - Array to add compliance items to
- * @returns {Promise<{score: number|null, runId: number|null}>}
+ * @returns {Promise<{score: number|null, runId: string|number|null}>} Object containing score and runId, or null values if operation failed
  */
 async function getOSSFScore(context, workflowOwner, workflowRepo, workflowFile, templateOwnerRepo, requestGuid, minScore, issues, compliance) {
     context.log(`Getting OSSF score using action APIs for ${templateOwnerRepo} with minimum score: ${minScore.toFixed(1)}`);
@@ -58,12 +58,12 @@ async function getOSSFScore(context, workflowOwner, workflowRepo, workflowFile, 
     // Validate input parameters
     if (!templateOwnerRepo || typeof templateOwnerRepo !== 'string' || templateOwnerRepo.indexOf('/') === -1) {
         addIssue(issues, 'ossf-score-invalid-template-repo', 'warning', 'Invalid template repo string for OSSF score. Use owner/repo format.');
-        return;
+        return { score: null, runId: null };
     }
 
     if (!requestGuid || typeof requestGuid !== 'string') {
         addIssue(issues, 'ossf-score-invalid-request-guid', 'warning', 'Invalid request GUID for OSSF score.');
-        return;
+        return { score: null, runId: null };
     }
 
     try {
@@ -86,7 +86,7 @@ async function getOSSFScore(context, workflowOwner, workflowRepo, workflowFile, 
         if (triggerResult.status !== 200 || !triggerResult.found) {
             addIssue(issues, 'ossf-score-workflow-trigger-failed', 'warning', 
                 `Failed to trigger OSSF score workflow. Status: ${triggerResult.status}, Error: ${triggerResult.error || 'Unknown error'}`);
-            return;
+            return { score: null, runId: null };
         }
 
         const runId = triggerResult.runId;
@@ -100,16 +100,23 @@ async function getOSSFScore(context, workflowOwner, workflowRepo, workflowFile, 
             await sleep(delayMs);
             run = await getWorkflowRunData(workflowOwner, workflowRepo, runId, context);
 
+            // Defensive check to ensure run and run.status exist
+            if (!run || typeof run.status === 'undefined') {
+                context.log.warn(`OSSF workflow check received invalid response, attempt: ${attempts + 1}/${maxAttempts}`);
+                attempts++;
+                continue;
+            }
+
             context.log(`Checking OSSF workflow status: ${run.status}, attempt: ${attempts + 1}/${maxAttempts}`);
 
             if (run.status === 'completed') break;
             attempts++;
         }
 
-        if (run.status !== 'completed') {
+        if (!run || run.status !== 'completed') {
             addIssue(issues, 'ossf-score-workflow-timeout', 'warning', 
                 'OSSF score workflow did not complete in expected time');
-            return;
+            return { score: null, runId: runId || null };
         }
 
         context.log(`OSSF score workflow completed, fetching artifacts`);
@@ -120,7 +127,7 @@ async function getOSSFScore(context, workflowOwner, workflowRepo, workflowFile, 
         if (!artifacts || !artifacts.artifacts || artifacts.artifacts.length === 0) {
             addIssue(issues, 'ossf-score-artifact-not-found', 'warning', 
                 'No artifacts found from OSSF score workflow run');
-            return;
+            return { score: null, runId: runId };
         }
 
         // Find the artifact with our requestGuid
@@ -131,14 +138,14 @@ async function getOSSFScore(context, workflowOwner, workflowRepo, workflowFile, 
             addIssue(issues, 'ossf-score-artifact-failed', 'warning', 
                 'OSSF score workflow artifact not found for request GUID', 
                 { workflowOrgRep, workflowFile, templateOwnerRepo, requestGuid, runId });
-            return;
+            return { score: null, runId };
         }
 
         // Check if the artifact has a download URL
         if (!runStatus.archive_download_url || runStatus.archive_download_url.length < 5) {
             addIssue(issues, 'ossf-score-artifact-download-failed', 'warning', 
                 `OSSF workflow concluded without finding artifact download URL`, runStatus);
-            return;
+            return { score: null, runId };
         }
 
         // Extract the score from the artifact name
@@ -146,11 +153,18 @@ async function getOSSFScore(context, workflowOwner, workflowRepo, workflowFile, 
         if (!scoreRaw) {
             addIssue(issues, 'ossf-score-value-not-found', 'warning', 
                 `OSSF workflow concluded without finding score value: ${runStatus.url}`, runStatus);
-            return;
+            return { score: null, runId };
         }
 
         const scoreString = scoreRaw.replace(`_`, '.');
         const score = parseFloat(scoreString);
+
+        // Check if score is a valid number
+        if (isNaN(score)) {
+            addIssue(issues, 'ossf-score-invalid-number', 'warning', 
+                `OSSF workflow returned invalid score value: ${scoreString}`, runStatus);
+            return { score: null, runId };
+        }
 
         // Compare the score with minimum required score
         const epsilon = 1e-10; // Small tolerance value
@@ -170,7 +184,14 @@ async function getOSSFScore(context, workflowOwner, workflowRepo, workflowFile, 
         return { score, runId };
 
     } catch (err) {
-        context.log.error('Error fetching OSSF Scorecard:', err);
+        context.log.error('Error fetching OSSF Scorecard:', {
+            error: err.message,
+            stack: err.stack,
+            templateOwnerRepo,
+            requestGuid,
+            operation: 'getOSSFScore'
+        });
+        
         addIssue(issues, 'ossf-score-error', 'warning', 'Failed to fetch OSSF Scorecard', 
                 { error: err instanceof Error ? err.message : String(err) });
         
