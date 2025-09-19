@@ -666,7 +666,7 @@ module.exports = async function (context, req) {
         compliance
       }
     };
-    context.log(`OSSF validation completed for ${templateUrl} with local run ID: ${runId}: ${JSON.stringify(context.res.body)}`);
+    context.log(`Trivy validation completed for ${templateUrl} with local run ID: ${runId}: ${JSON.stringify(context.res.body)}`);
   } catch (err) {
     context.log.error({
       message: 'Error during validation',
