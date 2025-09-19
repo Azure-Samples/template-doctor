@@ -35,7 +35,7 @@ function addIssue(issues, id, severity, message, details = null) {
     } else  {
         issue.error = message;
     }
-    
+
     issues.push(issue);
 }
 
@@ -177,7 +177,7 @@ async function getOSSFScore(context, workflowOwner, workflowRepo, workflowFile, 
             });
         } else {
             addIssue(issues, 'ossf-score-below-minimum', 'warning', 
-                `OSSF workflow concluded with score ${score.toFixed(1)} < ${minScore.toFixed(1)}: ${runStatus.url}`,
+                `OSSF workflow concluded with score ${score.toFixed(1)} < ${minScore.toFixed(1)}`,
                 { templateOwnerRepo: templateOwnerRepo, score: score.toFixed(1), minScore: minScore.toFixed(1), artifact: runStatus });
         }
 

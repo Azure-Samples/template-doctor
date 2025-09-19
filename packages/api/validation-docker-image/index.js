@@ -652,6 +652,7 @@ module.exports = async function (context, req) {
       status: 200,
       headers: { 'Access-Control-Allow-Origin': '*' },
       body: {
+        api: 'trivy-docker-image',
         templateUrl,
         runId: runRequestIdValue,
         githubRunId: runId || null,
@@ -665,6 +666,7 @@ module.exports = async function (context, req) {
         compliance
       }
     };
+    context.log(`OSSF validation completed for ${templateUrl} with local run ID: ${runId}: ${JSON.stringify(context.res.body)}`);
   } catch (err) {
     context.log.error({
       message: 'Error during validation',

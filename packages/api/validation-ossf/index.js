@@ -104,6 +104,7 @@ module.exports = async function (context, req) {
       status: 200,
       headers: { 'Access-Control-Allow-Origin': '*' },
       body: {
+        api: 'ossf',
         templateUrl,
         runId: localRunId,
         githubRunId: runId || null,
@@ -116,6 +117,7 @@ module.exports = async function (context, req) {
         compliance
       }
     };
+    context.log(`OSSF validation completed for ${templateUrl} with local run ID: ${runId}: ${JSON.stringify(context.res.body)}`);
 
   } catch (err) {
     // Enhanced error logging with structured information
