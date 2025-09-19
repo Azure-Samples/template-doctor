@@ -32,8 +32,8 @@ function addIssue(issues, id, severity, message, details = null) {
     
     if (details) {
         issue.details = details;
-    } else if (arguments.length > 4 && arguments[4] !== null) {
-        issue.error = arguments[4];
+    } else  {
+        issue.error = message;
     }
     
     issues.push(issue);
