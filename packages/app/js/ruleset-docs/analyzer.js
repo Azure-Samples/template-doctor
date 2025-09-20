@@ -3,7 +3,7 @@ console.log('Docs rule set loaded');
 class TemplateAnalyzerDocs {
   async getConfig() {
     const docsResponse = await fetch('./configs/docs-config.json');
-    if (docsResponse.ok !== true) {
+    if (!docsResponse.ok) {
       throw new Error(`Failed to load docs config: ${docsResponse.status}`);
     }
     const ruleSetConfig = await docsResponse.json();
@@ -86,7 +86,7 @@ class TemplateAnalyzerDocs {
       console.log(`[Docs-ossf] ${ossfApiUrl} response.status: ${response.status} ${response.statusText}`);
 
       // this api has up to 3 minutes to timeout
-      if (response.ok === true) { // Ensuring strict equality
+      if (response.ok) {
 
         const data = await response.json();
 
@@ -161,7 +161,7 @@ class TemplateAnalyzerDocs {
       console.log(`[Docs-trivy] ${trivyApiUrl} response.status: ${response.status} ${response.statusText}`);
 
       // this api has up to 3 minutes to timeout
-      if (response.ok === true) { // Ensuring strict equality
+      if (response.ok) {
 
         const data = await response.json();
 
@@ -287,7 +287,7 @@ class TemplateAnalyzerDocs {
             }
           });
           
-          // Summary compliant items if no issues found for each category
+          // Add summary compliant items if no issues found for each category
           if (imagesWithMisconfigurationIssues === 0) {
             compliant.push({
               id: `${PREFIX}images-no-misconfiguration-issues`,

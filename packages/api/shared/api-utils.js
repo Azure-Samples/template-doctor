@@ -185,17 +185,15 @@ async function withRetry(asyncFn, options = {}) {
  * @returns {Function} - A function that accepts a response and returns true if it should be retried
  */
 function createFetchResponseRetryCheck(retryableStatusCodes = [408, 429, 500, 502, 503, 504]) {
-  return (error) => {
-    // Network errors (like timeouts, connection refused) should be retried
-    if (!error.response) {
-      return true;
+  return (errOrResponse) => {
+    // If it's a Response object, check the status code
+    if (errOrResponse && typeof errOrResponse.status === "number") {
+      return retryableStatusCodes.includes(errOrResponse.status);
     }
-    
-    // Retry based on specific status codes
-    return retryableStatusCodes.includes(error.response.status);
+    // Otherwise, it's likely a network error (TypeError, etc.) -- retry
+    return true;
   };
 }
-
 /**
  * Wrapper for GitHub API calls with retry logic
  * @param {Function} apiFn - The function that makes the GitHub API call
