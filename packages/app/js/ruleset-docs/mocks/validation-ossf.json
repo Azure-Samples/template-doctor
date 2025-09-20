@@ -1,0 +1,44 @@
+{
+  "api": "ossf",
+  "templateUrl": "diberry/azure-search-static-web-app",
+  "runId": "e1bef769-c204-457b-a30b-ce97059f6e74",
+  "githubRunId": 17883657070,
+  "githubRunUrl": "https://github.com/diberry/template-doctor-2/actions/runs/17883657070",
+  "message": "validate-ossf-score.yml workflow triggered; e1bef769-c204-457b-a30b-ce97059f6e74 run completed",
+  "details": {
+    "score": 1.7
+  },
+  "issues": [
+    {
+      "id": "ossf-score-below-minimum",
+      "severity": "warning",
+      "message": "OSSF workflow concluded with score 1.7 < 6.0",
+      "details": {
+        "templateOwnerRepo": "diberry/azure-search-static-web-app",
+        "score": "1.7",
+        "minScore": "6.0",
+        "artifact": {
+          "id": 4063627509,
+          "node_id": "MDg6QXJ0aWZhY3Q0MDYzNjI3NTA5",
+          "name": "ossf-scorecard_diberry_azure-search-static-web-app_e1bef769-c204-457b-a30b-ce97059f6e74_score_1_7",
+          "size_in_bytes": 2193,
+          "url": "https://api.github.com/repos/diberry/template-doctor-2/actions/artifacts/4063627509",
+          "archive_download_url": "https://api.github.com/repos/diberry/template-doctor-2/actions/artifacts/4063627509/zip",
+          "expired": false,
+          "digest": "sha256:0b5d35ed809d0f5858dd5e499ab4ba8a3d50c1f3af7ee87b75539f366920cac2",
+          "created_at": "2025-09-20T18:59:41Z",
+          "updated_at": "2025-09-20T18:59:41Z",
+          "expires_at": "2025-12-19T18:59:25Z",
+          "workflow_run": {
+            "id": 17883657070,
+            "repository_id": 1059687572,
+            "head_repository_id": 1059687572,
+            "head_branch": "main",
+            "head_sha": "11e28b2ae8b3a9b84a7a084438140e2b414856b3"
+          }
+        }
+      }
+    }
+  ],
+  "compliance": []
+}

@@ -1,0 +1,262 @@
+{
+  "api": "trivy-docker-image",
+  "templateUrl": "diberry/azure-search-static-web-app",
+  "runId": "30cbd5a6-d4f7-4327-80a8-53a419ade551",
+  "githubRunId": 17883657073,
+  "githubRunUrl": "https://github.com/diberry/template-doctor-2/actions/runs/17883657073",
+  "message": "validate-docker-images.yml workflow triggered; 30cbd5a6-d4f7-4327-80a8-53a419ade551 run completed",
+  "details": {
+    "complianceResults": {
+      "repositoryScan": {
+        "totalMisconfigurations": 0,
+        "criticalMisconfigurations": 0,
+        "highMisconfigurations": 0,
+        "mediumMisconfigurations": 0,
+        "lowMisconfigurations": 0,
+        "misconfigurationDetails": [],
+        "totalVulnerabilities": 4,
+        "criticalVulns": 1,
+        "highVulns": 3,
+        "mediumVulns": 0,
+        "lowVulns": 0,
+        "vulnerabilityDetails": [],
+        "secretsFound": 0,
+        "licenseIssues": 0,
+        "secretDetails": [],
+        "licenseDetails": [],
+        "artifacts": {
+          "trivy-repo-scan.json": {
+            "filename": "trivy-repo-scan.json",
+            "artifactName": "https://github.com/diberry/azure-search-static-web-app",
+            "artifactType": "repository",
+            "imageId": "",
+            "repository": "",
+            "tag": "",
+            "digest": "",
+            "metadata": {},
+            "os": {
+              "family": "",
+              "name": "",
+              "version": ""
+            },
+            "vulnerabilities": {
+              "total": 4,
+              "critical": 1,
+              "high": 3,
+              "medium": 0,
+              "low": 0,
+              "details": []
+            },
+            "misconfigurations": {
+              "total": 0,
+              "critical": 0,
+              "high": 0,
+              "medium": 0,
+              "low": 0,
+              "details": []
+            },
+            "secrets": {
+              "count": 0,
+              "details": []
+            },
+            "licenses": {
+              "count": 0,
+              "details": []
+            }
+          }
+        },
+        "artifactName": "https://github.com/diberry/azure-search-static-web-app",
+        "artifactType": "repository",
+        "imageId": "",
+        "repository": "",
+        "tag": "",
+        "digest": "",
+        "os": {
+          "family": "",
+          "name": "",
+          "version": ""
+        }
+      },
+      "imageScans": [
+        {
+          "totalMisconfigurations": 13,
+          "criticalMisconfigurations": 2,
+          "highMisconfigurations": 4,
+          "mediumMisconfigurations": 2,
+          "lowMisconfigurations": 5,
+          "misconfigurationDetails": [],
+          "totalVulnerabilities": 1394,
+          "criticalVulns": 4,
+          "highVulns": 193,
+          "mediumVulns": 641,
+          "lowVulns": 552,
+          "vulnerabilityDetails": [],
+          "secretsFound": 0,
+          "licenseIssues": 1481,
+          "secretDetails": [],
+          "licenseDetails": [],
+          "artifacts": {
+            "mcr.microsoft.com_devcontainers_dotnet_1-9.0-bookworm.json": {
+              "filename": "mcr.microsoft.com_devcontainers_dotnet_1-9.0-bookworm.json",
+              "artifactName": "mcr.microsoft.com/devcontainers/dotnet:1-9.0-bookworm",
+              "artifactType": "container_image",
+              "imageId": "",
+              "repository": "",
+              "tag": "",
+              "digest": "",
+              "metadata": {},
+              "os": {
+                "family": "",
+                "name": "",
+                "version": ""
+              },
+              "vulnerabilities": {
+                "total": 1394,
+                "critical": 4,
+                "high": 193,
+                "medium": 641,
+                "low": 552,
+                "details": []
+              },
+              "misconfigurations": {
+                "total": 13,
+                "critical": 2,
+                "high": 4,
+                "medium": 2,
+                "low": 5,
+                "details": []
+              },
+              "secrets": {
+                "count": 0,
+                "details": []
+              },
+              "licenses": {
+                "count": 1481,
+                "details": []
+              }
+            }
+          },
+          "artifactName": "mcr.microsoft.com/devcontainers/dotnet:1-9.0-bookworm",
+          "artifactType": "container_image",
+          "imageId": "",
+          "repository": "",
+          "tag": "",
+          "digest": "",
+          "os": {
+            "family": "",
+            "name": "",
+            "version": ""
+          }
+        }
+      ]
+    },
+    "artifacts": [
+      {
+        "name": "scan-started-30cbd5a6-d4f7-4327-80a8-53a419ade551",
+        "id": 4063627258,
+        "url": "https://api.github.com/repos/diberry/template-doctor-2/actions/artifacts/4063627258",
+        "download": "https://api.github.com/repos/diberry/template-doctor-2/actions/artifacts/4063627258/zip"
+      },
+      {
+        "name": "find-images-diberry-azure-search-static-web-app-30cbd5a6-d4f7-4327-80a8-53a419ade551",
+        "id": 4063627297,
+        "url": "https://api.github.com/repos/diberry/template-doctor-2/actions/artifacts/4063627297",
+        "download": "https://api.github.com/repos/diberry/template-doctor-2/actions/artifacts/4063627297/zip"
+      },
+      {
+        "name": "scan-repo-diberry-azure-search-static-web-app-30cbd5a6-d4f7-4327-80a8-53a419ade551",
+        "id": 4063627561,
+        "url": "https://api.github.com/repos/diberry/template-doctor-2/actions/artifacts/4063627561",
+        "download": "https://api.github.com/repos/diberry/template-doctor-2/actions/artifacts/4063627561/zip"
+      },
+      {
+        "name": "scan-image-mcr.microsoft.com_devcontainers_dotnet_1-9.0-bookworm",
+        "id": 4063628867,
+        "url": "https://api.github.com/repos/diberry/template-doctor-2/actions/artifacts/4063628867",
+        "download": "https://api.github.com/repos/diberry/template-doctor-2/actions/artifacts/4063628867/zip"
+      }
+    ]
+  },
+  "issues": [
+    {
+      "id": "docker-repo-critical-vulnerabilities",
+      "severity": "error",
+      "message": "Repository contains 1 critical vulnerabilities",
+      "details": {
+        "count": 1
+      },
+      "error": "Repository contains 1 critical vulnerabilities"
+    },
+    {
+      "id": "docker-repo-high-vulnerabilities",
+      "severity": "warning",
+      "message": "Repository contains 3 high vulnerabilities",
+      "details": {
+        "count": 3
+      },
+      "error": "Repository contains 3 high vulnerabilities"
+    },
+    {
+      "id": "docker-image-0-critical-vulnerabilities",
+      "severity": "error",
+      "message": "Docker image mcr.microsoft.com/devcontainers/dotnet:1-9.0-bookworm contains 4 critical vulnerabilities",
+      "details": {
+        "count": 4,
+        "artifactName": "mcr.microsoft.com/devcontainers/dotnet:1-9.0-bookworm",
+        "repository": "",
+        "tag": ""
+      },
+      "error": "Docker image mcr.microsoft.com/devcontainers/dotnet:1-9.0-bookworm contains 4 critical vulnerabilities"
+    },
+    {
+      "id": "docker-image-0-high-vulnerabilities",
+      "severity": "warning",
+      "message": "Docker image mcr.microsoft.com/devcontainers/dotnet:1-9.0-bookworm contains 193 high vulnerabilities",
+      "details": {
+        "count": 193,
+        "artifactName": "mcr.microsoft.com/devcontainers/dotnet:1-9.0-bookworm",
+        "repository": "",
+        "tag": ""
+      },
+      "error": "Docker image mcr.microsoft.com/devcontainers/dotnet:1-9.0-bookworm contains 193 high vulnerabilities"
+    },
+    {
+      "id": "docker-image-0-critical-misconfigurations",
+      "severity": "error",
+      "message": "Docker image mcr.microsoft.com/devcontainers/dotnet:1-9.0-bookworm contains 2 critical misconfigurations",
+      "details": {
+        "count": 2,
+        "artifactName": "mcr.microsoft.com/devcontainers/dotnet:1-9.0-bookworm",
+        "repository": "",
+        "tag": ""
+      },
+      "error": "Docker image mcr.microsoft.com/devcontainers/dotnet:1-9.0-bookworm contains 2 critical misconfigurations"
+    }
+  ],
+  "compliance": [
+    {
+      "id": "docker-repo-no-critical-misconfigurations",
+      "category": "security",
+      "message": "Repository contains no critical misconfigurations",
+      "details": {
+        "repositoryScan": true
+      }
+    },
+    {
+      "id": "docker-repo-no-secrets",
+      "category": "security",
+      "message": "Repository contains no exposed secrets",
+      "details": {
+        "repositoryScan": true
+      }
+    },
+    {
+      "id": "docker-images-no-secrets",
+      "category": "security",
+      "message": "All Docker images are free of exposed secrets",
+      "details": {
+        "imageCount": 1
+      }
+    }
+  ]
+}

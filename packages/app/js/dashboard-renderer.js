@@ -1084,6 +1084,12 @@ document.addEventListener('DOMContentLoaded', function () {
             category = 'Bicep Issue';
           } else if (issue.id.includes('azure-yaml')) {
             category = 'Azure YAML Issue';
+          } else if (issue.id.includes('ossf') || issue.id.includes('trivy-repo')) {
+            category = 'Repo Security';
+          } else if (issue.id.includes('docs-repository') ) {
+            category = 'Repo Config';
+          } else if (issue.category.includes('docker')) {
+            category = 'Image Security';
           } else {
             category = 'General Issue';
           }
@@ -1100,6 +1106,8 @@ document.addEventListener('DOMContentLoaded', function () {
             fixHint = 'Add the missing resources to your Bicep files.';
           } else if (issue.id.includes('azure-yaml')) {
             fixHint = 'Update your azure.yaml file to include required sections.';
+          } else if (issue.id.includes('ossf') || issue.id.includes('trivy-repo') || issue.id.includes('docs-repository') || issue.category.includes('docker')) {
+            fixHint = issue.learnMoreUrl || 'Review https://aka.ms/samples.';
           } else {
             fixHint = 'Review the issue details and make appropriate changes.';
           }

@@ -1,6 +1,66 @@
 console.log('Docs rule set loaded');
 
 class TemplateAnalyzerDocs {
+
+  /**
+   * Helper method to fetch with mock support
+   * @param {string} url - The API URL 
+   * @param {Object} options - Fetch options
+   * @returns {Promise<Response>} - Fetch response
+   */
+  async fetchWithMockFallback(url, options = {}) {
+    if (!options || options?.useMockApi === false) {
+      return fetch(url, options);
+    } else {
+      return this.loadMockResponse(url, options);
+    }
+  }
+  
+  /**
+   * Load mock response for an API endpoint
+   * @param {string} url - The API URL 
+   * @param {Object} options - Fetch options
+   * @returns {Promise<Response>} - Mock response object
+   */
+  async loadMockResponse(url, options = {}) {
+    // Using mock data
+    try {
+      // Extract endpoint from URL
+      const urlObj = new URL(url, window.location.origin);
+      const endpoint = urlObj.pathname.split('/api/')[1] || urlObj.pathname;
+
+      console.log(`[Docs-Mock] Using mock data for: ${endpoint}`);
+
+      // Load mock data file
+      const mockPath = `./js/ruleset-docs/mocks/${endpoint}.json`;
+      const mockResponse = await fetch(mockPath);
+
+      if (!mockResponse.ok) {
+        console.warn(`[Docs-Mock] Mock data not found: ${mockPath}`);
+        throw new Error(`Mock data not found for ${endpoint}`);
+      }
+
+      const mockData = await mockResponse.json();
+
+      // Return a Response-like object
+      return {
+        ok: true,
+        status: 200,
+        statusText: 'OK (mocked)',
+        json: async () => mockData,
+        text: async () => JSON.stringify(mockData),
+        headers: new Headers({
+          'Content-Type': 'application/json'
+        })
+      };
+    } catch (error) {
+      console.error('[Docs-Mock] Error loading mock data:', error);
+
+      // Fallback to real API if mock fails
+      console.log('[Docs-Mock] Falling back to real API call');
+      return fetch(url, options);
+    }
+  }
   async getConfig() {
     const docsResponse = await fetch('./configs/docs-config.json');
     if (!docsResponse.ok) {
@@ -38,7 +98,7 @@ class TemplateAnalyzerDocs {
    */
   evaluateDefaultBranchRule(config, repoInfo, defaultBranch, issues, compliant) {
     const PREFIX = 'docs-repository-'; // Consistent prefix for this validation
-    const category = "Repo";
+    const category = "Repo config";
 
     // Guard: only run if docs-config defines a default branch requirement
     const expected = config?.githubRepositoryConfiguration?.defaultBranch?.mustBe;
@@ -65,6 +125,7 @@ class TemplateAnalyzerDocs {
   }
   async evaluateOssfScore(apiUrl, config, repoInfo, defaultBranch, issues, compliant) {
     const PREFIX = 'ossf-'; // Consistent prefix for this validation
+    const category = "Repo Security";
 
     try {
       const minScore = 6.0;
@@ -73,7 +134,8 @@ class TemplateAnalyzerDocs {
       const ossfApiUrl = `${apiUrl}/validation-ossf`;
       console.log(`[Docs-ossf] ${ossfApiUrl} for ${templateUrl}  `);
 
-      const response = await fetch(ossfApiUrl, {
+      const response = await this.fetchWithMockFallback(ossfApiUrl, {
+        useMockApi: config?.mockApiResponse,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -102,6 +164,7 @@ class TemplateAnalyzerDocs {
 
             issues.push({
               ...issue,
+              category,
               id
             });
           });
@@ -117,6 +180,7 @@ class TemplateAnalyzerDocs {
 
             compliant.push({
               ...item,
+              category,
               id
             });
           });
@@ -124,6 +188,7 @@ class TemplateAnalyzerDocs {
       } else {
         issues.push({
           id: `${PREFIX}api-failure`,
+          category,
           severity: 'warning',
           message: `Failed to validate OSSF score via API: ${response.status} ${response.statusText}`,
           error: `OSSF score validation API returned status ${response.status}`,
@@ -133,14 +198,25 @@ class TemplateAnalyzerDocs {
       console.error('Error during OSSF score validation:', error);
       issues.push({
         id: `${PREFIX}exception`,
+        category,
         severity: 'warning',
         message: 'Exception occurred during OSSF score validation',
         error: error instanceof Error ? error.message : String(error),
       });
     }
   }
+  /**
+   * Evaluates the Trivy security scan results. Trivy reports on both repository and Docker image security - they have different categories. 
+   * @param {string} apiUrl - The API URL
+   * @param {Object} config - The configuration object
+   * @param {Object} repoInfo - The repository information
+   * @param {Array} issues - The array to populate with issues
+   * @param {Array} compliant - The array to populate with compliant items
+   */
   async evaluateTrivyScore(apiUrl, config, repoInfo, issues, compliant) {
-    const PREFIX = 'docker-'; // Consistent prefix for this validation
+    const PREFIX = 'trivy-'; // Consistent prefix for this validation
+    const PREFIX_DOCKER = 'docker-'; // Consistent prefix for this validation
+    const PREFIX_REPO = 'docs-repository-'; // Consistent prefix for this validation
 
     try {
       const minScore = 0.0;
@@ -149,7 +225,8 @@ class TemplateAnalyzerDocs {
       const trivyApiUrl = `${apiUrl}/validation-docker-image`;
       console.log(`[Docs-trivy] ${trivyApiUrl} for ${templateUrl}  `);
 
-      const response = await fetch(trivyApiUrl, {
+      const response = await this.fetchWithMockFallback(trivyApiUrl, {
+        useMockApi: config?.mockApiResponse,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -170,6 +247,7 @@ class TemplateAnalyzerDocs {
           issues.push({
             id: `${PREFIX}api-data-response-failure`,
             severity: 'error',
+            category: "Repo Security",
             message: `Failed to validate docker images via API: no complianceResults returned`,
             error: `Docker image validation API returned no complianceResults`
           });
@@ -186,8 +264,8 @@ class TemplateAnalyzerDocs {
 
           if (criticalMisconfigurations === 0) {
             compliant.push({
-              id: `${PREFIX}repo-security-check-passed-critical-misconfigurations`,
-              category: 'security',
+              id: `${PREFIX_REPO}repo-security-check-passed-critical-misconfigurations`,
+              category: "Repo Security",
               message: `Repository critical misconfigurations security checks found ${criticalMisconfigurations} critical misconfigurations`,
               details: {
                 criticalMisconfigurations
@@ -195,9 +273,9 @@ class TemplateAnalyzerDocs {
             });
           } else {
             issues.push({
-              id: `${PREFIX}repo-security-check-failed-critical-misconfigurations`,
+              id: `${PREFIX_REPO}repo-security-check-failed-critical-misconfigurations`,
               severity: 'warning',
-              category: 'security',
+              category: "Repo Security",
               message: `Repository critical misconfigurations security checks found ${criticalMisconfigurations} critical misconfigurations`,
               details: {
                 criticalMisconfigurations
@@ -208,7 +286,7 @@ class TemplateAnalyzerDocs {
           if (criticalVulnerabilities === 0) {
             compliant.push({
               id: `${PREFIX}repo-security-check-passed-critical-vulnerabilities`,
-              category: 'security',
+              category: "Repo Security",
               message: `Repository critical vulnerabilities security checks found ${criticalVulnerabilities} critical vulnerabilities`,
               details: {
                 criticalVulnerabilities
@@ -218,6 +296,7 @@ class TemplateAnalyzerDocs {
             issues.push({
               id: `${PREFIX}repo-security-check-failed-critical-vulnerabilities`,
               severity: 'error',
+              category: "Repo Security",
               message: `Repo critical vulnerability security check found ${criticalVulnerabilities} critical vulnerabilities`,
               details: {
                 criticalVulnerabilities
@@ -231,16 +310,16 @@ class TemplateAnalyzerDocs {
           const imageScans = data?.details?.complianceResults?.imageScans;
           let imagesWithMisconfigurationIssues = 0;
           let imagesWithVulnerabilityIssues = 0;
-          
+
           imageScans.forEach(image => {
             const criticalMisconfigurations = image.criticalMisconfigurations;
             const criticalVulnerabilities = image.criticalVulns;
-            
+
             // Handle misconfigurations independently
             if (criticalMisconfigurations === 0) {
               compliant.push({
-                id: `${PREFIX}image-security-check-misconfigurations-${image.artifactName}`,
-                category: 'security',
+                id: `${PREFIX_DOCKER}image-security-check-misconfigurations-${image.artifactName}`,
+                category: 'Image Security',
                 message: `Docker image ${image.artifactName} critical misconfigurations security checks found ${criticalMisconfigurations} critical misconfigurations`,
                 details: {
                   artifactName: image.artifactName,
@@ -250,9 +329,9 @@ class TemplateAnalyzerDocs {
             } else {
               imagesWithMisconfigurationIssues++;
               issues.push({
-                id: `${PREFIX}image-security-check-misconfigurations-${image.artifactName}`,
+                id: `${PREFIX_DOCKER}image-security-check-misconfigurations-${image.artifactName}`,
                 severity: 'warning',
-                category: 'security',
+                category: 'Image Security',
                 message: `Docker image ${image.artifactName} critical misconfigurations security checks found ${criticalMisconfigurations} critical misconfigurations`,
                 details: {
                   artifactName: image.artifactName,
@@ -260,12 +339,12 @@ class TemplateAnalyzerDocs {
                 },
               });
             }
-            
+
             // Handle vulnerabilities independently
             if (criticalVulnerabilities === 0) {
               compliant.push({
-                id: `${PREFIX}image-security-check-vulnerabilities-${image.artifactName}`,
-                category: 'security',
+                id: `${PREFIX_DOCKER}image-security-check-vulnerabilities-${image.artifactName}`,
+                category: 'Image Security',
                 message: `Docker image ${image.artifactName} critical vulnerabilities security checks found ${criticalVulnerabilities} critical vulnerabilities`,
                 details: {
                   artifactName: image.artifactName,
@@ -275,9 +354,9 @@ class TemplateAnalyzerDocs {
             } else {
               imagesWithVulnerabilityIssues++;
               issues.push({
-                id: `${PREFIX}image-security-check-vulnerabilities-${image.artifactName}`,
+                id: `${PREFIX_DOCKER}image-security-check-vulnerabilities-${image.artifactName}`,
                 severity: 'warning',
-                category: 'security',
+                category: 'Image Security',
                 message: `Docker image ${image.artifactName} critical vulnerabilities security checks found ${criticalVulnerabilities} critical vulnerabilities`,
                 details: {
                   artifactName: image.artifactName,
@@ -286,23 +365,23 @@ class TemplateAnalyzerDocs {
               });
             }
           });
-          
+
           // Add summary compliant items if no issues found for each category
           if (imagesWithMisconfigurationIssues === 0) {
             compliant.push({
               id: `${PREFIX}images-no-misconfiguration-issues`,
-              category: 'security',
+              category: 'Image Security',
               message: `All Docker images are free of critical misconfigurations`,
               details: {
                 imageCount: imageScans.length
               },
             });
           }
-          
+
           if (imagesWithVulnerabilityIssues === 0) {
             compliant.push({
               id: `${PREFIX}images-no-vulnerability-issues`,
-              category: 'security',
+              category: 'Image Security',
               message: `All Docker images are free of critical vulnerabilities`,
               details: {
                 imageCount: imageScans.length
@@ -315,6 +394,7 @@ class TemplateAnalyzerDocs {
       } else {
         issues.push({
           id: `${PREFIX}image-api-failure`,
+          category: 'Repo Security',
           severity: 'warning',
           message: `Failed to validate Docker image via API: ${response.status} ${response.statusText}`,
           error: `Docker image validation API returned status ${response.status}`,
@@ -324,6 +404,7 @@ class TemplateAnalyzerDocs {
       console.error('Error during Docker image validation:', error);
       issues.push({
         id: `${PREFIX}image-validation-exception`,
+        category: 'Repo Security',
         severity: 'warning',
         message: 'Exception occurred during Docker image validation',
         error: error instanceof Error ? error.message : String(error),
@@ -341,6 +422,8 @@ class TemplateAnalyzerDocs {
    * @returns {Object} Summary of validation results
    */
   async validateDocConfiguration(config, repoInfo, defaultBranch, files, issues, compliant) {
+
+
     // Initialize validation results tracking
     const validationResults = {
       total: 0,
@@ -355,7 +438,7 @@ class TemplateAnalyzerDocs {
       if (config === null || config === undefined) {
         issues.push({
           id: 'docs-missing-configuration',
-          category: 'validation',
+          category: 'Docs config',
           severity: 'error',
           message: 'Documentation validation configuration is missing or invalid'
         });
@@ -446,7 +529,7 @@ class TemplateAnalyzerDocs {
       console.error('Error validating repository configuration:', err);
       issues.push({
         id: 'repo-configuration-validation-failed',
-        category: 'validation',
+        category: 'Docs config',
         severity: 'error', // Changed from warning to error
         message: 'Repository configuration validation failed',
         error: err instanceof Error ? err.message : String(err),
