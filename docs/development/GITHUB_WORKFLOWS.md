@@ -76,6 +76,43 @@ Specialized processing modules like **validation-docker-image/index.js** use the
 3. Retrieve and process results
 4. Return structured data to the client
 
+### shared/api-utils.js
+
+This core utility module provides essential functionality for all GitHub API interactions:
+
+- **withRetry()**: Implements a robust retry mechanism for API calls that might fail transiently
+- **fetchWithGitHubAuth()**: Makes authenticated requests to GitHub APIs with proper headers
+- **createGitHubHeaders()**: Generates authorization headers with the GitHub token
+- **withGitHubApiRetry()**: Specialized retry logic for GitHub API calls
+
+Key features of the API utilities:
+
+- **Automatic Retries**: Handles transient failures with configurable retry attempts (default: 3)
+- **Exponential Backoff**: Implements increasing delays between retries
+- **Timeout Handling**: Sets reasonable timeouts for API requests (default: 30 seconds)
+- **Comprehensive Logging**: Provides detailed logs for debugging API interactions
+- **Error Classification**: Determines which errors should trigger retries vs. immediate failures
+
+The workflow integration modules heavily depend on these utilities to ensure reliable communication with GitHub's API, particularly important when triggering workflows and waiting for their completion.
+
+Example usage pattern:
+
+```javascript
+// In action-trigger/index.js
+const { fetchWithGitHubAuth } = require('../shared/api-utils');
+
+// Make an authenticated request to GitHub API with retry logic
+const response = await fetchWithGitHubAuth(
+  `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflowId}/dispatches`,
+  {
+    method: 'POST',
+    body: JSON.stringify({ ref: 'main', inputs: workflowInput }),
+    operationName: 'triggerWorkflow'
+  },
+  context
+);
+```
+
 ## Authentication
 
 Workflows require GitHub authentication for API access. The system uses:
