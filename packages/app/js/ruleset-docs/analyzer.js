@@ -3,7 +3,7 @@ console.log('Docs rule set loaded');
 class TemplateAnalyzerDocs {
   async getConfig() {
     const docsResponse = await fetch('./configs/docs-config.json');
-    if (!docsResponse.ok) {
+    if (docsResponse.ok !== true) {
       throw new Error(`Failed to load docs config: ${docsResponse.status}`);
     }
     const ruleSetConfig = await docsResponse.json();
@@ -39,7 +39,7 @@ class TemplateAnalyzerDocs {
   evaluateDefaultBranchRule(config, repoInfo, defaultBranch, issues, compliant) {
     const PREFIX = 'docs-repository-'; // Consistent prefix for this validation
     const category = "Repo";
-    
+
     // Guard: only run if docs-config defines a default branch requirement
     const expected = config?.githubRepositoryConfiguration?.defaultBranch?.mustBe;
     if (!expected) return;
@@ -65,7 +65,7 @@ class TemplateAnalyzerDocs {
   }
   async evaluateOssfScore(apiUrl, config, repoInfo, defaultBranch, issues, compliant) {
     const PREFIX = 'ossf-'; // Consistent prefix for this validation
-    
+
     try {
       const minScore = 6.0;
       const templateUrl = `${repoInfo.owner}/${repoInfo.repo}`;
@@ -86,7 +86,7 @@ class TemplateAnalyzerDocs {
       console.log(`[Docs-ossf] ${ossfApiUrl} response.status: ${response.status} ${response.statusText}`);
 
       // this api has up to 3 minutes to timeout
-      if (response.ok) { // Fixed: was response.ok()
+      if (response.ok === true) { // Ensuring strict equality
 
         const data = await response.json();
 
@@ -96,10 +96,10 @@ class TemplateAnalyzerDocs {
           // Add each issue to the passed issues array
           data.issues.forEach(issue => {
             // Preserve original id if it already has the correct prefix
-            const id = issue.id.startsWith(PREFIX) 
-              ? issue.id 
+            const id = issue.id.startsWith(PREFIX)
+              ? issue.id
               : `${PREFIX}${issue.id}`;
-              
+
             issues.push({
               ...issue,
               id
@@ -111,10 +111,10 @@ class TemplateAnalyzerDocs {
           // Add each compliant item to the passed compliant array
           data.compliant.forEach(item => {
             // Preserve original id if it already has the correct prefix
-            const id = item.id.startsWith(PREFIX) 
-              ? item.id 
+            const id = item.id.startsWith(PREFIX)
+              ? item.id
               : `${PREFIX}${item.id}`;
-              
+
             compliant.push({
               ...item,
               id
@@ -141,7 +141,7 @@ class TemplateAnalyzerDocs {
   }
   async evaluateTrivyScore(apiUrl, config, repoInfo, issues, compliant) {
     const PREFIX = 'docker-'; // Consistent prefix for this validation
-    
+
     try {
       const minScore = 0.0;
       const templateUrl = `${repoInfo.owner}/${repoInfo.repo}`;
@@ -161,11 +161,11 @@ class TemplateAnalyzerDocs {
       console.log(`[Docs-trivy] ${trivyApiUrl} response.status: ${response.status} ${response.statusText}`);
 
       // this api has up to 3 minutes to timeout
-      if (response.ok) { // Fixed: was response.ok()
+      if (response.ok === true) { // Ensuring strict equality
 
         const data = await response.json();
 
-        if (!data?.details?.complianceResults) {
+        if (data?.details?.complianceResults === undefined || data?.details?.complianceResults === null) {
           // Add each issue to the passed issues array
           issues.push({
             id: `${PREFIX}api-data-response-failure`,
@@ -176,28 +176,52 @@ class TemplateAnalyzerDocs {
           return;
         }
 
-        if (data?.details?.complianceResults?.repositoryScan) {
+        if (data?.details?.complianceResults?.repositoryScan !== undefined &&
+          data?.details?.complianceResults?.repositoryScan !== null) {
 
           const repositoryScan = data?.details?.complianceResults?.repositoryScan;
 
           const criticalMisconfigurations = repositoryScan.criticalMisconfigurations;
           const criticalVulnerabilities = repositoryScan.criticalVulns;
 
-          if (criticalMisconfigurations == 0 && criticalVulnerabilities == 0) {
+          if (criticalMisconfigurations === 0) {
             compliant.push({
-              id: `${PREFIX}repo-security-check-passed`,
+              id: `${PREFIX}repo-security-check-passed-critical-misconfigurations`,
               category: 'security',
-              message: `Repository security checks completed successfully`,
+              message: `Repository critical misconfigurations security checks found ${criticalMisconfigurations} critical misconfigurations`,
               details: {
-                criticalMisconfigurations,
+                criticalMisconfigurations
+              },
+            });
+          } else {
+            issues.push({
+              id: `${PREFIX}repo-security-check-failed-critical-misconfigurations`,
+              severity: 'warning',
+              category: 'security',
+              message: `Repository critical misconfigurations security checks found ${criticalMisconfigurations} critical misconfigurations`,
+              details: {
+                criticalMisconfigurations
+              },
+            });
+          }
+
+          if (criticalVulnerabilities === 0) {
+            compliant.push({
+              id: `${PREFIX}repo-security-check-passed-critical-vulnerabilities`,
+              category: 'security',
+              message: `Repository critical vulnerabilities security checks found ${criticalVulnerabilities} critical vulnerabilities`,
+              details: {
                 criticalVulnerabilities
               },
             });
           } else {
             issues.push({
-              id: `${PREFIX}repo-security-check`,
-              severity: 'warning',
-              message: `Repo vulnerability scan found issues: ${criticalMisconfigurations} critical misconfigurations, ${criticalVulnerabilities} critical vulnerabilities`,
+              id: `${PREFIX}repo-security-check-failed-critical-vulnerabilities`,
+              severity: 'error',
+              message: `Repo critical vulnerability security check found ${criticalVulnerabilities} critical vulnerabilities`,
+              details: {
+                criticalVulnerabilities
+              },
             });
           }
 
@@ -205,35 +229,81 @@ class TemplateAnalyzerDocs {
 
         if (data?.details?.complianceResults?.imageScans?.length > 0) {
           const imageScans = data?.details?.complianceResults?.imageScans;
-          let imagesWithIssues = 0;
+          let imagesWithMisconfigurationIssues = 0;
+          let imagesWithVulnerabilityIssues = 0;
+          
           imageScans.forEach(image => {
             const criticalMisconfigurations = image.criticalMisconfigurations;
             const criticalVulnerabilities = image.criticalVulns;
-            if (criticalMisconfigurations == 0 && criticalVulnerabilities == 0) {
+            
+            // Handle misconfigurations independently
+            if (criticalMisconfigurations === 0) {
               compliant.push({
-                id: `${PREFIX}image-security-check-${image.artifactName}`,
+                id: `${PREFIX}image-security-check-misconfigurations-${image.artifactName}`,
                 category: 'security',
-                message: `Docker image ${image.artifactName} security checks completed successfully`,
+                message: `Docker image ${image.artifactName} critical misconfigurations security checks found ${criticalMisconfigurations} critical misconfigurations`,
                 details: {
                   artifactName: image.artifactName,
-                  criticalMisconfigurations,
+                  criticalMisconfigurations
+                },
+              });
+            } else {
+              imagesWithMisconfigurationIssues++;
+              issues.push({
+                id: `${PREFIX}image-security-check-misconfigurations-${image.artifactName}`,
+                severity: 'warning',
+                category: 'security',
+                message: `Docker image ${image.artifactName} critical misconfigurations security checks found ${criticalMisconfigurations} critical misconfigurations`,
+                details: {
+                  artifactName: image.artifactName,
+                  criticalMisconfigurations
+                },
+              });
+            }
+            
+            // Handle vulnerabilities independently
+            if (criticalVulnerabilities === 0) {
+              compliant.push({
+                id: `${PREFIX}image-security-check-vulnerabilities-${image.artifactName}`,
+                category: 'security',
+                message: `Docker image ${image.artifactName} critical vulnerabilities security checks found ${criticalVulnerabilities} critical vulnerabilities`,
+                details: {
+                  artifactName: image.artifactName,
                   criticalVulnerabilities
                 },
               });
             } else {
-              imagesWithIssues++;
+              imagesWithVulnerabilityIssues++;
               issues.push({
-                id: `${PREFIX}image-security-check-${image.artifactName}`,
+                id: `${PREFIX}image-security-check-vulnerabilities-${image.artifactName}`,
                 severity: 'warning',
-                message: `Docker image ${image.artifactName} vulnerability scan found issues: ${criticalMisconfigurations} critical misconfigurations, ${criticalVulnerabilities} critical vulnerabilities`,
+                category: 'security',
+                message: `Docker image ${image.artifactName} critical vulnerabilities security checks found ${criticalVulnerabilities} critical vulnerabilities`,
+                details: {
+                  artifactName: image.artifactName,
+                  criticalVulnerabilities
+                },
               });
             }
           });
-          if (imagesWithIssues === 0) {
+          
+          // Summary compliant items if no issues found for each category
+          if (imagesWithMisconfigurationIssues === 0) {
             compliant.push({
-              id: `${PREFIX}images-no-security-issues`,
+              id: `${PREFIX}images-no-misconfiguration-issues`,
               category: 'security',
-              message: `All Docker images are free of critical misconfigurations and vulnerabilities`,
+              message: `All Docker images are free of critical misconfigurations`,
+              details: {
+                imageCount: imageScans.length
+              },
+            });
+          }
+          
+          if (imagesWithVulnerabilityIssues === 0) {
+            compliant.push({
+              id: `${PREFIX}images-no-vulnerability-issues`,
+              category: 'security',
+              message: `All Docker images are free of critical vulnerabilities`,
               details: {
                 imageCount: imageScans.length
               },
@@ -282,7 +352,7 @@ class TemplateAnalyzerDocs {
 
     try {
       // Check for valid configuration
-      if (!config) {
+      if (config === null || config === undefined) {
         issues.push({
           id: 'docs-missing-configuration',
           category: 'validation',
@@ -302,17 +372,17 @@ class TemplateAnalyzerDocs {
       // Create a map of named validations with their conditions and functions
       const validations = {
         defaultBranch: {
-          enabled: !!config?.githubRepositoryConfiguration,
+          enabled: config?.githubRepositoryConfiguration !== null && config?.githubRepositoryConfiguration !== undefined,
           name: 'Default Branch Check',
           fn: () => this.evaluateDefaultBranchRule(config, repoInfo, defaultBranch, issues, compliant)
         },
         ossf: {
-          enabled: !!config?.ossf,
+          enabled: config?.ossf !== null && config?.ossf !== undefined,
           name: 'OSSF Scorecard',
           fn: () => this.evaluateOssfScore(apiUrl, config, repoInfo, defaultBranch, issues, compliant)
         },
         dockerImages: {
-          enabled: !!config?.dockerImages,
+          enabled: config?.dockerImages !== null && config?.dockerImages !== undefined,
           name: 'Docker Image Security',
           fn: () => this.evaluateTrivyScore(apiUrl, config, repoInfo, issues, compliant)
         }
@@ -326,7 +396,7 @@ class TemplateAnalyzerDocs {
 
       // Filter enabled validations and collect them
       Object.entries(validations).forEach(([key, validation]) => {
-        if (validation.enabled) {
+        if (validation.enabled === true) {
           asyncValidations.push(validation.fn());
           validationNames.push({ key, name: validation.name });
           validationResults.total++;
@@ -348,7 +418,7 @@ class TemplateAnalyzerDocs {
       // Process results and update tracking
       results.forEach((result, index) => {
         const validationInfo = validationNames[index];
-        
+
         if (result.status === 'fulfilled') {
           validationResults.successful++;
           validationResults.details.push({
@@ -364,7 +434,7 @@ class TemplateAnalyzerDocs {
             status: 'failed',
             error: result.reason
           });
-          
+
           console.warn(`[Docs] Validation '${validationInfo.name}' failed:`, result.reason);
         }
       });
@@ -381,7 +451,7 @@ class TemplateAnalyzerDocs {
         message: 'Repository configuration validation failed',
         error: err instanceof Error ? err.message : String(err),
       });
-      
+
       validationResults.failed = validationResults.total;
       validationResults.successful = 0;
       return validationResults;

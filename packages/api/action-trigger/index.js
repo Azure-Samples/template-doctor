@@ -1,18 +1,4 @@
-const gitHubApiVersion = "2022-11-28"; // GitHub API version for headers
-const fetchTimeout = 30000; // 30 seconds for fetch requests
-
-function createGitHubHeaders() {
-
-  const workflowToken = process.env.GH_WORKFLOW_TOKEN;
-  if (!workflowToken) throw new Error("Missing GH_WORKFLOW_TOKEN app setting");
-
-  return {
-    "Authorization": `Bearer ${workflowToken}`,
-    "Accept": 'application/vnd.github+json',
-    "X-GitHub-Api-Version": gitHubApiVersion,
-    "Content-Type": "application/json"
-  };
-}
+const { withRetry, createGitHubHeaders, fetchWithGitHubAuth } = require('../shared/api-utils');
 
 async function getRunList(workflowOwner, workflowRepo, workflowId, context = null) {
   const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
@@ -20,7 +6,7 @@ async function getRunList(workflowOwner, workflowRepo, workflowId, context = nul
 
   const workflowUrl = `https://api.github.com/repos/${encodeURIComponent(workflowOwner)}/${encodeURIComponent(workflowRepo)}/actions/workflows/${encodeURIComponent(workflowId)}/runs?event=workflow_dispatch&per_page=100&branch=main&created:>=${encodeURIComponent(isoDate)}`;
 
-  return fetchWithGitHubAuth(workflowUrl, {}, context);
+  return fetchWithGitHubAuth(workflowUrl, { operationName: 'getRunList' }, context);
 }
 
 async function triggerAction(workflowOwner, workflowRepo, workflowId, workflowInput, context = null) {
@@ -36,41 +22,9 @@ async function triggerAction(workflowOwner, workflowRepo, workflowId, workflowIn
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
+    operationName: 'triggerAction'
   }, context);
-}
-async function fetchWithGitHubAuth(url, options = {}, context = null) {
-  const requestOptions = {
-    ...options,
-    headers: {
-      ...createGitHubHeaders(),
-      ...(options.headers || {})
-    },
-    signal: AbortSignal.timeout(options.timeout || fetchTimeout)
-  };
-
-  if (context && context.log) {
-    context.log(`Making GitHub API request`, {
-      operation: 'fetchWithGitHubAuth',
-      url,
-      method: options.method || 'GET'
-    });
-  }
-
-  try {
-    return await fetch(url, requestOptions);
-  } catch (err) {
-    if (context && context.log && context.log.error) {
-      context.log.error(`Error in GitHub API request`, {
-        operation: 'fetchWithGitHubAuth',
-        url,
-        method: options.method || 'GET',
-        error: err.message,
-        stack: err.stack
-      });
-    }
-    throw err;
-  }
 }
 async function triggerWorkflow(workflowOwner, workflowRepo, workflowId, workflowInput, runIdInputProperty, context) {
     // Generate a correlation ID for this workflow trigger
@@ -119,52 +73,6 @@ async function triggerWorkflow(workflowOwner, workflowRepo, workflowId, workflow
       };
     }
 
-    // wait 5 seconds to give GitHub time to start the run (preserves original behaviour)
-    await new Promise(resolve => setTimeout(resolve, 5000));
-    
-    if (context && context.log) {
-        context.log(`Fetching recent runs to locate workflow run`, {
-            operation: 'triggerWorkflow',
-            workflowOwner,
-            workflowRepo,
-            workflowId,
-            correlationId
-        });
-    }
-
-    // Get recent runs for the workflow
-    const rawResponseFindRunId = await getRunList(workflowOwner, workflowRepo, workflowId, context);
-
-    if (context && context.log) {
-        context.log(`Fetched recent runs for workflow ${workflowOwner}/${workflowRepo}#${workflowId}`, {
-            operation: 'triggerWorkflow',
-            status: rawResponseFindRunId.status,
-            correlationId
-        });
-    }
-
-    if (!rawResponseFindRunId.ok) {
-      const errText = await rawResponseFindRunId.text();
-      if (context && context.log && context.log.error) {
-          context.log.error(`Failed to get workflow runs`, {
-              operation: 'triggerWorkflow',
-              workflowOwner,
-              workflowRepo,
-              workflowId,
-              status: rawResponseFindRunId.status,
-              error: errText,
-              correlationId
-          });
-      }
-      
-      return {
-        found: false,
-        status: 502,
-        error: `Get workflow runs failed: ${rawResponseFindRunId.status} ${rawResponseFindRunId.statusText} - ${errText}`,
-        ownerRepo: `${workflowOwner}/${workflowRepo}/actions/workflows/${workflowId}/runs`
-      };
-    }
-
     // Ensure the caller provided the input property to search for
     const uniqueInputId = workflowInput && Object.prototype.hasOwnProperty.call(workflowInput, runIdInputProperty)
       ? workflowInput[runIdInputProperty]
@@ -188,78 +96,150 @@ async function triggerWorkflow(workflowOwner, workflowRepo, workflowId, workflow
       };
     }
     
-    if (context && context.log) {
-        context.log(`Searching for run with input property`, {
-            operation: 'triggerWorkflow',
-            runIdInputProperty,
-            uniqueInputId,
-            correlationId
+    // Implement polling approach to find the workflow run
+    let matchingRun = null;
+    const maxAttempts = 5;
+    let attempts = 0;
+    
+    while (attempts < maxAttempts && !matchingRun) {
+        const waitTimeMs = 5000 * (attempts + 1); // Increasing delay (5s, 10s, 15s, 20s, 25s)
+        
+        if (context && context.log) {
+            context.log(`Waiting ${waitTimeMs/1000} seconds for GitHub to register the workflow run (attempt ${attempts + 1}/${maxAttempts})`, {
+                operation: 'triggerWorkflow',
+                workflowOwner,
+                workflowRepo,
+                workflowId,
+                correlationId,
+                attemptNumber: attempts + 1
+            });
+        }
+        await new Promise(resolve => setTimeout(resolve, waitTimeMs));
+        
+        if (context && context.log) {
+            context.log(`Fetching recent runs to locate workflow run (attempt ${attempts + 1}/${maxAttempts})`, {
+                operation: 'triggerWorkflow',
+                workflowOwner,
+                workflowRepo,
+                workflowId,
+                correlationId,
+                attemptNumber: attempts + 1
+            });
+        }
+
+        // Get recent runs for the workflow
+        const rawResponseFindRunId = await getRunList(workflowOwner, workflowRepo, workflowId, context);
+
+        if (!rawResponseFindRunId.ok) {
+            const errText = await rawResponseFindRunId.text();
+            if (context && context.log && context.log.error) {
+                context.log.error(`Failed to get workflow runs (attempt ${attempts + 1}/${maxAttempts})`, {
+                    operation: 'triggerWorkflow',
+                    workflowOwner,
+                    workflowRepo,
+                    workflowId,
+                    status: rawResponseFindRunId.status,
+                    error: errText,
+                    correlationId,
+                    attemptNumber: attempts + 1
+                });
+            }
+            
+            attempts++;
+            continue; // Try again after waiting
+        }
+
+        const rawDataFindRunId = await rawResponseFindRunId.json();
+
+        if (!rawDataFindRunId || !Array.isArray(rawDataFindRunId.workflow_runs)) {
+            if (context && context.log && context.log.error) {
+                context.log.error(`Invalid response structure from GitHub (attempt ${attempts + 1}/${maxAttempts})`, {
+                    operation: 'triggerWorkflow',
+                    correlationId,
+                    attemptNumber: attempts + 1
+                });
+            }
+            
+            attempts++;
+            continue; // Try again after waiting
+        }
+
+        if (context && context.log) {
+            context.log(`Received ${rawDataFindRunId.workflow_runs.length} workflow runs (attempt ${attempts + 1}/${maxAttempts})`, {
+                operation: 'triggerWorkflow',
+                runCount: rawDataFindRunId.workflow_runs.length,
+                correlationId,
+                attemptNumber: attempts + 1
+            });
+            
+            // Log sample data for first few runs to help diagnose issues
+            if (rawDataFindRunId.workflow_runs.length > 0) {
+                const sampleRuns = rawDataFindRunId.workflow_runs.slice(0, 3);
+                context.log(`Sample runs data`, {
+                    operation: 'triggerWorkflow',
+                    sampleRuns: sampleRuns.map(run => ({
+                        id: run.id,
+                        title: run.display_title || run.name,
+                        commitMsg: run.head_commit ? run.head_commit.message : null,
+                        createdAt: run.created_at
+                    })),
+                    correlationId,
+                    attemptNumber: attempts + 1
+                });
+            }
+        }
+
+        // be resilient: check display_title, name, and head_commit.message
+        matchingRun = rawDataFindRunId.workflow_runs.find(run => {
+            const title = run.display_title || run.name || '';
+            const commitMsg = (run.head_commit && run.head_commit.message) ? String(run.head_commit.message) : '';
+            return (title && title.includes(String(uniqueInputId))) || (commitMsg && commitMsg.includes(String(uniqueInputId)));
         });
-    }
 
-    const rawDataFindRunId = await rawResponseFindRunId.json();
+        if (matchingRun) {
+            if (context && context.log) {
+                context.log(`Matching run found on attempt ${attempts + 1}/${maxAttempts}`, {
+                    operation: 'triggerWorkflow',
+                    runId: matchingRun.id,
+                    runIdInputProperty,
+                    uniqueInputId,
+                    correlationId,
+                    attemptNumber: attempts + 1
+                });
+            }
+            
+            return {
+                status: 200,
+                found: true,
+                runId: matchingRun.id,
+                run: matchingRun,
+                uniqueInputId,
+                ownerRepo: `${workflowOwner}/${workflowRepo}/actions/workflows/${workflowId}/runs`,
+                attempts: attempts + 1
+            };
+        }
 
-    if (!rawDataFindRunId || !Array.isArray(rawDataFindRunId.workflow_runs)) {
-      if (context && context.log && context.log.error) {
-          context.log.error(`Invalid response structure from GitHub`, {
-              operation: 'triggerWorkflow',
-              correlationId
-          });
-      }
-      
-      return {
-        found: false,
-        status: 502,
-        error: 'trigger-action: Invalid response structure from GitHub when fetching workflow runs',
-        uniqueInputId,
-        ownerRepo: `${workflowOwner}/${workflowRepo}/actions/workflows/${workflowId}/runs`
-      };
-    }
-
-    // be resilient: check display_title, name, and head_commit.message
-    const matchingRun = rawDataFindRunId.workflow_runs.find(run => {
-      const title = run.display_title || run.name || '';
-      const commitMsg = (run.head_commit && run.head_commit.message) ? String(run.head_commit.message) : '';
-      return (title && title.includes(String(uniqueInputId))) || (commitMsg && commitMsg.includes(String(uniqueInputId)));
-    });
-
-    if (matchingRun) {
-      if (context && context.log) {
-          context.log(`Matching run found`, {
-              operation: 'triggerWorkflow',
-              runId: matchingRun.id,
-              runIdInputProperty,
-              uniqueInputId,
-              correlationId
-          });
-      }
-
-      return {
-        status: 200,
-        found: true,
-        runId: matchingRun.id,
-        run: matchingRun,
-        uniqueInputId,
-        ownerRepo: `${workflowOwner}/${workflowRepo}/actions/workflows/${workflowId}/runs`,
-      };
-    }
-
-    if (context && context.log && context.log.warn) {
-        context.log.warn(`No matching run found`, {
-            operation: 'triggerWorkflow',
-            runIdInputProperty,
-            uniqueInputId,
-            correlationId
-        });
+        if (context && context.log) {
+            context.log(`No matching run found on attempt ${attempts + 1}/${maxAttempts}, will ${attempts < maxAttempts - 1 ? 'retry' : 'give up'}`, {
+                operation: 'triggerWorkflow',
+                runIdInputProperty,
+                uniqueInputId,
+                correlationId,
+                attemptNumber: attempts + 1
+            });
+        }
+        
+        attempts++;
     }
     
-    // not found
+    // not found after all attempts
     return {
       found: false,
       status: 404,
-      error: 'trigger-action: Could not find the triggered workflow run',
+      error: `trigger-action: Could not find the triggered workflow run after ${maxAttempts} attempts`,
       uniqueInputId,
-      ownerRepo: `${workflowOwner}/${workflowRepo}/actions/workflows/${workflowId}/runs`
+      ownerRepo: `${workflowOwner}/${workflowRepo}/actions/workflows/${workflowId}/runs`,
+      attempts: maxAttempts
     };
 };
 
@@ -402,6 +382,7 @@ module.exports = async function (context, req) {
         workflowRepo,
         workflowId,
         runId,
+        attempts: result.attempts || 1,
         requestId
       });
       
@@ -410,7 +391,10 @@ module.exports = async function (context, req) {
         headers: { 'Access-Control-Allow-Origin': '*' },
         body: { 
           error: null, 
-          data: { runId }, 
+          data: { 
+            runId,
+            attempts: result.attempts || 1 
+          }, 
           context: { 
             uniqueInputId: result.uniqueInputId, 
             ownerRepo: result.ownerRepo, 
@@ -435,6 +419,7 @@ module.exports = async function (context, req) {
         status,
         error: result.error,
         errorType,
+        attempts: result.attempts,
         requestId
       });
       
@@ -449,6 +434,7 @@ module.exports = async function (context, req) {
             url: result.workflowUrl,
             uniqueInputId: result.uniqueInputId || null,
             ownerRepo: result.ownerRepo || `${workflowOwner}/${workflowRepo}`,
+            attempts: result.attempts,
             requestId
           }
         }
