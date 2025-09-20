@@ -61,6 +61,9 @@ document.addEventListener('DOMContentLoaded', function () {
     this.render = function (result, container) {
       this.debug('Rendering dashboard', result);
 
+      // Ensure security pill styling is loaded
+      this.ensureSecurityPillStyling();
+
       if (!result || !container) {
         console.error('Missing result data or container element');
         container.innerHTML = `
@@ -953,6 +956,61 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     /**
+     * Ensures security pill styling is loaded
+     * Adds the CSS to the head if not already present
+     */
+    this.ensureSecurityPillStyling = function() {
+      // Always include the external CSS file to ensure latest styling
+      const head = document.head || document.getElementsByTagName('head')[0];
+      
+      // Check if we've already loaded the external stylesheet
+      let externalStyleLoaded = false;
+      const links = document.getElementsByTagName('link');
+      for (let i = 0; i < links.length; i++) {
+        if (links[i].href && links[i].href.includes('security-pill.css')) {
+          externalStyleLoaded = true;
+          break;
+        }
+      }
+      
+      if (!externalStyleLoaded) {
+        console.log('Adding external security-pill.css stylesheet');
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.type = 'text/css';
+        link.href = 'css/security-pill.css';
+        link.id = 'security-pill-external-css';
+        head.appendChild(link);
+      }
+      
+      // Also add inline styles with animation as fallback
+      if (!document.getElementById('security-pill-inline-css')) {
+        console.log('Adding inline security pill styling with animation');
+        const style = document.createElement('style');
+        style.type = 'text/css';
+        style.id = 'security-pill-inline-css';
+        style.innerHTML = `
+          .security-pill {
+            animation: pulse-attention 2s infinite;
+          }
+          
+          @keyframes pulse-attention {
+            0% {
+              box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7);
+            }
+            70% {
+              box-shadow: 0 0 0 6px rgba(220, 53, 69, 0);
+            }
+            100% {
+              box-shadow: 0 0 0 0 rgba(220, 53, 69, 0);
+            }
+          }
+        `;
+        head.appendChild(style);
+      }
+    };
+
+    /**
      * Renders the issues panel with all failed checks
      * @param {Object} data - The adapted result data
      * @param {HTMLElement} container - The container element to render into
@@ -1087,6 +1145,23 @@ document.addEventListener('DOMContentLoaded', function () {
           } else {
             category = 'General Issue';
           }
+          
+          // Check if this is a security-related issue - debug to console
+          console.log(`Checking security for issue: ${issue.id}, message: ${issue.message}`);
+          
+          // More explicit security detection logic for debugging
+          const hasBicepAuthId = issue.id.includes('bicep-alternative-auth') || issue.id.includes('bicep-missing-auth');
+          const hasSecurityRecommendation = issue.recommendation && 
+                                         (issue.recommendation.includes('Managed Identity') || 
+                                          issue.recommendation.includes('security'));
+          const hasManagedIdentityMessage = issue.message && issue.message.includes('Managed Identity');
+          const hasSecurity = issue.message && issue.message.includes('Security');
+          const hasSecurityFlag = issue.securityIssue === true;
+          
+          // Use the explicit securityIssue flag if present, otherwise use our detection logic
+          const isSecurityIssue = hasSecurityFlag || hasBicepAuthId || hasSecurityRecommendation || hasManagedIdentityMessage || hasSecurity;
+          
+          console.log(`Security check results: securityFlag=${hasSecurityFlag}, bicepAuth=${hasBicepAuthId}, securityRec=${hasSecurityRecommendation}, managedIdentityMsg=${hasManagedIdentityMessage}, securityMsg=${hasSecurity}, FINAL=${isSecurityIssue}`); 
 
           // Generate a fix hint based on the issue type
           let fixHint;
@@ -1105,14 +1180,16 @@ document.addEventListener('DOMContentLoaded', function () {
           }
 
           return `
-                    <li class="item issue-item">
+                    <li class="item issue-item ${isSecurityIssue ? 'security-issue' : ''}">
                         <div class="item-header">
                             <div class="item-title">${issue.message}</div>
-                            <div class="item-category">${category}</div>
+                            <div class="item-category">${category} ${isSecurityIssue ? '<span class="security-pill">Security</span>' : ''}</div>
                         </div>
+                        ${isSecurityIssue ? `<div class="security-alert-banner">⚠️ Security Alert</div>` : ''}
                         <div class="item-message">${issue.error || issue.message}</div>
                         <div class="item-details">
                             <strong>How to fix:</strong> ${fixHint}
+                            ${issue.recommendation ? `<div style="margin-top: 8px;"><strong>Recommendation:</strong> ${issue.recommendation}</div>` : ''}
                         </div>
                         <div class="item-actions">
                             <a href="#" 

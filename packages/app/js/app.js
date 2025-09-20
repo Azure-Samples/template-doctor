@@ -383,13 +383,82 @@ let serviceReadinessPolling = false;
 function enqueueAnalysisRequest(args) {
   pendingAnalysisQueue.push(args);
   debug('app', `Enqueued analysis request. Queue length=${pendingAnalysisQueue.length}`);
+  
+  // Show a notification that the request has been queued
+  if (window.NotificationSystem) {
+    window.NotificationSystem.showInfo(
+      'Request Queued',
+      'Your analysis request has been queued and will run automatically when services are ready',
+      5000
+    );
+  }
+  
+  // Show a more visible message for the first queued request
+  if (pendingAnalysisQueue.length === 1 && !document.getElementById('queue-message')) {
+    const queueMessage = document.createElement('div');
+    queueMessage.id = 'queue-message';
+    queueMessage.className = 'alert alert-info';
+    queueMessage.style.position = 'fixed';
+    queueMessage.style.bottom = '20px';
+    queueMessage.style.right = '20px';
+    queueMessage.style.zIndex = '9999';
+    queueMessage.style.padding = '15px 20px';
+    queueMessage.style.borderRadius = '5px';
+    queueMessage.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
+    queueMessage.innerHTML = `
+      <strong>Services still starting up</strong>
+      <p>Your request was queued and will run automatically.</p>
+      <div class="progress" style="height:8px;margin-top:8px;">
+        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+             style="width:100%;height:8px;"></div>
+      </div>
+    `;
+    document.body.appendChild(queueMessage);
+    
+    // Remove the message when services are ready or after 15 seconds
+    setTimeout(() => {
+      if (queueMessage.parentNode) {
+        queueMessage.style.opacity = '0';
+        queueMessage.style.transition = 'opacity 0.5s ease';
+        setTimeout(() => {
+          if (queueMessage.parentNode) {
+            queueMessage.parentNode.removeChild(queueMessage);
+          }
+        }, 500);
+      }
+    }, 15000);
+  }
+  
   pollForServiceReadiness();
 }
 
 function drainAnalysisQueue() {
   if (!appAnalyzer || !appDashboard) return;
   if (pendingAnalysisQueue.length === 0) return;
+  
   debug('app', `Draining ${pendingAnalysisQueue.length} queued analysis request(s)`);
+  
+  // Remove the queue message if it exists
+  const queueMessage = document.getElementById('queue-message');
+  if (queueMessage && queueMessage.parentNode) {
+    queueMessage.style.opacity = '0';
+    queueMessage.style.transition = 'opacity 0.5s ease';
+    setTimeout(() => {
+      if (queueMessage.parentNode) {
+        queueMessage.parentNode.removeChild(queueMessage);
+      }
+    }, 500);
+  }
+  
+  // Show notification that requests are now being processed
+  if (window.NotificationSystem && pendingAnalysisQueue.length > 0) {
+    window.NotificationSystem.showSuccess(
+      'Processing Requests',
+      `Now processing ${pendingAnalysisQueue.length} queued analysis request(s)`,
+      3000
+    );
+  }
+  
   // Copy then clear to avoid reentrancy issues
   const queue = pendingAnalysisQueue.slice();
   pendingAnalysisQueue.length = 0;
@@ -399,20 +468,48 @@ function drainAnalysisQueue() {
   }
 }
 
-function pollForServiceReadiness(maxAttempts = 10, intervalMs = 500) {
+function pollForServiceReadiness(maxAttempts = 15, intervalMs = 500) {
   if (serviceReadinessPolling) return;
   serviceReadinessPolling = true;
   let attempts = 0;
+  
+  // Show initialization status to the user
+  const loadingMessage = document.createElement('div');
+  loadingMessage.id = 'service-init-message';
+  loadingMessage.className = 'alert alert-info';
+  loadingMessage.style.position = 'fixed';
+  loadingMessage.style.top = '10px';
+  loadingMessage.style.left = '50%';
+  loadingMessage.style.transform = 'translateX(-50%)';
+  loadingMessage.style.zIndex = '9999';
+  loadingMessage.style.padding = '10px 20px';
+  loadingMessage.style.borderRadius = '5px';
+  loadingMessage.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+  loadingMessage.textContent = 'Services initializing... Please wait.';
+  document.body.appendChild(loadingMessage);
+  
   const timer = setInterval(() => {
     attempts++;
     appAuth = window.GitHubAuth || appAuth;
     appGithub = window.GitHubClient || appGithub;
     appAnalyzer = window.TemplateAnalyzer || appAnalyzer;
     appDashboard = window.DashboardRenderer || appDashboard;
+    
+    // Update status message
+    loadingMessage.textContent = `Services initializing (${attempts}/${maxAttempts})... ${appAnalyzer ? '✓' : '⟳'} Analyzer ${appDashboard ? '✓' : '⟳'} Dashboard ${appGithub ? '✓' : '⟳'} GitHub`;
+    
     if (appAnalyzer && appGithub && appDashboard) {
       clearInterval(timer);
       serviceReadinessPolling = false;
       debug('app', 'All services became ready during polling');
+      // Remove the message with a fade-out effect
+      loadingMessage.style.transition = 'opacity 0.5s ease';
+      loadingMessage.style.opacity = '0';
+      setTimeout(() => {
+        if (loadingMessage.parentNode) {
+          loadingMessage.parentNode.removeChild(loadingMessage);
+        }
+      }, 500);
       drainAnalysisQueue();
     } else if (attempts >= maxAttempts) {
       clearInterval(timer);
@@ -422,6 +519,14 @@ function pollForServiceReadiness(maxAttempts = 10, intervalMs = 500) {
         github: !!appGithub,
         dashboard: !!appDashboard,
       });
+      // Keep the message visible but update it to show failure
+      loadingMessage.className = 'alert alert-warning';
+      loadingMessage.textContent = 'Some services failed to initialize. You may need to refresh the page.';
+      setTimeout(() => {
+        if (loadingMessage.parentNode) {
+          loadingMessage.parentNode.removeChild(loadingMessage);
+        }
+      }, 5000);
     }
   }, intervalMs);
 }
@@ -3137,6 +3242,31 @@ document.addEventListener('DOMContentLoaded', () => {
   debug('app', 'Application initialized');
 });
 
+// Expose a global method to check service readiness or trigger initialization
+window.checkServicesReady = function(forceReinitialize = false) {
+  debug('app', `Checking service readiness (force=${forceReinitialize})`);
+  
+  // Update service references
+  appAuth = window.GitHubAuth || appAuth;
+  appGithub = window.GitHubClient || appGithub;
+  appAnalyzer = window.TemplateAnalyzer || appAnalyzer;
+  appDashboard = window.DashboardRenderer || appDashboard;
+  
+  const servicesReady = !!appAnalyzer && !!appGithub && !!appDashboard;
+  
+  if (!servicesReady || forceReinitialize) {
+    // Try to reinitialize services
+    tryReinitializeServices();
+    
+    // Start polling for service readiness
+    pollForServiceReadiness();
+    
+    return false;
+  }
+  
+  return true;
+};
+
 // Function to attempt to reinitialize all required services
 function tryReinitializeServices() {
   debug('app', 'Attempting to reinitialize services');
@@ -3152,6 +3282,26 @@ function tryReinitializeServices() {
     debug('app', 'Calling checkAnalyzerReady to initialize analyzer');
     window.checkAnalyzerReady();
     appAnalyzer = window.TemplateAnalyzer;
+  }
+
+  // Try to initialize dashboard if missing
+  if (!appDashboard && typeof window.DashboardRenderer === 'undefined') {
+    debug('app', 'Attempting to load dashboard renderer script');
+    // Try to load the dashboard renderer script if it's not loaded
+    const dashboardScript = document.createElement('script');
+    dashboardScript.src = '/js/dashboard-renderer.js';
+    dashboardScript.async = true;
+    document.head.appendChild(dashboardScript);
+  }
+
+  // Try to initialize GitHub client if missing
+  if (!appGithub && typeof window.GitHubClient === 'undefined') {
+    debug('app', 'Attempting to load GitHub client script');
+    // Try to load the GitHub client script if it's not loaded
+    const githubScript = document.createElement('script');
+    githubScript.src = '/js/github.js';
+    githubScript.async = true;
+    document.head.appendChild(githubScript);
   }
 
   // Log updated status
@@ -3173,17 +3323,47 @@ document.addEventListener('template-analyzer-ready', () => {
   // Update the analyzer reference
   appAnalyzer = window.TemplateAnalyzer;
 
+  // Remove any existing service initialization message
+  const existingMessage = document.getElementById('service-init-message');
+  if (existingMessage && existingMessage.parentNode) {
+    existingMessage.parentNode.removeChild(existingMessage);
+  }
+
   if (appAnalyzer) {
     debug('app', 'Template analyzer successfully initialized');
+    
+    // Check if all required services are now available
+    const allServicesReady = !!appAnalyzer && !!appDashboard && !!appGithub;
+    
     if (window.NotificationSystem) {
       window.NotificationSystem.showSuccess(
         'Analyzer Ready',
-        'Template analyzer is now initialized and ready to use',
+        allServicesReady 
+          ? 'All services are now initialized and ready to use' 
+          : 'Template analyzer is ready, but some other services may still be initializing',
         3000,
       );
     }
-    drainAnalysisQueue();
+    
+    // If we have pending analysis requests and all services are ready, process them
+    if (allServicesReady) {
+      drainAnalysisQueue();
+    } else {
+      // Try to initialize other services if they're not ready yet
+      tryReinitializeServices();
+      // Start polling again to check if all services become ready
+      pollForServiceReadiness();
+    }
   } else {
     debug('app', 'Template analyzer still not available after ready event');
+    
+    // Show error notification
+    if (window.NotificationSystem) {
+      window.NotificationSystem.showError(
+        'Initialization Issue',
+        'Template analyzer failed to initialize properly. You may need to refresh the page.',
+        5000
+      );
+    }
   }
 });

@@ -1,0 +1,52 @@
+/* Security pill styling for Template Doctor */
+
+.security-issue {
+  border-left: 4px solid #dc3545 !important;
+  background-color: rgba(220, 53, 69, 0.05);
+}
+
+.security-issue .item-details {
+  border-left-color: #dc3545 !important;
+  background-color: rgba(220, 53, 69, 0.08);
+}
+
+.security-alert-banner {
+  display: block; 
+  margin: 6px 0 10px 0; 
+  background-color: #dc3545; 
+  color: white; 
+  padding: 6px 12px; 
+  border-radius: 6px; 
+  font-size: 0.9rem; 
+  font-weight: 600; 
+  max-width: fit-content; 
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.security-pill {
+  display: inline-block;
+  margin-left: 8px;
+  background-color: #dc3545;
+  color: white;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  animation: pulse-attention 2s infinite;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Animation for the security pill */
+@keyframes pulse-attention {
+  0% {
+    box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(220, 53, 69, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(220, 53, 69, 0);
+  }
+}

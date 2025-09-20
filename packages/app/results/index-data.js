@@ -61,7 +61,7 @@
     try {
       if (typeof document !== 'undefined') {
         const dynamicScript = document.createElement('script');
-        dynamicScript.src = 'scan-meta-backfill.js';
+        dynamicScript.src = '/results/scan-meta-backfill.js';
         dynamicScript.onload = function() {
           console.log('[index-data] Dynamically injected scan-meta-backfill.js loaded successfully');
           // Try to merge again after loaded

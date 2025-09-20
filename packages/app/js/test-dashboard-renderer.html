@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Renderer Test</title>
+    <script src="dashboard-renderer.js"></script>
+    <script>
+        window.onload = function() {
+            console.log('Testing dashboard renderer:');
+            console.log('DashboardRenderer object exists:', !!window.DashboardRenderer);
+            
+            if (window.DashboardRenderer) {
+                console.log('DashboardRenderer object methods:');
+                for (const method in window.DashboardRenderer) {
+                    console.log('- ' + method);
+                }
+            }
+            
+            document.getElementById('status').textContent = 
+                window.DashboardRenderer ? 'Dashboard Renderer loaded successfully!' : 'Dashboard Renderer failed to load';
+        };
+    </script>
+</head>
+<body>
+    <h1>Dashboard Renderer Test</h1>
+    <div id="status" style="padding: 20px; border: 1px solid #ccc; margin: 20px 0;">Checking status...</div>
+    <p>Check the browser console for more details about the DashboardRenderer object.</p>
+</body>
+</html>
