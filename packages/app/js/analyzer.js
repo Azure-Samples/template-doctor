@@ -352,7 +352,7 @@ class TemplateAnalyzer {
           // Non-fatal
           console.warn('[TemplateAnalyzer][docs] diagnostics tracking failed', e);
         }
-        TemplateAnalyzerDocs.prototype.validateDocConfiguration(
+        await TemplateAnalyzerDocs.prototype.validateDocConfiguration(
           config,
           repoInfo,
           defaultBranch,

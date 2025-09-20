@@ -6,6 +6,16 @@
       "description": "Default branch MUST be 'main'."
     }
   },
+  "ossf": {
+    "minScore": {
+      "mustBeGe": 6.0,
+      "policy": "MUST",
+      "description": "Minimum OSSF score must be greater than or equal to 6.0."
+    }
+  },
+  "dockerImages": {
+    "maxCriticalErrors": 0
+  },
   "requiredFiles": [],
   "requiredFolders": [],
   "readmeRequirements": {
