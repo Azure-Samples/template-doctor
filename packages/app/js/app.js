@@ -2727,6 +2727,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const repoName = repoUrl.split('github.com/')[1] || repoUrl;
     document.getElementById('repo-name').textContent = repoName;
     document.getElementById('repo-url').textContent = repoUrl;
+    
+    // Scroll to the analysis section to show the user it's happening
+    // Use setTimeout to ensure this happens after the UI updates
+    setTimeout(() => {
+      window.scrollTo({
+        top: analysisSection.offsetTop,
+        behavior: 'smooth'
+      });
+    }, 100);
 
     // Save to recent
     updateRecentSearches(repoUrl);
