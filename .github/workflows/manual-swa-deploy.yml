@@ -102,8 +102,6 @@ jobs:
           app_artifact_location: packages/app
           action: upload
           deployment_environment: ${{ github.event.inputs.environment || 'production' }}
-          # Always point to the app folder; prep step ensures config is there
-          config_file_location: packages/app
           skip_app_build: true
           skip_api_build: true
 

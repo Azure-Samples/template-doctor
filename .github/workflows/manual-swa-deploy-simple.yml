@@ -36,6 +36,5 @@ jobs:
           app_location: packages/app
           app_artifact_location: packages/app
           api_location: packages/api
-          config_file_location: packages/app
           skip_app_build: true
           skip_api_build: true

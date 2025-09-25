@@ -83,8 +83,6 @@ jobs:
           # Explicitly set action/environment for non-PR triggers
           action: upload
           deployment_environment: production
-          # Always point to the app folder; we copy config there in a prep step
-          config_file_location: packages/app
           # Treat app content as prebuilt; upload from the app folder directly
           app_artifact_location: packages/app
           skip_app_build: true
