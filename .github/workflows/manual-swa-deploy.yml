@@ -37,7 +37,6 @@ jobs:
           if [ -f "staticwebapp.config.json" ]; then
             cp -f staticwebapp.config.json packages/app/staticwebapp.config.json
           fi
-
       - name: Sanity check - app content exists
         run: |
           set -euo pipefail
@@ -102,6 +101,8 @@ jobs:
           app_artifact_location: packages/app
           action: upload
           deployment_environment: ${{ github.event.inputs.environment || 'production' }}
+          # Config file now lives at repo root; pass the folder
+          config_file_location: .
           skip_app_build: true
           skip_api_build: true
 

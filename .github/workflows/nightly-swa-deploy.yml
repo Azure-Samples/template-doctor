@@ -72,6 +72,7 @@ jobs:
             echo "Failed to retrieve SWA deployment token via Azure CLI" >&2
             exit 1
           fi
+
           echo "DEPLOY_TOKEN=$token" >> "$GITHUB_ENV"
 
       - name: Deploy to Static Web Apps (PRODUCTION)
@@ -83,6 +84,8 @@ jobs:
           # Explicitly set action/environment for non-PR triggers
           action: upload
           deployment_environment: production
+          # Point to the folder containing staticwebapp.config.json (now at repo root)
+          config_file_location: .
           # Treat app content as prebuilt; upload from the app folder directly
           app_artifact_location: packages/app
           skip_app_build: true

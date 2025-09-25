@@ -81,8 +81,8 @@ class NodeGitHubClient {
             await this.octokit.repos.createFork({ owner, repo });
           } catch (forkErr) {
             // Do not attribute to SAML; surface neutral guidance and continue
-            const msg = `Fork request failed for ${owner}/${repo}. Please verify repo visibility and retry; you can also create a fork via the GitHub UI, then re-run the scan. Original error: ${forkErr.status || ''} ${forkErr.message || forkErr}`;
-            throw new Error(msg);
+            console.error(`Fork request failed for ${owner}/${repo}:`, forkErr);
+            throw new Error(`Fork request failed for ${owner}/${repo}. Please verify repository visibility and retry, or create a fork via the GitHub UI and re-run the scan.`);
           }
           // Wait for fork to be ready
           let retries = 0;

@@ -26,7 +26,6 @@ jobs:
           if [ -f "staticwebapp.config.json" ]; then
             cp -f staticwebapp.config.json packages/app/staticwebapp.config.json
           fi
-
       - name: Deploy (no build, token only)
         uses: azure/static-web-apps-deploy@v1
         with:
@@ -36,5 +35,6 @@ jobs:
           app_location: packages/app
           app_artifact_location: packages/app
           api_location: packages/api
+          config_file_location: .
           skip_app_build: true
           skip_api_build: true
