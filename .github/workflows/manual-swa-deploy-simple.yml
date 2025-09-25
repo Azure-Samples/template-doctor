@@ -20,6 +20,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Ensure config is present under app folder
+        run: |
+          mkdir -p packages/app
+          if [ -f "staticwebapp.config.json" ]; then
+            cp -f staticwebapp.config.json packages/app/staticwebapp.config.json
+          fi
+
       - name: Deploy (no build, token only)
         uses: azure/static-web-apps-deploy@v1
         with:
@@ -29,6 +36,6 @@ jobs:
           app_location: packages/app
           app_artifact_location: packages/app
           api_location: packages/api
-          config_file_location: .
+          config_file_location: packages/app
           skip_app_build: true
           skip_api_build: true

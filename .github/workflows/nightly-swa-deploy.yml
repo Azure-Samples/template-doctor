@@ -26,6 +26,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Ensure config is present under app folder
+        run: |
+          mkdir -p packages/app
+          if [ -f "staticwebapp.config.json" ]; then
+            cp -f staticwebapp.config.json packages/app/staticwebapp.config.json
+          fi
+
       # Resolve deployment token via secret or Azure OIDC
       - name: Resolve deployment token
         env:
@@ -76,8 +83,8 @@ jobs:
           # Explicitly set action/environment for non-PR triggers
           action: upload
           deployment_environment: production
-          # Point to the folder containing staticwebapp.config.json (now at repo root)
-          config_file_location: .
+          # Always point to the app folder; we copy config there in a prep step
+          config_file_location: packages/app
           # Treat app content as prebuilt; upload from the app folder directly
           app_artifact_location: packages/app
           skip_app_build: true
