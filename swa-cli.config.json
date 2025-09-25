@@ -5,7 +5,7 @@
       "appLocation": "packages/app",
       "apiLocation": "packages/api",
       "outputLocation": "dist",
-      "appBuildCommand": "npm run build",
+      "appBuildCommand": "npm ci && npm run build",
       "apiBuildCommand": "rm -rf node_modules && npm ci --omit=dev",
       "apiLanguage": "node",
       "apiVersion": "18",
