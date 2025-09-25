@@ -47,26 +47,77 @@ This feature enhances the Template Doctor by showing previously scanned template
 - `assets/` - Contains images and other static assets
 - `results/` - Contains previously scanned template results
 
+## Build System
+
+The frontend uses a custom build system that optimizes the application for production deployment:
+
+### Build Commands
+
+- `npm run build` - Production build with minification and optimization
+- `npm run build:dev` - Development build without minification (for debugging)
+- `npm run clean` - Remove the dist folder
+
+### Build Process
+
+The build system:
+1. **Minifies JavaScript**: All `.js` files are minified using Terser with:
+   - Console statements removed in production
+   - Function names preserved for easier debugging
+   - Comments removed
+2. **Minifies CSS**: All `.css` files are minified using CleanCSS
+3. **Minifies HTML**: HTML files are minified with whitespace removal and optimization
+4. **Copies Assets**: Static files (images, configs, results) are copied to the output directory
+5. **Size Optimization**: Achieves ~59% size reduction compared to original source
+
+### Build Output
+
+- **Production build output**: `dist/` directory
+- **Build reports**: Shows original size vs optimized size
+- **File structure**: Maintains the same structure as the source files
+
+### Development vs Production
+
+- **Development mode**: Files are copied without minification for easier debugging
+- **Production mode**: Full optimization with minification, console removal, and compression
+
 ## Development Notes
 
 - The data is loaded asynchronously via the `templates-data-loader.js` script
 - Templates are rendered in a responsive grid layout
 - Ruleset configurations are loaded from the `configs/` directory
+- Build artifacts are ignored in git via `.gitignore`
 
 ## CSS Styles
 
 - Template cards use a consistent design language matching the rest of the UI
 - Highlighting effect uses CSS animations for a subtle pulse effect
 - Responsive design adapts to different screen sizes
+- CSS is minified in production builds for better performance
 
 ## Deployment
 
-This directory is designed to be deployed as a standalone static website. All necessary configurations are included within the directory.
+This directory is designed to be deployed as a standalone static website optimized for production:
 
-Before deploying to GitHub Pages, run:
+### Production Deployment
 
+1. Run the build process:
 ```bash
-./scripts/copy-results-data.sh
+npm run build
 ```
 
-This will copy the necessary template data to the frontend folder.
+2. Deploy the `dist/` folder contents to your static hosting service
+
+### Azure Static Web Apps
+
+When deploying to Azure Static Web Apps:
+- Set `outputLocation` to `dist` in your SWA configuration
+- Set `appBuildCommand` to `npm run build`
+- The build system will automatically create an optimized bundle
+
+### Development Testing
+
+For local development without build optimization:
+```bash
+npm run build:dev
+npm run start
+```

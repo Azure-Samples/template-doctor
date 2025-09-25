@@ -1,0 +1,11 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+
+name: template-doctor
+metadata:
+  template: template-doctor@0.0.1-beta
+
+services:
+  doctor:
+    project: .
+    language: js
+    host: staticwebapp
