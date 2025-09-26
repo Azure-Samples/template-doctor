@@ -33,7 +33,7 @@
     "devDependencies": {
         "@playwright/test": "^1.54.1",
         "@types/node": "^24.0.14",
-        "vitest": "^1.0.0"
+        "vitest": "^3.2.4"
     },
     "dependencies": {
     "@actions/core": "^1.11.1",
