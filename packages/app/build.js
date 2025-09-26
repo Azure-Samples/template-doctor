@@ -220,7 +220,7 @@ async function build() {
     
     // Show size comparison if in production mode
     if (isProduction) {
-      const originalSize = getDirSize(__dirname);
+      const originalSize = getDirSize(path.join(__dirname, 'src'));
       const builtSize = getDirSize(distDir);
       console.log(`📊 Original size: ${(originalSize / 1024).toFixed(1)} KB`);
       console.log(`📊 Built size: ${(builtSize / 1024).toFixed(1)} KB`);
