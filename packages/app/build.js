@@ -220,7 +220,7 @@ async function build() {
     
     // Show size comparison if in production mode
     if (isProduction) {
-      const originalSize = getDirSize(path.join(__dirname, 'src'));
+      const originalSize = getDirSize(__dirname);
       const builtSize = getDirSize(distDir);
       console.log(`📊 Original size: ${(originalSize / 1024).toFixed(1)} KB`);
       console.log(`📊 Built size: ${(builtSize / 1024).toFixed(1)} KB`);
@@ -238,7 +238,7 @@ function getDirSize(dir) {
   
   items.forEach(item => {
     const itemPath = path.join(dir, item.name);
-    if (item.isDirectory() && item.name !== 'node_modules' && item.name !== '.git') {
+    if (item.isDirectory() && item.name !== 'node_modules' && item.name !== '.git' && item.name !== 'dist') {
       size += getDirSize(itemPath);
     } else if (item.isFile()) {
       size += fs.statSync(itemPath).size;
