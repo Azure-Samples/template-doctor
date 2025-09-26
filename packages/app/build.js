@@ -38,7 +38,7 @@ async function processJsFiles() {
             drop_console: true,
             drop_debugger: true,
           },
-          mangle: false, // Keep function names for easier debugging
+          mangle: isProduction, // Enable mangling in production for better minification
           format: {
             comments: false,
           },
