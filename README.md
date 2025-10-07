@@ -16,6 +16,11 @@
 
 Template Doctor analyzes and validates samples and templates, including but not limited to Azure Developer CLI (azd) templates. It provides a web UI to view analysis results and take action, including opening GitHub issues and assigning them to GitHub copilot in one go. It also automates PR updates with scan results.
 
+> [!TIP]
+> **New: Azure Container Apps Deployment with EasyAuth**  
+> Deploy to Azure Container Apps with built-in GitHub authentication. No code changes required - EasyAuth handles everything at the platform level.  
+> 📖 [Quick Reference](docs/usage/EASYAUTH_QUICKREF.md) | [Full Guide](EASYAUTH.md) | [Deployment Docs](docs/usage/CONTAINER_APPS_EASYAUTH.md)
+
 # Overview
 
 Template Doctor is a containerized application that analyzes and validates samples and templates, with a focus on Azure Developer CLI (azd) templates. It provides:
