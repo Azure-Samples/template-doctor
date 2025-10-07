@@ -27,3 +27,8 @@ local.settings.json
 __azurite*
 
 gallery.jsonpackages/server/config/
+
+# Infrastructure parameters with secrets
+infra/main.parameters.json
+infra/*.parameters.json
+!infra/*.parameters.json.example

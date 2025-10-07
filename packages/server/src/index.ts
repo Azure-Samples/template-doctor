@@ -3,6 +3,12 @@ import cors from "cors";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
+import {
+    easyAuthMiddleware,
+    corsMiddleware,
+    errorHandler,
+    notFoundHandler,
+} from "./middleware/index.js";
 
 // ESM equivalents for __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -15,8 +21,13 @@ const app: Express = express();
 const port = process.env.PORT || 3000; // Default to 3000 for OAuth compatibility
 
 // Middleware
+// Use built-in CORS for now (can switch to custom corsMiddleware if needed)
 app.use(cors());
 app.use(express.json());
+
+// Add EasyAuth middleware to extract authentication info from headers
+// This runs on all requests and populates req.easyAuth
+app.use(easyAuthMiddleware);
 
 // Serve static files from frontend build (if available)
 // Use FRONTEND_DIST_PATH env var if set (for Docker), otherwise calculate relative path
@@ -26,6 +37,7 @@ app.use(express.static(staticPath));
 
 // Health check
 app.get("/api/health", (req: Request, res: Response) => {
+    const authReq = req as any; // Cast to access easyAuth
     res.json({
         status: "ok",
         timestamp: new Date().toISOString(),
@@ -33,6 +45,12 @@ app.get("/api/health", (req: Request, res: Response) => {
             hasGitHubToken: !!process.env.GITHUB_TOKEN,
             hasWorkflowToken: !!process.env.GH_WORKFLOW_TOKEN,
             hasAnalyzerToken: !!process.env.GITHUB_TOKEN_ANALYZER,
+        },
+        easyAuth: {
+            enabled: !!authReq.easyAuth,
+            authenticated: authReq.easyAuth?.isAuthenticated || false,
+            username: authReq.easyAuth?.username || null,
+            provider: authReq.easyAuth?.provider || null,
         },
     });
 });
@@ -56,6 +74,10 @@ app.use("/api/v4", githubRouter);
 app.use("/api/v4", analysisRouter);
 app.use("/api/v4", actionsRouter);
 app.use("/api/v4", miscRouter);
+
+// Error handlers (must be after all routes)
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 // Fallback to serve index.html for client-side routing (SPA)
 app.get("*", (req: Request, res: Response) => {

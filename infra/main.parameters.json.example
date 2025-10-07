@@ -1,0 +1,57 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environmentName": {
+      "value": "template-doctor-env"
+    },
+    "containerAppName": {
+      "value": "template-doctor"
+    },
+    "location": {
+      "value": "eastus"
+    },
+    "containerImage": {
+      "value": "YOUR_REGISTRY.azurecr.io/template-doctor:latest"
+    },
+    "targetPort": {
+      "value": 3000
+    },
+    "githubClientId": {
+      "value": "YOUR_GITHUB_OAUTH_CLIENT_ID"
+    },
+    "githubClientSecret": {
+      "value": "YOUR_GITHUB_OAUTH_CLIENT_SECRET"
+    },
+    "githubToken": {
+      "value": "YOUR_GITHUB_TOKEN"
+    },
+    "ghWorkflowToken": {
+      "value": "YOUR_GITHUB_WORKFLOW_TOKEN"
+    },
+    "setupAllowedUsers": {
+      "value": "username1,username2"
+    },
+    "configGistId": {
+      "value": "YOUR_CONFIG_GIST_ID"
+    },
+    "defaultRuleSet": {
+      "value": "dod"
+    },
+    "requireAuthForResults": {
+      "value": true
+    },
+    "archiveEnabled": {
+      "value": false
+    },
+    "archiveCollection": {
+      "value": "aigallery"
+    },
+    "dispatchTargetRepo": {
+      "value": "Template-Doctor/template-doctor"
+    },
+    "issueAiEnabled": {
+      "value": false
+    }
+  }
+}
