@@ -330,6 +330,33 @@ docker-compose up --build
 docker-compose down
 ```
 
+### Azure Container Apps Deployment (with EasyAuth)
+
+Deploy to Azure Container Apps with built-in GitHub authentication:
+
+```bash
+# 1. Build and push container image
+docker build -t template-doctor:latest -f Dockerfile.combined .
+docker tag template-doctor:latest YOUR_REGISTRY.azurecr.io/template-doctor:latest
+docker push YOUR_REGISTRY.azurecr.io/template-doctor:latest
+
+# 2. Configure parameters
+cp infra/main.parameters.json.example infra/main.parameters.json
+# Edit main.parameters.json with your values
+
+# 3. Deploy
+./infra/deploy.sh
+```
+
+**Features**:
+- ✅ Automatic GitHub OAuth integration
+- ✅ Protected resources (tiles, leaderboards, setup)
+- ✅ No code changes needed for authentication
+- ✅ Managed identity for Azure services
+- ✅ Auto-scaling (1-3 replicas)
+
+See [EasyAuth Integration Guide](EASYAUTH.md) and [Deployment Documentation](docs/usage/CONTAINER_APPS_EASYAUTH.md) for details.
+
 ### Preview Build Locally
 
 ```bash

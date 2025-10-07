@@ -256,6 +256,46 @@ For containerized production deployments:
 - Pass environment variables through your container orchestration platform
 - Never commit sensitive values to version control
 
+### Azure Container Apps with EasyAuth
+
+When deploying to Azure Container Apps with EasyAuth enabled:
+
+| Variable | Description | Required | Used In | Notes |
+| -------- | ----------- | -------- | ------- | ----- |
+| `GITHUB_CLIENT_ID` | GitHub OAuth Client ID | Yes | EasyAuth, Express | Used by EasyAuth platform for OAuth |
+| `GITHUB_CLIENT_SECRET` | GitHub OAuth Client Secret | Yes | EasyAuth | Used by EasyAuth platform for OAuth |
+| `SETUP_ALLOWED_USERS` | Comma-separated GitHub usernames | No | Express | Usernames authorized for /setup endpoint |
+
+**EasyAuth Headers (Injected by Azure)**:
+
+When EasyAuth is enabled, Azure Container Apps automatically injects authentication headers into every request:
+
+- `X-MS-CLIENT-PRINCIPAL`: Base64-encoded JSON with full user info
+- `X-MS-CLIENT-PRINCIPAL-ID`: Unique user identifier
+- `X-MS-CLIENT-PRINCIPAL-NAME`: GitHub username
+- `X-MS-CLIENT-PRINCIPAL-IDP`: Identity provider (e.g., "github")
+
+The Express middleware (`easyAuthMiddleware`) automatically extracts this information and makes it available as `req.easyAuth`.
+
+**Protected Resources**:
+
+With EasyAuth's `globalValidation` set to `RedirectToLoginPage`, all pages are protected:
+
+- Unauthenticated users are automatically redirected to GitHub login
+- After authentication, users are redirected back to their original destination
+- The application can access user identity via EasyAuth headers
+
+**Local Development**:
+
+During local development without EasyAuth:
+
+- EasyAuth headers are not present
+- The application falls back to the existing OAuth flow (browser-based)
+- Tokens are stored in localStorage
+- No changes to local development workflow
+
+See [Azure Container Apps EasyAuth Deployment Guide](../usage/CONTAINER_APPS_EASYAUTH.md) for full deployment instructions.
+
 ## Security Considerations
 
 - Never commit your `.env` file to version control
@@ -264,3 +304,5 @@ For containerized production deployments:
 - Consider using managed identities in Azure where possible
 - Do not expose AI provider keys to the frontend; only the server performs enrichment calls
 - Monitor rate limiting metrics to detect abuse of the enrichment endpoint
+- **EasyAuth**: Never commit `infra/main.parameters.json` - it contains secrets
+- **EasyAuth**: Use Azure Key Vault for production secret storage (advanced)
