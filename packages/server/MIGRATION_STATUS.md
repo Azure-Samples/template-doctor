@@ -83,7 +83,7 @@ Migrating all Azure Functions from `packages/api/` to Express routes in `package
 ### Azure Functions (OLD)
 
 ```typescript
-import { HttpRequest, Context } from "@azure/functions";
+import type { HttpRequest, Context } from "@azure/functions";
 import { wrapHttp } from "./shared/http";
 
 export const handler = wrapHttp(async (req: HttpRequest, ctx: Context) => {

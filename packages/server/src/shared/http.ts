@@ -1,4 +1,4 @@
-import { HttpRequest, Context } from "@azure/functions";
+import type { HttpRequest, Context } from "@azure/functions";
 import { loadEnv } from "./env";
 
 export interface HandlerResult {

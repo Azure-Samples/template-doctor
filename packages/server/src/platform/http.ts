@@ -1,6 +1,6 @@
 // Temporary shim for legacy handlers still using readJson/getQuery helpers.
 // Replace with shared http utilities (wrapHttp + explicit parsing) during full migration.
-import { HttpRequest } from "@azure/functions";
+import type { HttpRequest } from "@azure/functions";
 
 export async function readJson<T = any>(
     req: HttpRequest,
