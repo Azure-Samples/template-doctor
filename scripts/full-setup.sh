@@ -795,11 +795,11 @@ start_local_development() {
     echo ""
     
     if ask_yes_no "Start containers now?" "y"; then
-        print_step "Starting docker-compose..."
+        print_step "Starting docker compose..."
         echo ""
         
         # Start in background
-        if docker-compose --profile combined up -d --build; then
+        if docker compose --profile combined up -d --build; then
             echo ""
             print_success "Containers started successfully!"
             echo ""
@@ -807,7 +807,7 @@ start_local_development() {
             sleep 5
             
             # Check if containers are running
-            if docker-compose ps | grep -q "Up"; then
+            if docker compose ps | grep -q "Up"; then
                 print_success "All services are running!"
                 echo ""
                 print_info "Opening http://localhost:3000 in your browser..."
@@ -829,13 +829,13 @@ start_local_development() {
                 echo -e "  ${GREEN}http://localhost:3000${NC}"
                 echo ""
                 echo -e "${BOLD}Useful commands:${NC}"
-                echo -e "  View logs:    ${CYAN}docker-compose logs -f${NC}"
-                echo -e "  Stop:         ${CYAN}docker-compose down${NC}"
-                echo -e "  Restart:      ${CYAN}docker-compose restart${NC}"
+                echo -e "  View logs:    ${CYAN}docker compose logs -f${NC}"
+                echo -e "  Stop:         ${CYAN}docker compose down${NC}"
+                echo -e "  Restart:      ${CYAN}docker compose restart${NC}"
                 echo ""
             else
                 print_error "Services failed to start. Check logs:"
-                echo "  docker-compose logs"
+                echo "  docker compose logs"
                 exit 1
             fi
         else
@@ -844,7 +844,7 @@ start_local_development() {
         fi
     else
         print_info "Skipping container start. To start manually, run:"
-        echo "  docker-compose --profile combined up"
+        echo "  docker compose --profile combined up"
     fi
 }
 
