@@ -149,7 +149,7 @@ check_prerequisites() {
     if command -v node &> /dev/null; then
         local node_version=$(node --version)
         local major_version=$(echo "$node_version" | cut -d'.' -f1 | tr -d 'v')
-        if [[ "$major_version" -ge 20 && "$major_version" -lt 23 ]]; then
+        if [[ "$major_version" -ge 20 && "$major_version" -le 22 ]]; then
             print_success "Node.js $node_version (compatible)"
         else
             print_error "Node.js $node_version (need v20.x - v22.x)"
