@@ -867,8 +867,8 @@ deploy_to_azure() {
     echo "  • Configure Managed Identity for database access"
     echo ""
     
-    # Check if azd is already initialized
-    if [[ ! -f ".azure/config.json" ]]; then
+    # Check if azd is already initialized using azd env list
+    if ! azd env list --output json | grep -q '"name":'; then
         print_step "Initializing azd environment..."
         echo ""
         if azd init; then
