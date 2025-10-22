@@ -794,7 +794,7 @@ start_local_development() {
     echo "  • Express backend + Vite frontend (port 3000)"
     echo ""
     
-    if ask_yes_no "Start containers now?" "y"; then
+    if ask_yes_no "Start Docker containers now (MongoDB + Template Doctor)?" "y"; then
         print_step "Starting docker compose..."
         echo ""
         
