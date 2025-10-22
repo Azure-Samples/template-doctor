@@ -824,6 +824,8 @@ install_dependencies() {
     print_step "Running npm install..."
     echo ""
     
+    # Use 'npm install' instead of 'npm ci' for better compatibility across environments.
+    # 'npm ci' requires a clean node_modules and a lockfile, which may not always be present.
     if npm install; then
         print_success "Dependencies installed successfully!"
     else
