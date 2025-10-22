@@ -806,9 +806,12 @@ start_local_development() {
             print_info "Waiting for services to be ready..."
             sleep 5
             
-            # Check if containers are running
-            if docker compose ps | grep -q "Up"; then
-                print_success "All services are running!"
+            # Check if all required services are running
+            local running_services=$(docker compose ps --services --filter "status=running" 2>/dev/null | wc -l | tr -d ' ')
+            local total_services=$(docker compose ps --services 2>/dev/null | wc -l | tr -d ' ')
+            
+            if [[ "$running_services" -eq "$total_services" ]] && [[ "$running_services" -gt 0 ]]; then
+                print_success "All services are running! ($running_services/$total_services)"
                 echo ""
                 print_info "Opening http://localhost:3000 in your browser..."
                 sleep 2
