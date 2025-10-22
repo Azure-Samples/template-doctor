@@ -985,7 +985,7 @@ main() {
     if [[ "$DEPLOYMENT_TARGET" == "azure" ]]; then
         setup_dispatch_repo
     else
-        DISPATCH_TARGET_REPO="Template-Doctor/template-doctor"
+        DISPATCH_TARGET_REPO="<add-manually>"
     fi
     
     # MongoDB setup
