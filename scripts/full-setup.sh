@@ -799,7 +799,7 @@ start_local_development() {
         echo ""
         
         # Start in background
-        if docker compose --profile combined up -d --build; then
+        if docker compose --profile combined up -d; then
             echo ""
             print_success "Containers started successfully!"
             echo ""
