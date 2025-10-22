@@ -818,11 +818,11 @@ start_local_development() {
                 
                 # Open browser (cross-platform)
                 if command -v open &> /dev/null; then
-                    open "http://localhost:3000"
+                    open "http://localhost:3000" &>/dev/null &
                 elif command -v xdg-open &> /dev/null; then
-                    xdg-open "http://localhost:3000"
+                    xdg-open "http://localhost:3000" &>/dev/null &
                 elif command -v start &> /dev/null; then
-                    start "http://localhost:3000"
+                    start "http://localhost:3000" &>/dev/null &
                 fi
                 
                 echo ""
