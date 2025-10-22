@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 #
-# Template Doctor - Full Setup Script (Improved)
+# Template Doctor - Full Setup Script
 # ===============================================
 # This script guides you through the complete setup process for Template Doctor.
+# It handles both local development and Azure production deployment.
 #
-# Usage: ./scripts/full-setup-improved.sh
+# Usage: ./scripts/full-setup.sh
 #
 
 set -euo pipefail
@@ -24,6 +25,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="$REPO_ROOT/.env"
 
 # Track setup state
+DEPLOYMENT_TARGET=""  # "local" or "azure"
 GITHUB_OAUTH_DONE=false
 GITHUB_PAT_DONE=false
 MONGODB_DONE=false
@@ -90,38 +92,126 @@ ask_yes_no() {
 }
 
 # =============================================================================
+# Deployment Target Selection
+# =============================================================================
+
+select_deployment_target() {
+    print_section "Step 1: Choose Deployment Target"
+    
+    print_info "Are you setting up for local development or Azure deployment?"
+    echo ""
+    echo "Choose your path:"
+    echo -e "  ${BOLD}1)${NC} ${CYAN}Local Development${NC} - Run on your machine with Docker (5 minutes)"
+    echo "     • Installs dependencies"
+    echo "     • Creates .env configuration"
+    echo "     • Builds all packages"
+    echo "     • Starts Docker containers"
+    echo "     • Opens http://localhost:3000"
+    echo ""
+    echo -e "  ${BOLD}2)${NC} ${MAGENTA}Azure Production${NC} - Deploy to Azure Container Apps (10 minutes)"
+    echo "     • Installs dependencies"
+    echo "     • Creates .env configuration"
+    echo "     • Runs azd up (provisions + deploys)"
+    echo "     • Opens your Azure app URL"
+    echo ""
+    
+    read -p "Your choice [1-2]: " -r
+    
+    case "$REPLY" in
+        1)
+            DEPLOYMENT_TARGET="local"
+            print_success "Selected: Local Development"
+            ;;
+        2)
+            DEPLOYMENT_TARGET="azure"
+            print_success "Selected: Azure Production Deployment"
+            ;;
+        *)
+            print_error "Invalid choice"
+            exit 1
+            ;;
+    esac
+    
+    wait_for_enter
+}
+
+# =============================================================================
 # Prerequisites Check
 # =============================================================================
 
 check_prerequisites() {
-    print_section "Step 1: Prerequisites Check"
+    print_section "Step 2: Prerequisites Check"
     
     local all_good=true
     
-    # Check Docker
-    print_step "Checking Docker..."
-    if command -v docker &> /dev/null; then
-        if docker info &> /dev/null; then
-            local docker_version=$(docker --version | cut -d' ' -f3 | tr -d ',')
-            print_success "Docker installed and running (version: $docker_version)"
-        else
-            print_warning "Docker installed but not running"
-            print_info "Start Docker Desktop or docker daemon"
-            all_good=false
-        fi
-    else
-        print_error "Docker not found"
-        print_info "Install: https://www.docker.com/products/docker-desktop"
-        all_good=false
-    fi
-    
-    # Check Node.js (optional but recommended)
+    # Check Node.js
     print_step "Checking Node.js..."
     if command -v node &> /dev/null; then
         local node_version=$(node --version)
-        print_success "Node.js installed ($node_version)"
+        local major_version=$(echo "$node_version" | cut -d'.' -f1 | tr -d 'v')
+        if [[ "$major_version" -ge 20 && "$major_version" -lt 23 ]]; then
+            print_success "Node.js $node_version (compatible)"
+        else
+            print_error "Node.js $node_version (need v20.x - v22.x)"
+            print_info "Install with: nvm install 20 && nvm use 20"
+            all_good=false
+        fi
     else
-        print_warning "Node.js not found (optional but recommended for local dev)"
+        print_error "Node.js not found"
+        print_info "Install: https://nodejs.org/ or use nvm"
+        all_good=false
+    fi
+    
+    if [[ "$DEPLOYMENT_TARGET" == "local" ]]; then
+        # Check Docker for local development
+        print_step "Checking Docker..."
+        if command -v docker &> /dev/null; then
+            if docker info &> /dev/null; then
+                local docker_version=$(docker --version | cut -d' ' -f3 | tr -d ',')
+                print_success "Docker running (version: $docker_version)"
+            else
+                print_error "Docker installed but not running"
+                print_info "Start Docker Desktop or docker daemon"
+                all_good=false
+            fi
+        else
+            print_error "Docker not found"
+            print_info "Install: https://www.docker.com/products/docker-desktop"
+            all_good=false
+        fi
+        
+        # Check Docker Compose
+        print_step "Checking Docker Compose..."
+        if docker compose version &> /dev/null 2>&1 || docker-compose --version &> /dev/null 2>&1; then
+            print_success "Docker Compose available"
+        else
+            print_error "Docker Compose not found"
+            all_good=false
+        fi
+    fi
+    
+    if [[ "$DEPLOYMENT_TARGET" == "azure" ]]; then
+        # Check Azure CLI
+        print_step "Checking Azure CLI..."
+        if command -v az &> /dev/null; then
+            local az_version=$(az version --query '"azure-cli"' -o tsv 2>/dev/null || echo "unknown")
+            print_success "Azure CLI installed ($az_version)"
+        else
+            print_error "Azure CLI not found"
+            print_info "Install: https://learn.microsoft.com/cli/azure/install-azure-cli"
+            all_good=false
+        fi
+        
+        # Check azd
+        print_step "Checking Azure Developer CLI (azd)..."
+        if command -v azd &> /dev/null; then
+            local azd_version=$(azd version 2>/dev/null | head -n1 || echo "unknown")
+            print_success "azd installed ($azd_version)"
+        else
+            print_error "azd not found"
+            print_info "Install: https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd"
+            all_good=false
+        fi
     fi
     
     echo ""
@@ -370,97 +460,46 @@ setup_github_pat() {
 # =============================================================================
 
 setup_mongodb() {
-    print_section "Step 4: MongoDB Database Setup"
+    local step_num="4"
+    if [[ "$DEPLOYMENT_TARGET" == "azure" ]]; then
+        step_num="5"
+    fi
     
-    print_info "Template Doctor requires MongoDB for storing analysis results."
-    echo ""
-    echo "Choose your deployment target:"
-    echo -e "  ${BOLD}1)${NC} Local development (Docker Compose) - ${CYAN}Recommended${NC}"
-    echo -e "  ${BOLD}2)${NC} Production (Azure Cosmos DB with Managed Identity)"
-    echo -e "  ${BOLD}3)${NC} Custom MongoDB (provide connection string)"
-    echo -e "  ${BOLD}4)${NC} I will configure manually later"
-    echo ""
+    print_section "Step $step_num: MongoDB Database Setup"
     
-    read -p "Your choice [1-4]: " -r
-    
-    case "$REPLY" in
-        1)
-            print_step "Configuring for local development..."
-            echo ""
-            print_info "For local development, Template Doctor uses:"
-            echo -e "  • MongoDB container via docker-compose"
-            echo -e "  • Database: ${BOLD}template-doctor${NC}"
-            echo -e "  • Connection: ${CYAN}mongodb://mongodb:27017/template-doctor${NC}"
-            echo ""
-            print_success "No configuration needed - docker-compose handles this automatically!"
-            echo ""
-            print_warning "${BOLD}CRITICAL:${NC} Do NOT set MONGODB_URI in .env for local development!"
-            echo -e "  • The .env file will have MONGODB_URI commented out"
-            echo -e "  • Docker Compose automatically connects to the mongodb container"
-            echo -e "  • If you see connection errors, make sure MONGODB_URI is NOT set"
-            echo ""
-            print_info "To start local development:"
-            echo -e "  ${BOLD}docker-compose --profile combined up${NC}"
-            echo -e "  This starts BOTH the app and MongoDB containers"
-            echo ""
-            
-            # Don't set MONGODB_URI for local - let docker-compose default handle it
-            MONGODB_URI="UNSET_FOR_LOCAL_DEV"
-            MONGODB_DONE=true
-            ;;
-            
-        2)
-            print_step "Configuring for Azure Cosmos DB (Production)..."
-            echo ""
-            print_success "Production deployment uses Managed Identity - NO configuration needed in .env!"
-            echo ""
-            print_info "When you run ${BOLD}azd up${NC}, it will automatically:"
-            echo -e "  ✓ Provision Cosmos DB (serverless, MongoDB API)"
-            echo -e "  ✓ Create Container App with System-Assigned Managed Identity"
-            echo -e "  ✓ Set COSMOS_ENDPOINT environment variable"
-            echo -e "  ✓ Grant MI 'Cosmos DB Built-in Data Contributor' role"
-            echo -e "  ✓ Connect securely using tokens (no connection strings!)"
-            echo ""
-            print_warning "${BOLD}IMPORTANT:${NC} Do NOT set MONGODB_URI in .env for production!"
-            echo "  Production uses COSMOS_ENDPOINT (set automatically by Bicep)"
-            echo ""
-            print_info "See: ${BOLD}infra/README.md${NC} for deployment details"
-            echo ""
-            
-            # For local .env, mark as not needed (production uses COSMOS_ENDPOINT from Bicep)
-            MONGODB_URI="<production-configured-by-bicep-not-needed-in-env>"
-            MONGODB_DONE=true
-            ;;
-            
-        3)
-            print_step "Using custom MongoDB..."
-            echo ""
-            print_info "Enter your MongoDB connection string:"
-            echo -e "Format: ${CYAN}mongodb+srv://USERNAME:PASSWORD@cluster.mongodb.net/?options${NC}"
-            echo ""
-            
-            read -p "MongoDB URI: " MONGODB_URI
-            
-            if [[ ! "$MONGODB_URI" =~ ^mongodb ]]; then
-                print_error "MongoDB URI must start with 'mongodb://' or 'mongodb+srv://'"
-                exit 1
-            fi
-            
-            MONGODB_DONE=true
-            print_success "MongoDB configured!"
-            ;;
-            
-        4)
-            MONGODB_URI="<add-manually>"
-            MONGODB_DONE=true
-            print_info "Skipping MongoDB setup - remember to configure in .env"
-            ;;
-            
-        *)
-            print_error "Invalid choice"
-            exit 1
-            ;;
-    esac
+    if [[ "$DEPLOYMENT_TARGET" == "local" ]]; then
+        print_step "Configuring for local development..."
+        echo ""
+        print_info "For local development, Template Doctor uses:"
+        echo -e "  • MongoDB container via docker-compose"
+        echo -e "  • Database: ${BOLD}template-doctor${NC}"
+        echo -e "  • Connection: ${CYAN}mongodb://mongodb:27017/template-doctor${NC}"
+        echo ""
+        print_success "No configuration needed - docker-compose handles this automatically!"
+        echo ""
+        print_warning "${BOLD}CRITICAL:${NC} Do NOT set MONGODB_URI in .env for local development!"
+        
+        # Don't set MONGODB_URI for local - let docker-compose default handle it
+        MONGODB_URI="UNSET_FOR_LOCAL_DEV"
+        MONGODB_DONE=true
+        
+    else  # Azure deployment
+        print_step "Configuring for Azure Cosmos DB (Production)..."
+        echo ""
+        print_success "Production deployment uses Managed Identity - NO configuration needed in .env!"
+        echo ""
+        print_info "When you run ${BOLD}azd up${NC}, it will automatically:"
+        echo -e "  ✓ Provision Cosmos DB (serverless, MongoDB API)"
+        echo -e "  ✓ Create Container App with System-Assigned Managed Identity"
+        echo -e "  ✓ Set COSMOS_ENDPOINT environment variable"
+        echo -e "  ✓ Grant MI 'Cosmos DB Built-in Data Contributor' role"
+        echo -e "  ✓ Connect securely using tokens (no connection strings!)"
+        echo ""
+        
+        # For production, mark as configured by Bicep
+        MONGODB_URI="<production-configured-by-bicep>"
+        MONGODB_DONE=true
+    fi
     
     wait_for_enter
 }
@@ -671,6 +710,207 @@ EOF
 }
 
 # =============================================================================
+# Install Dependencies
+# =============================================================================
+
+install_dependencies() {
+    local step_num
+    if [[ "$DEPLOYMENT_TARGET" == "local" ]]; then
+        step_num="5"
+    else
+        step_num="6"
+    fi
+    
+    print_section "Step $step_num: Installing Dependencies"
+    
+    print_step "Running npm ci (clean install)..."
+    echo ""
+    
+    if npm ci; then
+        print_success "Dependencies installed successfully!"
+    else
+        print_error "Failed to install dependencies"
+        exit 1
+    fi
+    
+    wait_for_enter
+}
+
+# =============================================================================
+# Build Packages
+# =============================================================================
+
+build_packages() {
+    local step_num
+    if [[ "$DEPLOYMENT_TARGET" == "local" ]]; then
+        step_num="6"
+    else
+        step_num="7"
+    fi
+    
+    print_section "Step $step_num: Building Packages"
+    
+    print_step "Building analyzer-core..."
+    if npm run build -w packages/analyzer-core; then
+        print_success "analyzer-core built"
+    else
+        print_error "Failed to build analyzer-core"
+        exit 1
+    fi
+    
+    print_step "Building server..."
+    if npm run build -w packages/server; then
+        print_success "server built"
+    else
+        print_error "Failed to build server"
+        exit 1
+    fi
+    
+    print_step "Building app..."
+    if npm run build -w packages/app; then
+        print_success "app built"
+    else
+        print_error "Failed to build app"
+        exit 1
+    fi
+    
+    echo ""
+    print_success "All packages built successfully!"
+    
+    wait_for_enter
+}
+
+# =============================================================================
+# Start Local Development
+# =============================================================================
+
+start_local_development() {
+    print_section "Step 7: Starting Local Development"
+    
+    print_info "Starting Docker Compose with combined profile..."
+    echo ""
+    echo "This will start:"
+    echo "  • MongoDB container"
+    echo "  • Express backend + Vite frontend (port 3000)"
+    echo ""
+    
+    if ask_yes_no "Start containers now?" "y"; then
+        print_step "Starting docker-compose..."
+        echo ""
+        
+        # Start in background
+        if docker-compose --profile combined up -d --build; then
+            echo ""
+            print_success "Containers started successfully!"
+            echo ""
+            print_info "Waiting for services to be ready..."
+            sleep 5
+            
+            # Check if containers are running
+            if docker-compose ps | grep -q "Up"; then
+                print_success "All services are running!"
+                echo ""
+                print_info "Opening http://localhost:3000 in your browser..."
+                sleep 2
+                
+                # Open browser (cross-platform)
+                if command -v open &> /dev/null; then
+                    open "http://localhost:3000"
+                elif command -v xdg-open &> /dev/null; then
+                    xdg-open "http://localhost:3000"
+                elif command -v start &> /dev/null; then
+                    start "http://localhost:3000"
+                fi
+                
+                echo ""
+                print_success "🎉 Template Doctor is running!"
+                echo ""
+                echo -e "${BOLD}Access your application:${NC}"
+                echo -e "  ${GREEN}http://localhost:3000${NC}"
+                echo ""
+                echo -e "${BOLD}Useful commands:${NC}"
+                echo -e "  View logs:    ${CYAN}docker-compose logs -f${NC}"
+                echo -e "  Stop:         ${CYAN}docker-compose down${NC}"
+                echo -e "  Restart:      ${CYAN}docker-compose restart${NC}"
+                echo ""
+            else
+                print_error "Services failed to start. Check logs:"
+                echo "  docker-compose logs"
+                exit 1
+            fi
+        else
+            print_error "Failed to start containers"
+            exit 1
+        fi
+    else
+        print_info "Skipping container start. To start manually, run:"
+        echo "  docker-compose --profile combined up"
+    fi
+}
+
+# =============================================================================
+# Deploy to Azure
+# =============================================================================
+
+deploy_to_azure() {
+    print_section "Step 8: Deploy to Azure"
+    
+    print_info "Ready to deploy to Azure with azd!"
+    echo ""
+    echo "This will:"
+    echo "  • Initialize azd environment (if needed)"
+    echo "  • Provision Azure resources (Cosmos DB, Container Apps, etc.)"
+    echo "  • Deploy your application"
+    echo "  • Configure Managed Identity for database access"
+    echo ""
+    
+    # Check if azd is already initialized
+    if [[ ! -f ".azure/config.json" ]]; then
+        print_step "Initializing azd environment..."
+        echo ""
+        if azd init; then
+            print_success "azd initialized"
+        else
+            print_error "Failed to initialize azd"
+            exit 1
+        fi
+    else
+        print_info "azd environment already initialized"
+    fi
+    
+    echo ""
+    if ask_yes_no "Run azd up now?" "y"; then
+        print_step "Running azd up (this may take 5-10 minutes)..."
+        echo ""
+        
+        if azd up; then
+            echo ""
+            print_success "🎉 Deployment complete!"
+            echo ""
+            print_info "Your application is now running on Azure!"
+            echo ""
+            print_info "Next steps:"
+            echo "  • azd has printed your application URL above"
+            echo "  • Set up production OAuth app with your Azure domain"
+            echo "  • Update GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET for production"
+            echo ""
+            echo -e "${BOLD}Useful commands:${NC}"
+            echo -e "  View logs:    ${CYAN}azd logs${NC}"
+            echo -e "  Redeploy:     ${CYAN}azd deploy${NC}"
+            echo -e "  Tear down:    ${CYAN}azd down${NC}"
+            echo ""
+        else
+            print_error "Deployment failed"
+            print_info "Check the error messages above and try again"
+            exit 1
+        fi
+    else
+        print_info "Skipping deployment. To deploy manually, run:"
+        echo "  azd up"
+    fi
+}
+
+# =============================================================================
 # Summary
 # =============================================================================
 
@@ -699,74 +939,16 @@ print_summary() {
         print_success ".env file created"
     fi
     
-    echo ""
-    print_info "Next steps for LOCAL DEVELOPMENT:"
-    echo ""
-    echo -e "  ${BOLD}1. Start with Docker Compose (Recommended):${NC}"
-    echo -e "     ${CYAN}docker-compose --profile combined up${NC}"
-    echo ""
-    echo "     This starts:"
-    echo "       • MongoDB container"
-    echo "       • Express backend + Vite frontend on port 3000"
-    echo ""
-    echo -e "  ${BOLD}2. Access the application:${NC}"
-    echo -e "     ${GREEN}http://localhost:3000${NC}"
-    echo ""
-    echo -e "  ${BOLD}3. Test OAuth login:${NC}"
-    echo "     • Click 'Sign in with GitHub'"
-    echo "     • Authorize the app"
-    echo ""
+    print_success "Dependencies installed"
+    print_success "Packages built"
+    
+    if [[ "$DEPLOYMENT_TARGET" == "local" ]]; then
+        print_success "Docker containers running"
+    else
+        print_success "Deployed to Azure"
+    fi
     
     echo ""
-    print_warning "${BOLD}TROUBLESHOOTING: MongoDB Connection Errors${NC}"
-    echo ""
-    echo "  If you see 'connect ECONNREFUSED ::1:27017' or 'localhost:27017' errors:"
-    echo ""
-    echo -e "  ${BOLD}1. Check your .env file:${NC}"
-    echo "     • MONGODB_URI should be COMMENTED OUT (starts with #)"
-    echo "     • If you see MONGODB_URI=mongodb://localhost:27017, DELETE that line"
-    echo "     • The correct line should be:"
-    echo -e "       ${CYAN}# MONGODB_URI - DO NOT SET for local dev!${NC}"
-    echo ""
-    echo -e "  ${BOLD}2. Verify MongoDB container is running:${NC}"
-    echo -e "     ${CYAN}docker ps | grep mongodb${NC}"
-    echo "     • You should see 'template-doctor-mongodb' running"
-    echo ""
-    echo -e "  ${BOLD}3. Restart Docker Compose:${NC}"
-    echo -e "     ${CYAN}docker-compose down${NC}"
-    echo -e "     ${CYAN}docker-compose --profile combined up${NC}"
-    echo ""
-    echo "  Docker Compose automatically connects containers via the service name 'mongodb',"
-    echo "  NOT 'localhost'. The MONGODB_URI environment variable should be unset for local dev."
-    echo ""
-    print_info "For PRODUCTION deployment:"
-    echo ""
-    echo -e "  ${BOLD}1. Run azd up:${NC}"
-    echo -e "     ${CYAN}azd init${NC}  # First time only"
-    echo -e "     ${CYAN}azd up${NC}    # Deploys everything with Managed Identity"
-    echo ""
-    echo "     This automatically:"
-    echo "       ✓ Provisions Cosmos DB (serverless, MongoDB API)"
-    echo "       ✓ Creates Container App with System-Assigned MI"
-    echo "       ✓ Grants MI access to Cosmos DB (no connection strings!)"
-    echo "       ✓ Deploys your application"
-    echo ""
-    echo -e "  ${BOLD}2. Access your app:${NC}"
-    echo "     • URL printed at end of azd up"
-    echo "     • Example: https://web-abc123.azurecontainerapps.io"
-    echo ""
-    print_warning "  ${BOLD}Before deploying:${NC} Make sure you have UAMI configured for azd!"
-    echo "     • azd needs User-Assigned Managed Identity to provision resources"
-    echo "     • See: https://learn.microsoft.com/azure/developer/azure-developer-cli/managed-identity"
-    echo ""
-    
-    echo ""
-    print_info "Documentation:"
-    echo "  • docs/usage/DOCKER.md"
-    echo "  • docs/deployment/COSMOS_DB_PORTAL_SETUP.md"
-    echo "  • README.md"
-    echo ""
-    
     print_success "Happy template analyzing! 🚀"
     echo ""
 }
@@ -781,14 +963,46 @@ main() {
     # Change to repo root
     cd "$REPO_ROOT"
     
-    # Run setup steps
+    # Step 1: Choose deployment target
+    select_deployment_target
+    
+    # Step 2: Check prerequisites
     check_prerequisites
+    
+    # Step 3: GitHub OAuth
     setup_github_oauth
+    
+    # Step 4: GitHub PAT
     setup_github_pat
-    setup_mongodb
+    
+    # Step 5 (local) or 4 (azure): Admin users
     setup_admin_user
-    setup_dispatch_repo
+    
+    # Step 5 (azure) or skip: Dispatch repo (only needed for Azure)
+    if [[ "$DEPLOYMENT_TARGET" == "azure" ]]; then
+        setup_dispatch_repo
+    else
+        DISPATCH_TARGET_REPO="Template-Doctor/template-doctor"
+    fi
+    
+    # MongoDB setup
+    setup_mongodb
+    
+    # Create .env file
     create_env_file
+    
+    # Install dependencies
+    install_dependencies
+    
+    # Build packages
+    build_packages
+    
+    # Deploy based on target
+    if [[ "$DEPLOYMENT_TARGET" == "local" ]]; then
+        start_local_development
+    else
+        deploy_to_azure
+    fi
     
     # Print summary
     print_summary

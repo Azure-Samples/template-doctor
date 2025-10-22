@@ -83,9 +83,9 @@ Template Doctor is a **containerized monorepo** with the following structure:
 
 # Installation and Setup
 
-## 🚀 New Users - Automated Setup (Recommended)
+## 🚀 Automated Setup Wizard (Recommended)
 
-For first-time setup, we provide a **comprehensive setup wizard** that guides you through everything:
+The **fastest way to get started** - our interactive wizard handles everything:
 
 ```bash
 git clone https://github.com/Template-Doctor/template-doctor.git
@@ -93,20 +93,41 @@ cd template-doctor
 ./scripts/full-setup.sh
 ```
 
-The wizard will:
+The wizard will ask: **"Are you setting up for local development or Azure deployment?"**
 
-- ✅ Check prerequisites (Azure CLI, azd, Docker)
+### Local Development Path (5 minutes)
+- ✅ Check prerequisites (Node.js, Docker)
 - ✅ Guide you through GitHub OAuth App creation
-- ✅ Help you create a GitHub Personal Access Token with correct scopes
-- ✅ Configure MongoDB (existing or new Cosmos DB)
-- ✅ Set up admin users and environment variables
-- ✅ Optionally configure UAMI for GitHub Actions CI/CD
-- ✅ Deploy to Azure with `azd provision` and `azd deploy`
-- ✅ Verify the deployment is working
+- ✅ Create GitHub Personal Access Token
+- ✅ Configure MongoDB (automatic Docker setup)
+- ✅ Set up admin users
+- ✅ Install npm dependencies
+- ✅ Build all packages
+- ✅ **Start Docker containers automatically**
+- ✅ **Open http://localhost:3000 in your browser**
 
-**This is the easiest way to get started!** The script is interactive, validates configuration at each step, and provides helpful troubleshooting tips.
+### Azure Production Path (10 minutes)
+- ✅ Check prerequisites (Node.js, Azure CLI, azd)
+- ✅ Guide you through GitHub OAuth App creation
+- ✅ Create GitHub Personal Access Token
+- ✅ Configure Cosmos DB (automatic azd setup)
+- ✅ Set up admin users and workflow repository
+- ✅ Install npm dependencies
+- ✅ Build all packages
+- ✅ **Run `azd up` to provision and deploy**
+- ✅ **Open your Azure app URL**
 
-For manual setup or local development only, see sections below.
+> [!TIP]
+> The wizard is interactive, validates configuration at each step, and provides helpful troubleshooting tips. **This is the easiest way to get Template Doctor running!**
+
+---
+
+## Manual Setup
+
+If you prefer to set things up manually, choose your path:
+
+- **[Local Development](#local-development-docker)** - Run on your machine with Docker
+- **[Production Deployment](#production-deployment-azure)** - Deploy to Azure with azd
 
 ## Prerequisites
 
