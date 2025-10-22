@@ -85,6 +85,11 @@ import './scripts/ruleset-modal.ts'; // Ruleset configuration modal (migrated fr
 import './scripts/batch-scan.ts'; // Batch scan with cancel/resume support and IndexedDB persistence
 import './scripts/azd-validation.ts'; // AZD provision testing with live log streaming
 
+// Generic Workflow System (NEW)
+import './services/workflow-service.ts'; // Generic workflow execution service
+import './components/generic-workflow-ui.ts'; // Reusable workflow UI component
+import './modules/azd-validation-workflow.ts'; // AZD validation via generic workflow system
+
 // Expose a typed-friendly facade (will refine later)
 // Minimal surface typings; deeper analyzer/api client types live in their respective modules.
 export const Analyzer: any = (window as any).TemplateAnalyzer;

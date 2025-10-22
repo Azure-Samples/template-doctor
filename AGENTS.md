@@ -2,6 +2,87 @@
 
 This document provides specific guidance for AI agents working with the Template Doctor codebase. It complements the README.md with focused information for automated assistance.
 
+## ⛔ FORBIDDEN - Testing Framework Policy
+
+**CRITICAL: DO NOT ADD ANY TEST FRAMEWORKS OTHER THAN VITEST**
+
+- ✅ **USE VITEST ONLY** - All tests (unit, integration, API, E2E) use Vitest
+- ❌ **FORBIDDEN: supertest, jest, mocha, chai, jasmine, ava, tap**
+- ❌ **FORBIDDEN: Any additional test runners or assertion libraries**
+
+**Why Vitest Only:**
+- Already installed and configured for the entire project
+- Handles unit tests, integration tests, AND API endpoint testing
+- No need for supertest - Vitest can test Express routes directly
+- Playwright handles browser E2E tests (separate from Vitest)
+
+**API Testing Pattern (Use Vitest, NOT supertest):**
+```typescript
+import { describe, it, expect, vi } from 'vitest';
+import { Request, Response } from 'express';
+import { someRouteHandler } from '../routes/my-route';
+
+it('should handle API request', async () => {
+  const req = { body: { data: 'test' } } as Request;
+  const res = { json: vi.fn(), status: vi.fn().mockReturnThis() } as unknown as Response;
+  
+  await someRouteHandler(req, res);
+  
+  expect(res.status).toHaveBeenCalledWith(200);
+  expect(res.json).toHaveBeenCalledWith({ success: true });
+});
+```
+
+**Before adding ANY testing dependency, check this policy first.**
+
+## ⛔ FORBIDDEN - User Interface Policy
+
+**CRITICAL: NEVER USE alert(), confirm(), OR prompt()**
+
+- ✅ **USE NOTIFICATION SYSTEM ONLY** - showNotification() for all user feedback
+- ❌ **FORBIDDEN: alert(), confirm(), prompt()**
+- ❌ **FORBIDDEN: window.alert, window.confirm, window.prompt**
+- ❌ **FORBIDDEN: Native browser dialogs of any kind**
+
+**Why No Native Dialogs:**
+- Block the entire browser tab (terrible UX)
+- Cannot be styled or controlled
+- Break automated testing (Playwright cannot handle them reliably)
+- Look unprofessional and outdated
+- No way to test behavior programmatically
+
+**Notification System Pattern:**
+```typescript
+import { showNotification } from './src/notifications/notifications.ts';
+
+// Success message
+showNotification('success', 'Operation Complete', 'Your changes were saved successfully.');
+
+// Error message  
+showNotification('error', 'Operation Failed', error.message);
+
+// Warning message
+showNotification('warning', 'Missing Input', 'Please enter a template URL.');
+
+// Info message
+showNotification('info', 'Configuration Preview', 'See console for details.');
+```
+
+**For confirmations, use custom modal dialogs (not confirm()):**
+```typescript
+// WRONG ❌
+if (confirm('Delete this?')) { ... }
+
+// RIGHT ✅
+showConfirmDialog({
+  title: 'Confirm Deletion',
+  message: 'Are you sure you want to delete this?',
+  onConfirm: () => { ... }
+});
+```
+
+**Before writing ANY user-facing message, use the notification system.**
+
 ## Project Overview
 
 Template Doctor analyzes and validates sample templates, with a focus on Azure Developer CLI (azd) templates. It runs as a containerized application with Express backend and Vite frontend.
@@ -277,9 +358,77 @@ The script exits non‑zero on the first critical failure (missing endpoint / un
 - `docs/development/OAUTH_CONFIGURATION.md`: OAuth setup details
 - `docs/development/EXPRESS_MIGRATION_MATRIX.md`: Azure Functions → Express migration tracking
 - `docs/development/AZD_VALIDATION_ARTIFACT_PARSING.md`: **CRITICAL** - Implementation plan for accurate AZD validation (ACTIVE WORK)
+- `docs/development/GENERIC_WORKFLOW_SYSTEM.md`: **NEW** - Generic workflow execution system documentation
+- `docs/development/NEW_WORKFLOW_GUIDE.md`: **NEW** - Guide for adding new workflows
 - `docs/usage/GITHUB_ACTION_SETUP.md`: GitHub Action setup guide
 - `docker-compose.yml`: Multi-container development setup
 - `Dockerfile.combined`: Single-container production build
+
+## Adding New Workflows (CRITICAL GUIDANCE FOR AGENTS)
+
+**When a user requests triggering a new GitHub Actions workflow, use the Generic Workflow Execution System.**
+
+### DO NOT create new specific endpoints
+
+❌ **WRONG**: Creating new specific endpoints like `/api/v4/validation-xyz`
+✅ **CORRECT**: Configure the workflow and use `/api/v4/workflow-execute`
+
+### Quick Steps:
+
+1. **Create the GitHub Actions workflow** in `.github/workflows/my-workflow.yml`
+   - Must support `workflow_dispatch` trigger
+   - Must accept `run_id` input parameter
+   - Should upload artifacts with results
+
+2. **Configure the workflow** by adding to MongoDB `workflow_configs` collection:
+   ```javascript
+   {
+     id: "my-workflow",
+     name: "My Workflow",
+     workflowFile: "my-workflow.yml",
+     artifactCompressed: true,
+     streamLogs: true,
+     customParser: "markdown",  // or "json", "log", or custom
+     defaultInputs: { param: "value" },
+     timeout: 300000
+   }
+   ```
+
+3. **Use the generic endpoints**:
+   - Trigger: `POST /api/v4/workflow-execute`
+   - Status: `GET /api/v4/workflow-status`
+   - Cancel: `POST /api/v4/workflow-cancel`
+
+4. **(Optional) Register custom parser** if artifact format is non-standard:
+   ```typescript
+   import { registerParser } from './services/workflow-parser-registry';
+   registerParser('my-parser', (content, config) => { /* parse logic */ });
+   ```
+
+### Built-in Features:
+
+- ✅ Automatic ZIP artifact detection and decompression
+- ✅ Real-time job log streaming (if `streamLogs: true`)
+- ✅ Built-in parsers: markdown, JSON, log, azd-validation
+- ✅ OAuth authentication required
+- ✅ Rate limiting applied
+- ✅ Workflow-specific result templates
+
+### References:
+
+- **Complete Guide**: `docs/development/NEW_WORKFLOW_GUIDE.md`
+- **System Documentation**: `docs/development/GENERIC_WORKFLOW_SYSTEM.md`
+- **Example Workflows**: See `packages/server/src/services/workflow-config-loader.ts` for defaults
+
+### Key Files:
+
+- `packages/server/src/types/workflow.ts` - Type definitions
+- `packages/server/src/services/workflow-service.ts` - Core logic (trigger/status/cancel/artifacts)
+- `packages/server/src/services/workflow-parser-registry.ts` - Parser plugins
+- `packages/server/src/services/workflow-config-loader.ts` - Configuration management
+- `packages/server/src/routes/generic-workflow.ts` - API endpoints
+
+**REMEMBER**: The generic system is designed to make adding workflows trivial. DO NOT duplicate functionality by creating new specific endpoints. Configure, don't code.
 
 ## Security Considerations
 

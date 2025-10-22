@@ -146,6 +146,237 @@ Notes:
 - The status endpoint queries the GitHub API with either the client-provided run ID or falls back to in-memory store
 - The validation workflow includes additional steps like location determination, repository cloning, and running the microsoft/template-validation-action
 
+---
+
+## Generic Workflow Execution System
+
+**NEW**: Template Doctor now supports a unified workflow execution system that allows triggering any GitHub Actions workflow without creating new endpoints. This system replaces the pattern of creating workflow-specific endpoints (like `/validate-template`, `/docker-scan`, etc.) with a single generic execution framework.
+
+### Architecture Overview
+
+```mermaid
+graph TB
+    subgraph "Frontend Layer"
+        UI[User Interface]
+        WC[Workflow Component]
+    end
+
+    subgraph "Backend Layer"
+        API[Generic Workflow API]
+        WS[Workflow Service]
+        PR[Parser Registry]
+        CL[Config Loader]
+    end
+
+    subgraph "Storage Layer"
+        DB[(MongoDB - workflow_configs)]
+    end
+
+    subgraph "GitHub"
+        GHA[GitHub Actions]
+        WF1[validation-template.yml]
+        WF2[validation-docker-image.yml]
+        WF3[validation-ossf.yml]
+        WFN[custom-workflow.yml]
+    end
+
+    UI -->|1. Select workflow| WC
+    WC -->|2. POST /workflow-execute| API
+    API -->|3. Load config| CL
+    CL -->|4. Query| DB
+    DB -->|5. Return config| CL
+    API -->|6. Trigger| WS
+    WS -->|7. Dispatch| GHA
+    GHA -->|8. Execute| WF1
+    GHA -->|8. Execute| WF2
+    GHA -->|8. Execute| WF3
+    GHA -->|8. Execute| WFN
+    
+    WC -->|9. Poll| API
+    API -->|10. Status| WS
+    WS -->|11. Query| GHA
+    GHA -->|12. Status + logs + artifacts| WS
+    WS -->|13. Download artifact| GHA
+    WS -->|14. Parse| PR
+    PR -->|15. Parsed result| API
+    API -->|16. Result + template| WC
+    WC -->|17. Render| UI
+
+    class API,WS,PR,CL highlight
+    class DB highlight
+    classDef highlight fill:#f9f,stroke:#333,stroke-width:2px
+```
+
+### Generic Workflow Flow
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant FE as Frontend
+    participant API as Generic Workflow API
+    participant WS as Workflow Service
+    participant PR as Parser Registry
+    participant DB as MongoDB
+    participant GH as GitHub Actions
+
+    Note over FE,API: All requests require OAuth authentication
+
+    U->>FE: Select workflow (e.g., "azd-validation")
+    FE->>API: POST /api/v4/workflow-execute + Bearer token
+    Note right of FE: { workflowId: "azd-validation",<br/>inputs: { templateUrl: "..." } }
+    
+    API->>API: Auth Middleware: Validate token
+    API->>DB: Load workflow configuration
+    DB-->>API: Return config (workflowFile, parser, timeout, etc.)
+    
+    API->>WS: triggerWorkflow(config, inputs)
+    WS->>GH: POST /repos/.../actions/workflows/{file}/dispatches
+    Note right of WS: workflow_dispatch with run_id input
+    GH-->>WS: 204 No Content
+    WS->>WS: Wait 2s for workflow to start
+    WS->>GH: GET /repos/.../actions/runs?event=workflow_dispatch
+    GH-->>WS: Return workflow runs (extract run ID)
+    WS-->>API: Return workflowRunId
+    API-->>FE: Return { workflowRunId, status: "queued" }
+
+    loop Poll until complete
+        FE->>API: GET /api/v4/workflow-status?workflowRunId={id}&workflowId={id} + Bearer token
+        API->>API: Auth Middleware: Validate token
+        API->>DB: Load workflow config
+        DB-->>API: Return config
+        API->>WS: getWorkflowStatus(runId, config)
+        
+        WS->>GH: GET /repos/.../actions/runs/{runId}
+        GH-->>WS: Return status, conclusion
+        
+        alt streamLogs is true
+            WS->>GH: GET /repos/.../actions/runs/{runId}/jobs
+            GH-->>WS: Return jobs list
+            loop For each job
+                WS->>GH: GET /repos/.../actions/jobs/{jobId}/logs
+                GH-->>WS: Return logs
+            end
+        end
+        
+        alt Workflow completed
+            WS->>GH: GET /repos/.../actions/runs/{runId}/artifacts
+            GH-->>WS: Return artifacts list
+            WS->>GH: GET /repos/.../actions/artifacts/{artifactId}/{archive_format}
+            GH-->>WS: Return artifact ZIP
+            WS->>WS: Detect ZIP (magic bytes 0x50 0x4B)
+            WS->>WS: Extract first file from ZIP
+            WS->>PR: parseArtifact(content, config)
+            PR->>PR: Select parser (config.customParser or auto-detect)
+            PR-->>WS: Return parsed result
+        end
+        
+        WS-->>API: Return { status, conclusion, jobs, logs, result }
+        API-->>FE: Return complete status
+    end
+
+    FE->>FE: Load result template (config.resultTemplate)
+    FE-->>U: Render results with workflow-specific template
+```
+
+### Key Components
+
+1. **Workflow Configuration** (`workflow_configs` MongoDB collection):
+   - Stores workflow metadata: `id`, `name`, `workflowFile`, `artifactCompressed`, `streamLogs`, `customParser`, `resultTemplate`, `defaultInputs`, `timeout`
+   - Loaded on server startup via `initializeWorkflowConfigs()`
+   - Configurable via `/api/v4/setup` endpoint (admin only)
+
+2. **Workflow Service** (`packages/server/src/services/workflow-service.ts`):
+   - `triggerWorkflow()`: Dispatches GitHub workflow with run_id input
+   - `getWorkflowStatus()`: Fetches status + jobs + logs + artifacts
+   - `cancelWorkflow()`: Cancels running workflow
+   - `downloadArtifact()`: Auto-detects ZIP, extracts, returns content
+   - `fetchJobLogs()`: Streams logs from all jobs
+
+3. **Parser Registry** (`packages/server/src/services/workflow-parser-registry.ts`):
+   - Built-in parsers: `markdown`, `log`, `json`, `azd-validation`
+   - Custom parser registration via `registerParser(name, parserFn)`
+   - Auto-detection based on content type
+
+4. **Generic API Endpoints** (`packages/server/src/routes/generic-workflow.ts`):
+   - `GET /api/v4/workflows` - List all workflow configurations
+   - `POST /api/v4/workflow-execute` - Trigger workflow (requires auth)
+   - `GET /api/v4/workflow-status` - Poll status with logs/results (requires auth)
+   - `POST /api/v4/workflow-cancel` - Cancel workflow (requires auth)
+
+### Default Workflows
+
+The system includes three pre-configured workflows:
+
+| Workflow ID         | GitHub Actions File          | Timeout | Stream Logs | Parser         |
+|---------------------|------------------------------|---------|-------------|----------------|
+| azd-validation      | validation-template.yml      | 10 min  | Yes         | azd-validation |
+| docker-image-scan   | validation-docker-image.yml  | 5 min   | No          | markdown       |
+| ossf-scorecard      | validation-ossf.yml          | 5 min   | No          | json           |
+
+### Adding New Workflows
+
+**CRITICAL**: Do NOT create new specific endpoints for workflows. Use the generic system:
+
+1. Create GitHub Actions workflow file (`.github/workflows/my-workflow.yml`)
+   - Must support `workflow_dispatch` trigger
+   - Must accept `run_id` input parameter
+   - Should upload artifacts with results
+
+2. Configure workflow in MongoDB via `/api/v4/setup` (admin) or programmatically:
+   ```javascript
+   {
+     id: "my-workflow",
+     name: "My Workflow",
+     workflowFile: "my-workflow.yml",
+     artifactCompressed: true,
+     streamLogs: true,
+     customParser: "markdown",
+     defaultInputs: { param: "value" },
+     timeout: 300000
+   }
+   ```
+
+3. Use generic endpoints from frontend:
+   ```javascript
+   // Trigger
+   const { workflowRunId } = await fetch('/api/v4/workflow-execute', {
+     method: 'POST',
+     headers: { 'Authorization': `Bearer ${token}` },
+     body: JSON.stringify({ workflowId: 'my-workflow', inputs: { ... } })
+   });
+
+   // Poll status
+   const status = await fetch(`/api/v4/workflow-status?workflowRunId=${runId}&workflowId=my-workflow`, {
+     headers: { 'Authorization': `Bearer ${token}` }
+   });
+   ```
+
+4. (Optional) Register custom parser if needed:
+   ```typescript
+   import { registerParser } from './services/workflow-parser-registry';
+   registerParser('my-parser', (content, config) => {
+     // Parse logic
+     return parsedResult;
+   });
+   ```
+
+### Benefits
+
+- ✅ **No Code Changes**: Add workflows via configuration, not code
+- ✅ **Unified API**: Single set of endpoints for all workflows
+- ✅ **Automatic Features**: ZIP extraction, log streaming, parsing
+- ✅ **Extensible**: Custom parsers for any artifact format
+- ✅ **Consistent Auth**: All workflows use OAuth authentication
+- ✅ **Result Templates**: Workflow-specific rendering
+
+### Documentation
+
+- **System Architecture**: [GENERIC_WORKFLOW_SYSTEM.md](./GENERIC_WORKFLOW_SYSTEM.md)
+- **User Guide**: [NEW_WORKFLOW_GUIDE.md](./NEW_WORKFLOW_GUIDE.md)
+- **AI Agent Guidance**: [AGENTS.md](../../AGENTS.md#adding-new-workflows-critical-guidance-for-agents)
+
+---
+
 ## Submit Analysis Workflow
 
 This diagram shows how the Template Doctor processes and submits analysis results to be stored in the repository.

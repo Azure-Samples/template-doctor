@@ -175,6 +175,26 @@ export interface Configuration {
   updatedAt: Date;
 }
 
+/**
+ * WorkflowConfig collection - GitHub Actions workflow configurations
+ */
+export interface WorkflowConfigDocument {
+  _id?: ObjectId;
+  id: string; // Unique workflow ID
+  name: string; // Display name
+  workflowFile: string; // GitHub workflow filename
+  description?: string;
+  artifactCompressed: boolean;
+  artifactNamePattern?: string;
+  streamLogs: boolean;
+  customParser?: string;
+  resultTemplate?: string;
+  defaultInputs?: Record<string, string>;
+  timeout?: number;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 // ===== Database Service Class =====
 
 class DatabaseService {
@@ -428,6 +448,14 @@ class DatabaseService {
   get configuration(): Collection<Configuration> {
     if (!this.db) throw new Error('Database not connected');
     return this.db.collection<Configuration>('configuration');
+  }
+
+  /**
+   * Workflow configurations collection
+   */
+  get workflowConfigs(): Collection<WorkflowConfigDocument> {
+    if (!this.db) throw new Error('Database not connected');
+    return this.db.collection<WorkflowConfigDocument>('workflow_configs');
   }
 }
 

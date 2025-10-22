@@ -378,6 +378,30 @@
                 </div>
             </div>
             
+            <!-- Workflow Configurations -->
+            <div class="section">
+                <div class="section-header">
+                    <i class="fas fa-project-diagram"></i>
+                    Workflow Configurations
+                </div>
+                <div class="section-content">
+                    <p style="margin-bottom: 15px; color: #6b7280;">
+                        Configure GitHub Actions workflows that can be triggered via the generic workflow system.
+                    </p>
+                    <div id="workflows-list" class="deprecated-models">
+                        <!-- Will be populated by JavaScript -->
+                    </div>
+                    <div class="btn-group" style="margin-top: 20px; padding-top: 15px;">
+                        <button class="btn btn-secondary" onclick="refreshWorkflows()">
+                            <i class="fas fa-sync-alt"></i> Refresh Workflows
+                        </button>
+                        <span style="color: #6b7280; font-size: 12px; align-self: center;">
+                            Load workflows from backend configuration
+                        </span>
+                    </div>
+                </div>
+            </div>
+            
             <!-- Deprecated Models -->
             <div class="section">
                 <div class="section-header">
@@ -611,8 +635,9 @@
             };
             
             // For demo purposes, just show the JSON
-            alert('Configuration would be saved:\\n\\n' + JSON.stringify(formData, null, 2));
+            showNotification('info', 'Configuration Preview', 'Configuration would be saved (see console for details)');
             console.log('Configuration to save:', formData);
+            console.log('Configuration JSON:', JSON.stringify(formData, null, 2));
         }
         
         async function testConnection() {
@@ -620,13 +645,13 @@
                 const response = await fetch('/api/v4/client-settings');
                 if (response.ok) {
                     const data = await response.json();
-                    alert('✅ Connection successful!\\n\\nReceived configuration with ' + Object.keys(data).length + ' settings.');
+                    showNotification('success', 'Connection Successful', `Received configuration with ${Object.keys(data).length} settings.`);
                     updateConnectionStatus(true, 'Connection test successful');
                 } else {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
             } catch (error) {
-                alert('❌ Connection failed:\\n\\n' + error.message);
+                showNotification('error', 'Connection Failed', error.message);
                 updateConnectionStatus(false, 'Connection test failed: ' + error.message);
             }
         }
@@ -634,11 +659,65 @@
         function refreshDeprecatedModels() {
             // For demo purposes, simulate a workflow trigger
             if (confirm('This will trigger a workflow to update deprecated models. Continue?')) {
-                alert('🔄 Deprecated models refresh initiated!\\n\\nThis would normally trigger a GitHub workflow to update the list.');
+                showNotification('info', 'Deprecated Models Refresh', 'Workflow initiated to update the list.');
                 // In a real implementation, this would call an API endpoint
                 console.log('Would trigger deprecated models workflow');
             }
         }
+        
+        async function refreshWorkflows() {
+            try {
+                const response = await fetch('/api/v4/workflows');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                const { workflows, count } = await response.json();
+                populateWorkflows(workflows);
+                showNotification('success', 'Workflows Loaded', `Loaded ${count} workflow configuration(s)`);
+            } catch (error) {
+                showNotification('error', 'Failed to Load Workflows', error.message);
+                console.error('Failed to load workflows:', error);
+            }
+        }
+        
+        function populateWorkflows(workflows) {
+            const container = document.getElementById('workflows-list');
+            if (!workflows || workflows.length === 0) {
+                container.innerHTML = '<div style=\"color: #6b7280; font-style: italic; text-align: center; padding: 20px;\">No workflows configured</div>';
+                return;
+            }
+            
+            container.innerHTML = workflows.map(wf => `
+                <div class=\"model-tag\" style=\"background: #dbeafe; border-color: #3b82f6; color: #1e40af;\">
+                    <div style=\"flex: 1;\">
+                        <div style=\"font-weight: 600;\">${escapeHtml(wf.name || wf.id)}</div>
+                        <div style=\"font-size: 11px; opacity: 0.8; margin-top: 2px;\">
+                            ${wf.workflowFile}
+                            ${wf.streamLogs ? ' • Logs' : ''}
+                            ${wf.customParser ? (' • ' + wf.customParser) : ''}
+                        </div>
+                    </div>
+                    <span style=\"font-size: 11px; opacity: 0.7;\">${wf.id}</span>
+                </div>
+            `).join('');
+            
+            // Add count info
+            const countInfo = document.createElement('div');
+            countInfo.style.cssText = 'grid-column: 1 / -1; text-align: center; color: #6b7280; font-size: 12px; margin-top: 10px;';
+            countInfo.innerHTML = `${workflows.length} workflow${workflows.length !== 1 ? 's' : ''} configured`;
+            container.appendChild(countInfo);
+        }
+        
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+        
+        // Auto-load workflows on page load
+        window.addEventListener('load', () => {
+            refreshWorkflows().catch(err => console.warn('Auto-refresh workflows failed:', err));
+        });
     </script>
 
     <!-- Footer -->

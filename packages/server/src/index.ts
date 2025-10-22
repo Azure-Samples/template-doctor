@@ -70,6 +70,7 @@ import { adminConfigRouter } from './routes/admin-config.js';
 import { adminRouter } from './routes/admin.js';
 import leaderboardsRouter from './routes/leaderboards.js';
 import { azdTestRouter } from './routes/azd-test.js';
+import { genericWorkflowRouter } from './routes/generic-workflow.js';
 
 // Initialize database connection
 import { database } from './services/database.js';
@@ -106,6 +107,7 @@ app.use('/api/v4', actionsRouter);
 app.use('/api/v4', miscRouter);
 app.use('/api/v4', resultsRouter);
 app.use('/api/v4', azdTestRouter); // AZD deployment test results
+app.use('/api/v4', genericWorkflowRouter); // Generic workflow execution system
 app.use('/api/v4/admin', adminConfigRouter); // Admin configuration endpoints
 app.use('/api/admin', adminRouter); // Debug and inspection endpoints
 app.use('/api/v4/leaderboards', leaderboardsRouter); // Leaderboards analytics
@@ -163,6 +165,16 @@ export function startServer(port: number = Number(defaultPort)): Promise<http.Se
         startupLogger.info('Configuration initialized');
       } catch (error) {
         startupLogger.error({ err: error }, 'Failed to initialize configuration');
+      }
+
+      // Initialize workflow configurations
+      try {
+        startupLogger.info('Initializing workflow configurations...');
+        const { initializeWorkflowConfigs } = await import('./services/workflow-config-loader.js');
+        await initializeWorkflowConfigs();
+        startupLogger.info('Workflow configurations initialized');
+      } catch (error) {
+        startupLogger.error({ err: error }, 'Failed to initialize workflow configurations');
       }
 
       resolve(server);

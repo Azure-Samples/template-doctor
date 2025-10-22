@@ -586,6 +586,42 @@ Quick checklist
   - Globally: set `archiveEnabled: true` in runtime-config, or
   - Per-run: check the “Also save metadata to the centralized archive for this analysis” box in the analyze modal when global is off.
 
+## Generic Workflow Execution System
+
+Template Doctor includes a **Generic Workflow Execution System** that allows you to trigger any GitHub Actions workflow without writing custom code. This system is used for validation, security scanning, compliance checks, and more.
+
+### For Developers Adding New Workflows
+
+If you want to add your own custom workflows to Template Doctor:
+
+- 📖 **[Quick Start Guide](docs/development/NEW_WORKFLOW_GUIDE.md)** - Step-by-step instructions for adding new workflows
+- 🏗️ **[System Architecture](docs/development/GENERIC_WORKFLOW_SYSTEM.md)** - Complete technical documentation
+- 📋 **[Architecture Overview](docs/development/architecture.md#generic-workflow-execution-system)** - How it fits into Template Doctor
+
+### Key Features
+
+- ✅ **No Code Changes Required** - Configure via MongoDB or setup endpoint
+- ✅ **Automatic Artifact Parsing** - Built-in parsers for markdown, JSON, logs, and custom formats
+- ✅ **Real-time Log Streaming** - Monitor workflow execution with live job logs
+- ✅ **Result Templates** - Custom HTML rendering for workflow-specific results
+- ✅ **OAuth Protected** - All endpoints require GitHub authentication
+
+### Quick Example
+
+```javascript
+// Configure a new workflow
+db.workflow_configs.insertOne({
+  id: "my-validation",
+  name: "My Custom Validation",
+  workflowFile: "my-validation.yml",
+  streamLogs: true,
+  customParser: "markdown",
+  timeout: 300000
+});
+```
+
+Then trigger from the frontend or API - no additional code needed!
+
 ## Contributing
 
 - Add/update tests for features and fixes. Frontend E2E tests live in the app package; run from root via `npm test`.

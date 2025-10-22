@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AZD Validation - Generic Workflow Demo</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/notifications.css" />
+    <link rel="stylesheet" href="css/workflow.css" />
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f8fafc;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .header {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .header h1 {
+            margin: 0 0 10px 0;
+            color: #1f2937;
+        }
+        .header p {
+            margin: 0;
+            color: #6b7280;
+        }
+        .demo-controls {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .demo-controls label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #374151;
+        }
+        .demo-controls input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn:hover {
+            background: #2563eb;
+        }
+        .btn-danger {
+            background: #ef4444;
+        }
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+        #workflow-container {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-flask"></i> Generic Workflow System Demo</h1>
+            <p>Test the azd-validation workflow using the new generic workflow execution system</p>
+        </div>
+
+        <div class="demo-controls">
+            <label for="template-url">Template URL or owner/repo:</label>
+            <input type="text" id="template-url" placeholder="Azure-Samples/todo-nodejs-mongo" value="Azure-Samples/todo-nodejs-mongo">
+            <button class="btn" onclick="startValidation()" style="margin-top: 10px;">
+                <i class="fas fa-play"></i> Run Validation
+            </button>
+        </div>
+
+        <div id="workflow-container"></div>
+    </div>
+
+    <!-- Notification System Container -->
+    <div id="notification-container"></div>
+
+    <script type="module">
+        import { GenericWorkflowUI } from './src/components/generic-workflow-ui.ts';
+        import './src/notifications/notification-system.ts';
+        import './src/notifications/notifications.ts';
+
+        let currentWorkflowUI = null;
+
+        window.startValidation = function() {
+            const templateUrl = document.getElementById('template-url').value.trim();
+            if (!templateUrl) {
+                showNotification('warning', 'Missing Template URL', 'Please enter a template URL to validate.');
+                return;
+            }
+
+            // Destroy previous instance if exists
+            if (currentWorkflowUI) {
+                currentWorkflowUI.destroy();
+            }
+
+            // Extract owner/repo from URL if needed
+            let templateRef = templateUrl;
+            if (templateUrl.startsWith('http')) {
+                try {
+                    const url = new URL(templateUrl);
+                    const parts = url.pathname.split('/').filter(Boolean);
+                    if (parts.length >= 2) {
+                        templateRef = `${parts[0]}/${parts[1]}`;
+                    }
+                } catch (e) {
+                    console.warn('Failed to parse URL:', e);
+                }
+            }
+
+            console.log('Starting validation for:', templateRef);
+
+            // Create new workflow UI instance
+            currentWorkflowUI = new GenericWorkflowUI({
+                container: 'workflow-container',
+                workflowId: 'azd-validation',
+                inputs: {
+                    templateName: templateRef,
+                    templateUrl: templateUrl,
+                    targetRepoUrl: templateUrl,
+                },
+                onStateChange: (state, response) => {
+                    console.log('Workflow state changed:', state, response);
+                },
+                polling: {
+                    intervalMs: 10000,
+                    maxAttempts: 60,
+                },
+                features: {
+                    showLogs: true,
+                    showJobDetails: true,
+                    allowCancel: true,
+                },
+            });
+
+            // Auto-start
+            setTimeout(() => {
+                if (currentWorkflowUI) {
+                    currentWorkflowUI.start();
+                }
+            }, 500);
+        };
+    </script>
+</body>
+</html>
