@@ -37,11 +37,29 @@ ENV_CONFIGURED=false
 
 print_header() {
     echo ""
-    echo -e "${CYAN}${BOLD}╔══════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${CYAN}${BOLD}║                                                          ║${NC}"
-    echo -e "${CYAN}${BOLD}║        Template Doctor - Full Setup Wizard              ║${NC}"
-    echo -e "${CYAN}${BOLD}║                                                          ║${NC}"
-    echo -e "${CYAN}${BOLD}╚══════════════════════════════════════════════════════════╝${NC}"
+    echo -e "${CYAN}${BOLD}"
+    cat << 'EOF'
+╔══════════════════════════════════════════════════════════════════════╗
+║                                                                      ║
+║   ████████╗███████╗███╗   ███╗██████╗ ██╗      █████╗ ████████╗███████╗
+║   ╚══██╔══╝██╔════╝████╗ ████║██╔══██╗██║     ██╔══██╗╚══██╔══╝██╔════╝
+║      ██║   █████╗  ██╔████╔██║██████╔╝██║     ███████║   ██║   █████╗  
+║      ██║   ██╔══╝  ██║╚██╔╝██║██╔═══╝ ██║     ██╔══██║   ██║   ██╔══╝  
+║      ██║   ███████╗██║ ╚═╝ ██║██║     ███████╗██║  ██║   ██║   ███████╗
+║      ╚═╝   ╚══════╝╚═╝     ╚═╝╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝   ╚══════╝
+║                                                                      ║
+║                   ██████╗  ██████╗  ██████╗████████╗ ██████╗ ██████╗ 
+║                   ██╔══██╗██╔═══██╗██╔════╝╚══██╔══╝██╔═══██╗██╔══██╗
+║                   ██║  ██║██║   ██║██║        ██║   ██║   ██║██████╔╝
+║                   ██║  ██║██║   ██║██║        ██║   ██║   ██║██╔══██╗
+║                   ██████╔╝╚██████╔╝╚██████╗   ██║   ╚██████╔╝██║  ██║
+║                   ╚═════╝  ╚═════╝  ╚═════╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝
+║                                                                      ║
+║                            ⚕  Setup Wizard  ⚕                        ║
+║                                                                      ║
+╚══════════════════════════════════════════════════════════════════════╝
+EOF
+    echo -e "${NC}"
     echo ""
 }
 
@@ -98,39 +116,43 @@ ask_yes_no() {
 select_deployment_target() {
     print_section "Step 1: Choose Deployment Target"
     
-    print_info "Are you setting up for local development or Azure deployment?"
-    echo ""
-    echo "Choose your path:"
-    echo -e "  ${BOLD}1)${NC} ${CYAN}Local Development${NC} - Run on your machine with Docker (5 minutes)"
-    echo "     • Installs dependencies"
-    echo "     • Creates .env configuration"
-    echo "     • Builds all packages"
-    echo "     • Starts Docker containers"
-    echo "     • Opens http://localhost:3000"
-    echo ""
-    echo -e "  ${BOLD}2)${NC} ${MAGENTA}Azure Production${NC} - Deploy to Azure Container Apps (10 minutes)"
-    echo "     • Installs dependencies"
-    echo "     • Creates .env configuration"
-    echo "     • Runs azd up (provisions + deploys)"
-    echo "     • Opens your Azure app URL"
-    echo ""
-    
-    read -p "Your choice [1-2]: " -r
-    
-    case "$REPLY" in
-        1)
-            DEPLOYMENT_TARGET="local"
-            print_success "Selected: Local Development"
-            ;;
-        2)
-            DEPLOYMENT_TARGET="azure"
-            print_success "Selected: Azure Production Deployment"
-            ;;
-        *)
-            print_error "Invalid choice"
-            exit 1
-            ;;
-    esac
+    while true; do
+        print_info "Are you setting up for local development or Azure deployment?"
+        echo ""
+        echo "Choose your path:"
+        echo -e "  ${BOLD}1)${NC} ${CYAN}Local Development${NC} - Run on your machine with Docker (5 minutes)"
+        echo "     • Installs dependencies"
+        echo "     • Creates .env configuration"
+        echo "     • Builds all packages"
+        echo "     • Starts Docker containers"
+        echo "     • Opens http://localhost:3000"
+        echo ""
+        echo -e "  ${BOLD}2)${NC} ${MAGENTA}Azure Production${NC} - Deploy to Azure Container Apps (10 minutes)"
+        echo "     • Installs dependencies"
+        echo "     • Creates .env configuration"
+        echo "     • Runs azd up (provisions + deploys)"
+        echo "     • Opens your Azure app URL"
+        echo ""
+        
+        read -p "Your choice [1-2]: " -r
+        
+        case "$REPLY" in
+            1)
+                DEPLOYMENT_TARGET="local"
+                print_success "Selected: Local Development"
+                break
+                ;;
+            2)
+                DEPLOYMENT_TARGET="azure"
+                print_success "Selected: Azure Production Deployment"
+                break
+                ;;
+            *)
+                print_error "Invalid choice. Please enter 1 or 2."
+                echo ""
+                ;;
+        esac
+    done
     
     wait_for_enter
 }
@@ -246,73 +268,83 @@ setup_github_oauth() {
     echo -e "  ${BOLD}3)${NC} I will add values manually to .env later"
     echo ""
     
-    read -p "Your choice [1-3]: " -r
-    
-    case "$REPLY" in
-        1)
-            echo ""
-            print_info "Let's create a GitHub OAuth App:"
-            echo ""
-            echo -e "1. Open: ${CYAN}https://github.com/settings/developers${NC}"
-            echo -e "2. Click '${BOLD}New OAuth App${NC}'"
-            echo -e "3. Fill in:"
-            echo -e "   ${BOLD}Application name:${NC} Template Doctor"
-            echo -e "   ${BOLD}Homepage URL:${NC} http://localhost:3000 (for local dev)"
-            echo -e "   ${BOLD}Authorization callback URL:${NC} http://localhost:3000/callback.html"
-            echo -e "4. Click '${BOLD}Register application${NC}'"
-            echo -e "5. Copy the ${BOLD}Client ID${NC} (starts with Ov or Iv)"
-            echo -e "6. Click '${BOLD}Generate a new client secret${NC}'"
-            echo -e "7. Copy the ${BOLD}Client Secret${NC} (you won't see it again!)"
-            echo ""
-            print_warning "NOTE: For production, create a separate OAuth app with production URL"
-            echo ""
+    while true; do
+        read -p "Your choice [1-3]: " -r
+        
+        case "$REPLY" in
+            1)
+                echo ""
+                print_info "Let's create a GitHub OAuth App:"
+                echo ""
+                echo -e "1. Open: ${CYAN}https://github.com/settings/developers${NC}"
+                echo -e "2. Click '${BOLD}New OAuth App${NC}'"
+                echo -e "3. Fill in:"
+                echo -e "   ${BOLD}Application name:${NC} Template Doctor"
+                echo -e "   ${BOLD}Homepage URL:${NC} http://localhost:3000 (for local dev)"
+                echo -e "   ${BOLD}Authorization callback URL:${NC} http://localhost:3000/callback.html"
+                echo -e "4. Click '${BOLD}Register application${NC}'"
+                echo -e "5. Copy the ${BOLD}Client ID${NC} (starts with Ov or Iv)"
+                echo -e "6. Click '${BOLD}Generate a new client secret${NC}'"
+                echo -e "7. Copy the ${BOLD}Client Secret${NC} (you won't see it again!)"
+                echo ""
+                print_warning "NOTE: For production, create a separate OAuth app with production URL"
+                echo ""
+                
+                wait_for_enter
+                
+                echo ""
+                read -p "GitHub Client ID: " GITHUB_CLIENT_ID
+                read -sp "GitHub Client Secret: " GITHUB_CLIENT_SECRET
+                echo ""
+                
+                if [[ -z "$GITHUB_CLIENT_ID" || -z "$GITHUB_CLIENT_SECRET" ]]; then
+                    print_error "Both Client ID and Secret are required"
+                    exit 1
+                fi
+                
+                GITHUB_OAUTH_DONE=true
+                print_success "OAuth App configured!"
+                break
+                ;;
             
-            wait_for_enter
+            2)
+                echo ""
+                print_step "Great! Enter your OAuth App credentials:"
+                echo ""
+                
+                read -p "GitHub Client ID (starts with Ov or Iv): " GITHUB_CLIENT_ID
+                read -sp "GitHub Client Secret: " GITHUB_CLIENT_SECRET
+                echo ""
+                
+                if [[ -z "$GITHUB_CLIENT_ID" || -z "$GITHUB_CLIENT_SECRET" ]]; then
+                    print_error "Both Client ID and Secret are required"
+                    exit 1
+                fi
+                
+                GITHUB_OAUTH_DONE=true
+                print_success "OAuth credentials saved!"
+                break
+                ;;
             
-            echo ""
-            read -p "GitHub Client ID: " GITHUB_CLIENT_ID
-            read -sp "GitHub Client Secret: " GITHUB_CLIENT_SECRET
-            echo ""
+            3)
+                GITHUB_CLIENT_ID="<add-manually>"
+                GITHUB_CLIENT_SECRET="<add-manually>"
+                GITHUB_OAUTH_DONE=true
+                print_warning "You chose manual configuration."
+                echo ""
+                print_info "${BOLD}ACTION REQUIRED:${NC} After setup completes, edit ${CYAN}.env${NC} and add:"
+                echo -e "  ${BOLD}GITHUB_CLIENT_ID${NC}=your_oauth_client_id"
+                echo -e "  ${BOLD}GITHUB_CLIENT_SECRET${NC}=your_oauth_client_secret"
+                break
+                ;;
             
-            if [[ -z "$GITHUB_CLIENT_ID" || -z "$GITHUB_CLIENT_SECRET" ]]; then
-                print_error "Both Client ID and Secret are required"
-                exit 1
-            fi
-            
-            GITHUB_OAUTH_DONE=true
-            print_success "OAuth App configured!"
-            ;;
-            
-        2)
-            echo ""
-            print_step "Great! Enter your OAuth App credentials:"
-            echo ""
-            
-            read -p "GitHub Client ID (starts with Ov or Iv): " GITHUB_CLIENT_ID
-            read -sp "GitHub Client Secret: " GITHUB_CLIENT_SECRET
-            echo ""
-            
-            if [[ -z "$GITHUB_CLIENT_ID" || -z "$GITHUB_CLIENT_SECRET" ]]; then
-                print_error "Both Client ID and Secret are required"
-                exit 1
-            fi
-            
-            GITHUB_OAUTH_DONE=true
-            print_success "OAuth credentials saved!"
-            ;;
-            
-        3)
-            GITHUB_CLIENT_ID="<add-manually>"
-            GITHUB_CLIENT_SECRET="<add-manually>"
-            GITHUB_OAUTH_DONE=true
-            print_info "Skipping OAuth setup - remember to add GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET to .env"
-            ;;
-            
-        *)
-            print_error "Invalid choice"
-            exit 1
-            ;;
-    esac
+            *)
+                print_error "Invalid choice. Please enter 1, 2, or 3."
+                echo ""
+                continue
+                ;;
+        esac
+    done
     
     wait_for_enter
 }
@@ -342,10 +374,11 @@ setup_github_pat() {
     echo -e "  ${BOLD}3)${NC} I will add values manually to .env later"
     echo ""
     
-    read -p "Your choice [1-3]: " -r
-    
-    case "$REPLY" in
-        1)
+    while true; do
+        read -p "Your choice [1-3]: " -r
+        
+        case "$REPLY" in
+            1)
             echo ""
             print_info "Let's create a GitHub Personal Access Token:"
             echo ""
@@ -398,6 +431,7 @@ setup_github_pat() {
             
             GITHUB_PAT_DONE=true
             print_success "GitHub PATs configured!"
+            break
             ;;
             
         2)
@@ -436,6 +470,7 @@ setup_github_pat() {
             
             GITHUB_PAT_DONE=true
             print_success "GitHub PATs saved!"
+            break
             ;;
             
         3)
@@ -443,14 +478,22 @@ setup_github_pat() {
             GITHUB_TOKEN_ANALYZER="<add-manually>"
             GH_WORKFLOW_TOKEN="<add-manually>"
             GITHUB_PAT_DONE=true
-            print_info "Skipping GitHub PAT setup - remember to add tokens to .env"
+            print_warning "You chose manual configuration."
+            echo ""
+            print_info "${BOLD}ACTION REQUIRED:${NC} After setup completes, edit ${CYAN}.env${NC} and add:"
+            echo -e "  ${BOLD}GITHUB_TOKEN${NC}=ghp_your_token_here"
+            echo -e "  ${BOLD}GITHUB_TOKEN_ANALYZER${NC}=ghp_your_token_here (can be same)"
+            echo -e "  ${BOLD}GH_WORKFLOW_TOKEN${NC}=ghp_your_token_here (can be same)"
+            break
             ;;
             
         *)
-            print_error "Invalid choice"
-            exit 1
+            print_error "Invalid choice. Please enter 1, 2, or 3."
+            echo ""
+            continue
             ;;
-    esac
+        esac
+    done
     
     wait_for_enter
 }
@@ -524,35 +567,43 @@ setup_admin_user() {
     echo -e "  ${BOLD}2)${NC} I will configure manually later"
     echo ""
     
-    read -p "Your choice [1-2]: " -r
-    
-    case "$REPLY" in
-        1)
-            echo ""
-            print_step "Enter GitHub usernames (comma-separated):"
-            print_info "Example: user1,user2,user3"
-            echo ""
+    while true; do
+        read -p "Your choice [1-2]: " -r
+        
+        case "$REPLY" in
+            1)
+                echo ""
+                print_step "Enter GitHub usernames (comma-separated):"
+                print_info "Example: user1,user2,user3"
+                echo ""
+                
+                read -p "Admin GitHub users: " ADMIN_GITHUB_USERS
+                
+                if [[ -z "$ADMIN_GITHUB_USERS" ]]; then
+                    print_warning "No admin users specified - you can add them to .env later"
+                    ADMIN_GITHUB_USERS=""
+                else
+                    print_success "Admin users: $ADMIN_GITHUB_USERS"
+                fi
+                break
+                ;;
             
-            read -p "Admin GitHub users: " ADMIN_GITHUB_USERS
+            2)
+                ADMIN_GITHUB_USERS="<add-manually>"
+                print_warning "You chose manual configuration."
+                echo ""
+                print_info "${BOLD}ACTION REQUIRED:${NC} After setup completes, edit ${CYAN}.env${NC} and add:"
+                echo -e "  ${BOLD}ADMIN_GITHUB_USERS${NC}=username1,username2"
+                break
+                ;;
             
-            if [[ -z "$ADMIN_GITHUB_USERS" ]]; then
-                print_warning "No admin users specified - you can add them to .env later"
-                ADMIN_GITHUB_USERS=""
-            else
-                print_success "Admin users: $ADMIN_GITHUB_USERS"
-            fi
-            ;;
-            
-        2)
-            ADMIN_GITHUB_USERS="<add-manually>"
-            print_info "Skipping admin setup - remember to add ADMIN_GITHUB_USERS to .env"
-            ;;
-            
-        *)
-            print_error "Invalid choice"
-            exit 1
-            ;;
-    esac
+            *)
+                print_error "Invalid choice. Please enter 1 or 2."
+                echo ""
+                continue
+                ;;
+        esac
+    done
     
     wait_for_enter
 }
@@ -580,31 +631,39 @@ setup_dispatch_repo() {
     echo -e "  ${BOLD}2)${NC} I will configure manually later"
     echo ""
     
-    read -p "Your choice [1-2]: " -r
-    
-    case "$REPLY" in
-        1)
-            echo ""
-            read -p "Repository (format: owner/repo): " DISPATCH_TARGET_REPO
+    while true; do
+        read -p "Your choice [1-2]: " -r
+        
+        case "$REPLY" in
+            1)
+                echo ""
+                read -p "Repository (format: owner/repo): " DISPATCH_TARGET_REPO
+                
+                if [[ ! "$DISPATCH_TARGET_REPO" =~ ^[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+$ ]]; then
+                    print_error "Invalid format - must be owner/repo"
+                    exit 1
+                fi
+                
+                print_success "Dispatch target: $DISPATCH_TARGET_REPO"
+                break
+                ;;
             
-            if [[ ! "$DISPATCH_TARGET_REPO" =~ ^[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+$ ]]; then
-                print_error "Invalid format - must be owner/repo"
-                exit 1
-            fi
+            2)
+                DISPATCH_TARGET_REPO="<add-manually>"
+                print_warning "You chose manual configuration."
+                echo ""
+                print_info "${BOLD}ACTION REQUIRED:${NC} After setup completes, edit ${CYAN}.env${NC} and add:"
+                echo -e "  ${BOLD}DISPATCH_TARGET_REPO${NC}=owner/repo"
+                break
+                ;;
             
-            print_success "Dispatch target: $DISPATCH_TARGET_REPO"
-            ;;
-            
-        2)
-            DISPATCH_TARGET_REPO="<add-manually>"
-            print_info "Skipping dispatch repo setup - remember to add DISPATCH_TARGET_REPO to .env"
-            ;;
-            
-        *)
-            print_error "Invalid choice"
-            exit 1
-            ;;
-    esac
+            *)
+                print_error "Invalid choice. Please enter 1 or 2."
+                echo ""
+                continue
+                ;;
+        esac
+    done
     
     wait_for_enter
 }
@@ -617,13 +676,52 @@ create_env_file() {
     print_section "Step 7: Creating .env File"
     
     if [[ -f "$ENV_FILE" ]]; then
-        print_warning ".env file already exists!"
-        if ! ask_yes_no "Overwrite it?"; then
-            print_info "Keeping existing .env file"
-            return
+        print_warning "${BOLD}.env file already exists!${NC}"
+        echo ""
+        print_info "Your existing .env contains configuration that will be ${RED}OVERWRITTEN${NC}."
+        echo ""
+        echo "Choose an option:"
+        echo -e "  ${BOLD}1)${NC} Overwrite .env now (backup will be created)"
+        echo -e "  ${BOLD}2)${NC} Skip .env creation (I'll configure it manually)"
+        if [[ "$DEPLOYMENT_TARGET" == "azure" ]]; then
+            echo -e "  ${BOLD}3)${NC} Skip for now and configure before deployment"
         fi
-        mv "$ENV_FILE" "${ENV_FILE}.backup.$(date +%s)"
-        print_info "Backed up existing .env file"
+        echo ""
+        
+        while true; do
+            read -p "Your choice [1-$(if [[ "$DEPLOYMENT_TARGET" == "azure" ]]; then echo "3"; else echo "2"; fi)]: " -r
+            
+            case "$REPLY" in
+                1)
+                    mv "$ENV_FILE" "${ENV_FILE}.backup.$(date +%s)"
+                    print_success "Backed up existing .env file"
+                    break
+                    ;;
+                2)
+                    print_info "Skipping .env creation - using existing file"
+                    print_warning "${BOLD}REMINDER:${NC} Make sure your .env has all required values!"
+                    wait_for_enter
+                    return
+                    ;;
+                3)
+                    if [[ "$DEPLOYMENT_TARGET" == "azure" ]]; then
+                        print_info "Skipping .env creation for now"
+                        print_warning "${BOLD}ACTION REQUIRED:${NC} Configure .env before running deployment!"
+                        wait_for_enter
+                        return
+                    else
+                        print_error "Invalid choice. Please enter 1 or 2."
+                        echo ""
+                        continue
+                    fi
+                    ;;
+                *)
+                    print_error "Invalid choice. Please enter 1$(if [[ "$DEPLOYMENT_TARGET" == "azure" ]]; then echo ", 2, or 3"; else echo " or 2"; fi)."
+                    echo ""
+                    continue
+                    ;;
+            esac
+        done
     fi
     
     print_step "Creating .env file with your configuration..."
@@ -723,10 +821,10 @@ install_dependencies() {
     
     print_section "Step $step_num: Installing Dependencies"
     
-    print_step "Running npm ci (clean install)..."
+    print_step "Running npm install..."
     echo ""
     
-    if npm ci; then
+    if npm install; then
         print_success "Dependencies installed successfully!"
     else
         print_error "Failed to install dependencies"
