@@ -5,6 +5,18 @@ All notable changes to Template Doctor will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0](https://github.com/Azure-Samples/template-doctor/compare/v2.2.0...v2.3.0) (2025-10-24)
+
+
+### Features
+
+* Unified header navigation and empty state UI ([#172](https://github.com/Azure-Samples/template-doctor/issues/172)) ([e97c11b](https://github.com/Azure-Samples/template-doctor/commit/e97c11bb32ec7d6e60f2871a12ea49e8a6f0d1c5))
+
+
+### Bug Fixes
+
+* Category percentages showing 0% instead of real values ([#173](https://github.com/Azure-Samples/template-doctor/issues/173)) ([42863fe](https://github.com/Azure-Samples/template-doctor/commit/42863fe2666ac735344dfed1805998cc9399df83))
+
 ## [Unreleased]
 
 ### ⚠ BREAKING CHANGES
