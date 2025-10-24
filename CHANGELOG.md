@@ -5,7 +5,60 @@ All notable changes to Template Doctor will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0](https://github.com/Template-Doctor/template-doctor/compare/v2.0.0...v2.1.0) (2025-10-22)
+
+
+### Features
+
+* Add DISABLE_AUTH environment variable for testing ([#155](https://github.com/Template-Doctor/template-doctor/issues/155)) ([46cd3b4](https://github.com/Template-Doctor/template-doctor/commit/46cd3b47ea12731c65088f8a47866ef58d5941e5))
+* Add OAuth 2.0 API Authentication ([#147](https://github.com/Template-Doctor/template-doctor/issues/147)) ([d312ec7](https://github.com/Template-Doctor/template-doctor/commit/d312ec781d96b4f2882083b0351f23d1f3d031a8))
+* Add rate limiting to API endpoints with UI improvements ([#150](https://github.com/Template-Doctor/template-doctor/issues/150)) ([7944293](https://github.com/Template-Doctor/template-doctor/commit/79442932c83834168afd224c83ddb8c578c1ab6b))
+* Improve setup script with enhanced UX and critical UAMI deploym… ([#160](https://github.com/Template-Doctor/template-doctor/issues/160)) ([a370114](https://github.com/Template-Doctor/template-doctor/commit/a37011463aa531d8157482b7bfd1dde954b76b83))
+* release v2.2.0 with security fixes ([f2e88e4](https://github.com/Template-Doctor/template-doctor/commit/f2e88e42b8138211e28abd4dd860766b13cc0b3a))
+* reset release-please to calculate from v2.0.1 ([315d715](https://github.com/Template-Doctor/template-doctor/commit/315d715e24d531e78d44760f4a17cf023468f2e2))
+* trigger v2.2.0 release after establishing v2.1.0 baseline ([c6b9b5f](https://github.com/Template-Doctor/template-doctor/commit/c6b9b5f2943cffa3250e70d95f0270331796152a))
+
+
+### Bug Fixes
+
+* Add critical MongoDB connection guidance for Docker Compose users ([8d1aa95](https://github.com/Template-Doctor/template-doctor/commit/8d1aa9501494d8a5ab9bf55dcb5061f8f70a7c5c))
+* scannedby createdby clean ([#158](https://github.com/Template-Doctor/template-doctor/issues/158)) ([bb5ab04](https://github.com/Template-Doctor/template-doctor/commit/bb5ab042239111421c5b312607c3aabdab37c7aa))
+* trigger release-please workflow ([095b8cf](https://github.com/Template-Doctor/template-doctor/commit/095b8cf4404aa3294f6130ca4a52f459bb6cd9c1))
+* update MongoDB connection string placeholder to avoid secret scanning ([#148](https://github.com/Template-Doctor/template-doctor/issues/148)) ([cab4c85](https://github.com/Template-Doctor/template-doctor/commit/cab4c85e247ba63b23b303d77293fa2281af9ba2))
+* update release-please manifest to force 2.2.0 release ([2de5e6b](https://github.com/Template-Doctor/template-doctor/commit/2de5e6b5cf6995bc220803236eb35b82e6b8ab1d))
+
 ## [Unreleased]
+
+## [2.2.0] - 2025-10-22
+
+### Security Fixes
+
+- **CRITICAL**: Fix XSS vulnerability in GitHub search (sanitize untrusted repository names before DOM insertion)
+- **CRITICAL**: Fix GitHub issue search XSS (escape HTML in issue titles/bodies)
+- **CRITICAL**: Sanitize repository URLs before DOM operations (prevent `javascript:` protocol attacks)
+- **HIGH**: Fix validation status XSS in polling (sanitize repository names in status updates)
+- **HIGH**: Escape Markdown content before rendering (prevent script injection via report content)
+- **HIGH**: Fix metadata XSS in result cards (sanitize all user-controlled metadata fields)
+
+### Performance Improvements
+
+- Optimize leaderboard calculations (10x-40x faster with batched database queries)
+- Add database indexes for common query patterns
+- Implement efficient pagination for large result sets
+
+### Bug Fixes
+
+- Fix notification system edge cases (prevent double notifications)
+- Improve error messages for validation failures
+- Fix GitHub API rate limit handling
+
+### Tests
+
+- Add 65 comprehensive test cases (OAuth, XSS prevention, API endpoints)
+- 100% passing rate (65/65 tests)
+- Improved test coverage for security-critical paths
+
+## [2.1.0] - 2025-10-20
 
 ### ⚠ BREAKING CHANGES
 
@@ -17,15 +70,95 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Features
 
-- Add OAuth 2.0 authentication to all API endpoints (except public health/config endpoints)
-- Add three-tier rate limiting (standard: 100/min, strict: 10/min, auth: 20/min)
+- Add OAuth 2.0 authentication to all API endpoints (except public health/config endpoints) ([#147](https://github.com/Azure-Samples/template-doctor/issues/147))
+- Add three-tier rate limiting (standard: 100/min, strict: 10/min, auth: 20/min) ([#150](https://github.com/Azure-Samples/template-doctor/issues/150))
 
 ### Bug Fixes
 
 - Fix health endpoint path in logger configuration (was `/api/v4/health`, corrected to `/api/health`)
+- Update MongoDB connection string placeholder to avoid secret scanning ([#148](https://github.com/Azure-Samples/template-doctor/issues/148))
 - Remove duplicate vitest imports in test files
 
-## 1.0.0 (2025-10-07)
+### Documentation
+
+- Fix README port references, architecture, and Docker commands ([#149](https://github.com/Azure-Samples/template-doctor/issues/149))
+
+## [2.0.1] - 2025-10-19
+
+### Miscellaneous
+
+- **Documentation reorganization** ([#141](https://github.com/Azure-Samples/template-doctor/pull/141))
+  - Moved documentation to proper directories (docs/development/, docs/usage/, docs/deployment/)
+  - Removed 1,668 lines of temporary files
+  - Organized by purpose with clean root directory
+  - Updated all cross-references
+- **Azurite cleanup** ([#142](https://github.com/Azure-Samples/template-doctor/pull/142))
+  - Removed storage emulator configuration files from version control
+  - Already covered by .gitignore patterns
+- **Prettier formatting** ([#143](https://github.com/Azure-Samples/template-doctor/pull/143))
+  - Standardized code formatting across 95 files
+  - 26,080 insertions, 24,436 deletions
+  - TypeScript, JavaScript, JSON, Markdown, and YAML files formatted consistently
+
+### Summary
+
+- **3,398 lines removed**: Documentation debt and tech debt cleanup
+- **Better organization**: Clean root directory with only GitHub standard files
+- **Improved consistency**: Standardized code formatting across the entire codebase
+- **No functional changes**: Pure cleanup and maintenance
+
+## [2.0.0] - 2025-10-19
+
+### ⚠ BREAKING CHANGES
+
+- **TypeScript Migration**: Deleted 49 legacy JavaScript files from `packages/app/js/`. All frontend code has been migrated to TypeScript with modern ES modules.
+- **Express Server**: Migrated from Azure Functions to Express.js backend for improved performance and development experience.
+- **Database Architecture**: Introduced MongoDB persistence layer, replacing file-based storage.
+
+### Major Features
+
+#### Database Persistence (#135)
+- MongoDB integration with comprehensive schema (repos, analysis, configuration, rulesets)
+- Automatic persistence of all analysis results
+- Historical tracking and trend analysis capabilities
+- Seeded database with production-ready sample data
+
+#### Express Server Migration (#128)
+- Complete backend rewrite from Azure Functions to Express.js
+- 20+ RESTful API endpoints with consistent error handling
+- Improved CORS configuration and middleware architecture
+- Enhanced logging with structured request/response tracking
+
+#### Azure Developer CLI (azd) Support (#126)
+- Full azd deployment integration
+- Infrastructure as Code with Bicep templates
+- Optimized Docker builds (multi-stage, layer caching)
+- Azure Container Apps deployment support
+
+#### Security & Validation
+- Comprehensive XSS protection (18 patterns, 56 test cases, defense in depth)
+- ACR managed identity authentication (no more password-based auth)
+- Enhanced input validation with consistent UX (red borders, clear error messages)
+- OSSF Scorecard workflow integration (#53)
+
+#### Developer Experience
+- Agents.md compliance validation (#100)
+- Improved issue creation workflow (#92)
+- Batch scan functionality (#5)
+- Dev container support (Node + Python) (#18)
+- Queue-based analysis requests with service readiness polling
+
+### Bug Fixes
+
+- Fixed action button visibility and interactivity
+- Fixed historical data display (#10)
+- Fixed Test AZD deployment button endpoint (#63)
+- Fixed PR creation and history (#44)
+- Fixed fork indicator and history fetching for old forks
+- OSSF & Trivy message fixes for reporting (#118)
+- OSSF workflow run URL (#111)
+
+## [1.0.0] - 2025-10-07
 
 ### ⚠ BREAKING CHANGES
 
@@ -224,10 +357,9 @@ Thank you to all contributors who made this release possible!
 
 ---
 
-## [Unreleased]
-
-Changes that are in development but not yet released will appear here.
-
----
-
-[1.0.0]: https://github.com/Template-Doctor/template-doctor/releases/tag/v1.0.0
+[Unreleased]: https://github.com/Azure-Samples/template-doctor/compare/v2.2.0...HEAD
+[2.2.0]: https://github.com/Azure-Samples/template-doctor/compare/v2.1.0...v2.2.0
+[2.1.0]: https://github.com/Azure-Samples/template-doctor/compare/v2.0.1...v2.1.0
+[2.0.1]: https://github.com/Azure-Samples/template-doctor/compare/v2.0.0...v2.0.1
+[2.0.0]: https://github.com/Azure-Samples/template-doctor/compare/v1.0.0...v2.0.0
+[1.0.0]: https://github.com/Azure-Samples/template-doctor/releases/tag/v1.0.0
