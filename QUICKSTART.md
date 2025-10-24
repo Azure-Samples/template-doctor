@@ -50,6 +50,31 @@ Click "Sign in with GitHub" and you're ready! 🎉
 
 ---
 
+## 🔄 Quick Redeploy (Already Configured)
+
+If you already have `.env` configured and just need to redeploy to Azure:
+
+```bash
+./scripts/full-setup.sh --deploy
+```
+
+This command:
+- ✅ Skips all configuration prompts
+- ✅ Validates existing `.env` file
+- ✅ Checks for Template Doctor updates
+- ✅ Installs dependencies and builds packages
+- ✅ Deploys to Azure (runs `azd provision` + `deploy.sh`)
+
+**When to use**: After initial setup, for quick updates or redeployments to Azure.
+
+**Input flexibility**: All setup prompts support multiple input methods:
+- **Press Enter**: Uses the default (shown in capital letter, e.g., `[Y/n]`)
+- **Type 1**: Yes/Option 1
+- **Type 2**: No/Option 2
+- **Type y/n**: Traditional yes/no input
+
+---
+
 ## ⚠️ Common Mistakes (DON'T DO THIS!)
 
 ### ❌ WRONG: Setting MONGODB_URI in .env

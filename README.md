@@ -108,17 +108,37 @@ The wizard will ask: **"Are you setting up for local development or Azure deploy
 
 ### Azure Production Path (10 minutes)
 - ✅ Check prerequisites (Node.js, Azure CLI, azd)
-- ✅ Guide you through GitHub OAuth App creation
+- ✅ Guide you through GitHub OAuth App creation (if not configured)
 - ✅ Create GitHub Personal Access Token
 - ✅ Configure Cosmos DB (automatic azd setup)
 - ✅ Set up admin users and workflow repository
 - ✅ Install npm dependencies
 - ✅ Build all packages
-- ✅ **Run `azd up` to provision and deploy**
+- ✅ **Run `azd provision` and `deploy.sh` to deploy**
 - ✅ **Open your Azure app URL**
+
+### Quick Redeploy Mode
+
+If you already have `.env` configured and just need to redeploy:
+
+```bash
+./scripts/full-setup.sh --deploy
+```
+
+This skips all configuration prompts and goes straight to deployment:
+- ✅ Validates existing `.env` configuration
+- ✅ Checks for version updates
+- ✅ Installs dependencies and builds packages
+- ✅ Deploys to Azure (runs `azd provision` + `deploy.sh`)
 
 > [!TIP]
 > The wizard is interactive, validates configuration at each step, and provides helpful troubleshooting tips. **This is the easiest way to get Template Doctor running!**
+
+**Input Options**: All prompts support multiple input methods:
+- **Press Enter**: Uses the default (shown in capital letter)
+- **Type 1**: Yes/Option 1
+- **Type 2**: No/Option 2
+- **Type y/n**: Traditional yes/no input
 
 ---
 
@@ -538,6 +558,26 @@ Access at http://localhost:3000
   ```
 
 - **Configuration mismatch**: Verify `config.json` has correct `githubOAuth.clientId` matching `.env`
+
+- **Azure deployment timeout**: If Container App provisioning times out:
+  - The setup script uses a two-step deployment: `azd provision` (infrastructure) then `deploy.sh` (build + deploy)
+  - This avoids timeout issues with the placeholder image in `azd up`
+
+- **Stuck deployment blocking retries**:
+  ```bash
+  # Option 1: Cancel the stuck deployment
+  az deployment group cancel --resource-group <rg-name> --name container-app
+  
+  # Option 2: Delete and recreate
+  azd down --force --purge
+  ./scripts/full-setup.sh --deploy
+  ```
+
+- **Setup script input errors**: The script accepts multiple input formats:
+  - Press Enter for defaults
+  - Type `1` for yes, `2` for no
+  - Type `y` or `n` for yes/no
+  - If you see "Invalid choice", try using numeric input (1/2)
 
 ## Deployments
 

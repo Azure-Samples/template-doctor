@@ -3,6 +3,7 @@
 
 param location string = resourceGroup().location
 param environmentName string
+param logAnalyticsWorkspaceId string
 
 // Generate unique resource name
 var resourceToken = toLower(uniqueString(subscription().id, environmentName, location))
@@ -79,32 +80,21 @@ resource diagnosticSettings 'Microsoft.Insights/diagnosticSettings@2021-05-01-pr
   name: 'cosmos-diagnostics'
   scope: cosmosAccount
   properties: {
+    workspaceId: logAnalyticsWorkspaceId
     logs: [
       {
         category: 'MongoRequests'
         enabled: true
-        retentionPolicy: {
-          enabled: true
-          days: 30
-        }
       }
       {
         category: 'QueryRuntimeStatistics'
         enabled: true
-        retentionPolicy: {
-          enabled: true
-          days: 30
-        }
       }
     ]
     metrics: [
       {
         category: 'Requests'
         enabled: true
-        retentionPolicy: {
-          enabled: true
-          days: 30
-        }
       }
     ]
   }

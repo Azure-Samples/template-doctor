@@ -5,10 +5,18 @@
 # This script guides you through the complete setup process for Template Doctor.
 # It handles both local development and Azure production deployment.
 #
-# Usage: ./scripts/full-setup.sh
+# Usage: 
+#   ./scripts/full-setup.sh              # Interactive setup
+#   ./scripts/full-setup.sh --deploy     # Skip to Azure deployment (requires existing .env)
 #
 
 set -euo pipefail
+
+# Parse command line arguments
+SKIP_TO_DEPLOY=false
+if [[ "${1:-}" == "--deploy" ]]; then
+    SKIP_TO_DEPLOY=true
+fi
 
 # Colors
 RED='\033[0;31m'
@@ -98,15 +106,116 @@ wait_for_enter() {
 
 ask_yes_no() {
     local prompt="$1"
-    local default="${2:-n}"
+    local default="${2:-y}"  # Default to 'y' if not specified
     
-    if [[ "$default" == "y" ]]; then
-        read -p "$prompt [Y/n] " -r
-        [[ -z "$REPLY" || "$REPLY" =~ ^[Yy]$ ]]
+    while true; do
+        if [[ "$default" == "y" ]]; then
+            read -p "$prompt [Y/n]: " -r
+            # Empty input or 1 = yes, 2 or n/N = no
+            if [[ -z "$REPLY" || "$REPLY" == "1" || "$REPLY" =~ ^[Yy]$ ]]; then
+                return 0
+            elif [[ "$REPLY" == "2" || "$REPLY" =~ ^[Nn]$ ]]; then
+                return 1
+            else
+                print_error "Invalid input. Press Enter or 1 for yes, 2 or n for no."
+                continue
+            fi
+        else
+            read -p "$prompt [y/N]: " -r
+            # Empty input or 2 = no, 1 or y/Y = yes
+            if [[ -z "$REPLY" || "$REPLY" == "2" || "$REPLY" =~ ^[Nn]$ ]]; then
+                return 1
+            elif [[ "$REPLY" == "1" || "$REPLY" =~ ^[Yy]$ ]]; then
+                return 0
+            else
+                print_error "Invalid input. Press Enter or 2 for no, 1 or y for yes."
+                continue
+            fi
+        fi
+    done
+}
+
+# Mask secrets showing only last 3 characters
+mask_secret() {
+    local value="$1"
+    local length=${#value}
+    
+    if [[ -z "$value" || "$value" == "<add-manually>" || "$value" == "<production-configured-by-bicep>" || "$value" == "UNSET_FOR_LOCAL_DEV" ]]; then
+        echo "$value"
+    elif [[ $length -le 3 ]]; then
+        echo "***"
     else
-        read -p "$prompt [y/N] " -r
-        [[ "$REPLY" =~ ^[Yy]$ ]]
+        local visible="${value: -3}"
+        echo "****$visible"
     fi
+}
+
+# =============================================================================
+# Version Check
+# =============================================================================
+
+check_version() {
+    print_section "Checking Template Doctor Version"
+    
+    # Get local version from package.json
+    local local_version=$(node -p "require('./package.json').version" 2>/dev/null)
+    
+    if [[ -z "$local_version" ]]; then
+        print_warning "Could not determine local version from package.json"
+        wait_for_enter
+        return
+    fi
+    
+    print_step "Local version: v${local_version}"
+    
+    # Try to fetch latest release from GitHub
+    print_step "Checking for updates..."
+    
+    local latest_version=$(curl -s https://api.github.com/repos/Azure-Samples/template-doctor/releases/latest 2>/dev/null | grep '"tag_name"' | sed -E 's/.*"([^"]+)".*/\1/' | sed 's/^v//')
+    
+    if [[ -z "$latest_version" ]]; then
+        print_info "Could not check for updates (GitHub API unavailable)"
+        wait_for_enter
+        return
+    fi
+    
+    print_step "Latest version: v${latest_version}"
+    echo ""
+    
+    # Compare versions (simple string comparison)
+    if [[ "$local_version" != "$latest_version" ]]; then
+        print_warning "${BOLD}A newer version is available!${NC}"
+        echo ""
+        echo -e "  Current: ${CYAN}v${local_version}${NC}"
+        echo -e "  Latest:  ${GREEN}v${latest_version}${NC}"
+        echo ""
+        print_info "It's recommended to update before running setup:"
+        echo ""
+        echo -e "  ${BOLD}1. Fetch latest changes:${NC}"
+        echo -e "     ${CYAN}git fetch upstream${NC}"
+        echo ""
+        echo -e "  ${BOLD}2. Pull latest from main:${NC}"
+        echo -e "     ${CYAN}git pull upstream main${NC}"
+        echo ""
+        echo -e "  ${BOLD}3. Or checkout the latest release:${NC}"
+        echo -e "     ${CYAN}git checkout v${latest_version}${NC}"
+        echo ""
+        
+        if ask_yes_no "Continue with setup anyway?" "y"; then
+            echo ""
+            print_info "Continuing with v${local_version}..."
+        else
+            echo ""
+            print_info "Setup cancelled. Update your repository and run the script again."
+            exit 0
+        fi
+        
+        echo ""
+    else
+        print_success "You're running the latest version!"
+    fi
+    
+    wait_for_enter
 }
 
 # =============================================================================
@@ -134,7 +243,9 @@ select_deployment_target() {
         echo "     • Opens your Azure app URL"
         echo ""
         
-        read -p "Your choice [1-2]: " -r
+        read -p "Your choice [1-2] (Press Enter for 1): " -r
+        # Default to 1 (local) if empty
+        REPLY="${REPLY:-1}"
         
         case "$REPLY" in
             1)
@@ -145,6 +256,60 @@ select_deployment_target() {
             2)
                 DEPLOYMENT_TARGET="azure"
                 print_success "Selected: Azure Production Deployment"
+                
+                # Ask if they already did local dev setup
+                echo ""
+                echo ""
+                print_info "Have you already completed the local development setup?"
+                echo ""
+                
+                while true; do
+                    read -p "Did you run this setup script for local development? [1=yes, 2=no] (Press Enter for 2): " -r
+                    # Default to no (2) if empty
+                    REPLY="${REPLY:-2}"
+                    case "$REPLY" in
+                        [Yy1]*)
+                            echo ""
+                            print_info "Great! We'll skip the basic setup and focus on production configuration."
+                            echo ""
+                            print_warning "${BOLD}IMPORTANT: You'll need to configure production OAuth credentials.${NC}"
+                            echo ""
+                            echo "Your .env file has development OAuth credentials for localhost:3000."
+                            echo "For Azure deployment, you have two options:"
+                            echo ""
+                            echo -e "  ${BOLD}Option 1: Use separate production OAuth App (RECOMMENDED)${NC}"
+                            echo "    • Create new GitHub OAuth app with Azure URL"
+                            echo "    • We'll add GITHUB_CLIENT_ID_PROD to your .env"
+                            echo ""
+                            echo -e "  ${BOLD}Option 2: Update existing dev OAuth app${NC}"
+                            echo "    • Reuse same OAuth app for both dev and prod"
+                            echo "    • Update callback URLs after deployment"
+                            echo ""
+                            
+                            wait_for_enter
+                            
+                            # Mark basic setup as done - will load .env later
+                            GITHUB_PAT_DONE=true    # Assume PATs already configured
+                            MONGODB_DONE=true       # Azure uses Cosmos DB
+                            # Note: GITHUB_OAUTH_DONE stays false so we still show OAuth setup for PROD credentials
+                            break
+                            ;;
+                        [Nn2]*)
+                            echo ""
+                            print_info "No problem! We'll guide you through the full setup process."
+                            echo ""
+                            print_warning "Remember: You'll need to configure OAuth URLs with your Azure domain after provisioning."
+                            echo ""
+                            wait_for_enter
+                            break
+                            ;;
+                        *)
+                            print_error "Invalid choice. Please enter 1 for yes or 2 for no."
+                            echo ""
+                            continue
+                            ;;
+                    esac
+                done
                 break
                 ;;
             *)
@@ -269,7 +434,9 @@ setup_github_oauth() {
     echo ""
     
     while true; do
-        read -p "Your choice [1-3]: " -r
+        read -p "Your choice [1-3] (Press Enter for 1): " -r
+        # Default to 1 (create new) if empty
+        REPLY="${REPLY:-1}"
         
         case "$REPLY" in
             1)
@@ -332,9 +499,18 @@ setup_github_oauth() {
                 GITHUB_OAUTH_DONE=true
                 print_warning "You chose manual configuration."
                 echo ""
-                print_info "${BOLD}ACTION REQUIRED:${NC} After setup completes, edit ${CYAN}.env${NC} and add:"
-                echo -e "  ${BOLD}GITHUB_CLIENT_ID${NC}=your_oauth_client_id"
-                echo -e "  ${BOLD}GITHUB_CLIENT_SECRET${NC}=your_oauth_client_secret"
+                
+                if [[ "$DEPLOYMENT_TARGET" == "azure" ]]; then
+                    print_info "${BOLD}ACTION REQUIRED:${NC} After setup completes, edit ${CYAN}.env${NC} and add:"
+                    echo -e "  ${BOLD}GITHUB_CLIENT_ID_PROD${NC}=your_production_oauth_client_id"
+                    echo -e "  ${BOLD}GITHUB_CLIENT_SECRET_PROD${NC}=your_production_oauth_client_secret"
+                    echo ""
+                    print_info "These production credentials will be used when deployed to Azure."
+                else
+                    print_info "${BOLD}ACTION REQUIRED:${NC} After setup completes, edit ${CYAN}.env${NC} and add:"
+                    echo -e "  ${BOLD}GITHUB_CLIENT_ID${NC}=your_oauth_client_id"
+                    echo -e "  ${BOLD}GITHUB_CLIENT_SECRET${NC}=your_oauth_client_secret"
+                fi
                 break
                 ;;
             
@@ -375,7 +551,9 @@ setup_github_pat() {
     echo ""
     
     while true; do
-        read -p "Your choice [1-3]: " -r
+        read -p "Your choice [1-3] (Press Enter for 1): " -r
+        # Default to 1 (create new) if empty
+        REPLY="${REPLY:-1}"
         
         case "$REPLY" in
             1)
@@ -568,7 +746,9 @@ setup_admin_user() {
     echo ""
     
     while true; do
-        read -p "Your choice [1-2]: " -r
+        read -p "Your choice [1-2] (Press Enter for 1): " -r
+        # Default to 1 (enter now) if empty
+        REPLY="${REPLY:-1}"
         
         case "$REPLY" in
             1)
@@ -632,7 +812,9 @@ setup_dispatch_repo() {
     echo ""
     
     while true; do
-        read -p "Your choice [1-2]: " -r
+        read -p "Your choice [1-2] (Press Enter for 1): " -r
+        # Default to 1 (enter now) if empty
+        REPLY="${REPLY:-1}"
         
         case "$REPLY" in
             1)
@@ -669,6 +851,156 @@ setup_dispatch_repo() {
 }
 
 # =============================================================================
+# Load and Validate Configuration
+# =============================================================================
+
+load_and_validate_config() {
+    print_section "Loading Configuration"
+    
+    # Load existing .env if it exists
+    if [[ -f "$ENV_FILE" ]]; then
+        print_step "Loading values from existing .env file..."
+        set -a  # automatically export all variables
+        source "$ENV_FILE" 2>/dev/null || true
+        set +a
+        
+        # Store values in script variables (with defaults to prevent unbound errors)
+        GITHUB_CLIENT_ID="${GITHUB_CLIENT_ID:-${GITHUB_CLIENT_ID:-}}"
+        GITHUB_CLIENT_SECRET="${GITHUB_CLIENT_SECRET:-}"
+        GITHUB_CLIENT_ID_PROD="${GITHUB_CLIENT_ID_PROD:-}"
+        GITHUB_CLIENT_SECRET_PROD="${GITHUB_CLIENT_SECRET_PROD:-}"
+        GITHUB_TOKEN="${GITHUB_TOKEN:-}"
+        GITHUB_TOKEN_ANALYZER="${GITHUB_TOKEN_ANALYZER:-${GITHUB_TOKEN:-}}"
+        GH_WORKFLOW_TOKEN="${GH_WORKFLOW_TOKEN:-${GITHUB_TOKEN:-}}"
+        ADMIN_GITHUB_USERS="${ADMIN_GITHUB_USERS:-}"
+        DISPATCH_TARGET_REPO="${DISPATCH_TARGET_REPO:-}"
+        
+        print_success "Configuration loaded"
+    else
+        print_info "No existing .env file found - will create new one"
+    fi
+    
+    echo ""
+    
+    # Validate required variables based on deployment target
+    local missing_vars=()
+    
+    # Always need basic OAuth
+    if [[ -z "$GITHUB_CLIENT_ID" || "$GITHUB_CLIENT_ID" == "<add-manually>" ]]; then
+        missing_vars+=("GITHUB_CLIENT_ID")
+    fi
+    
+    if [[ -z "$GITHUB_CLIENT_SECRET" || "$GITHUB_CLIENT_SECRET" == "<add-manually>" ]]; then
+        missing_vars+=("GITHUB_CLIENT_SECRET")
+    fi
+    
+    # For Azure production, check if prod OAuth is needed
+    if [[ "$DEPLOYMENT_TARGET" == "azure" ]]; then
+        if [[ -z "$GITHUB_CLIENT_ID_PROD" || "$GITHUB_CLIENT_ID_PROD" == "<add-manually>" ]]; then
+            print_warning "Production OAuth credentials not configured"
+            echo ""
+            echo "You can either:"
+            echo "  • Add them manually to .env after setup"
+            echo "  • Use dev OAuth credentials (not recommended for production)"
+            echo ""
+        fi
+    fi
+    
+    # Show warnings for missing optional values
+    if [[ -z "$GITHUB_TOKEN" || "$GITHUB_TOKEN" == "<add-manually>" ]]; then
+        print_warning "GITHUB_TOKEN not set - some features may not work"
+    fi
+    
+    if [[ ${#missing_vars[@]} -gt 0 ]]; then
+        print_warning "Some required variables are not configured:"
+        for var in "${missing_vars[@]}"; do
+            echo "  • $var"
+        done
+        echo ""
+        print_info "These will be marked as ${CYAN}<add-manually>${NC} in .env"
+        echo ""
+    fi
+    
+    wait_for_enter
+}
+
+# =============================================================================
+# Configuration Summary
+# =============================================================================
+
+show_config_summary() {
+    print_section "Configuration Summary"
+    
+    print_info "Please review your configuration before proceeding:"
+    echo ""
+    
+    echo -e "${BOLD}Deployment Target:${NC}"
+    if [[ "$DEPLOYMENT_TARGET" == "local" ]]; then
+        echo -e "  ${CYAN}Local Development${NC} (Docker Compose on port 3000)"
+    else
+        echo -e "  ${MAGENTA}Azure Production${NC} (Container Apps)"
+    fi
+    echo ""
+    
+    # OAuth - show prod for Azure, dev for local
+    if [[ "$DEPLOYMENT_TARGET" == "azure" ]]; then
+        echo -e "${BOLD}GitHub OAuth (Production):${NC}"
+        if [[ -n "${GITHUB_CLIENT_ID_PROD:-}" && "${GITHUB_CLIENT_ID_PROD:-}" != "<add-manually>" ]]; then
+            echo -e "  Client ID: $(mask_secret "${GITHUB_CLIENT_ID_PROD:-}")"
+            echo -e "  Client Secret: $(mask_secret "${GITHUB_CLIENT_SECRET_PROD:-}")"
+        else
+            echo -e "  ${YELLOW}Not configured - will use dev credentials${NC}"
+            echo -e "  Client ID: $(mask_secret "$GITHUB_CLIENT_ID")"
+            echo -e "  Client Secret: $(mask_secret "$GITHUB_CLIENT_SECRET")"
+        fi
+    else
+        echo -e "${BOLD}GitHub OAuth (Development):${NC}"
+        echo -e "  Client ID: $(mask_secret "$GITHUB_CLIENT_ID")"
+        echo -e "  Client Secret: $(mask_secret "$GITHUB_CLIENT_SECRET")"
+    fi
+    echo ""
+    
+    if [[ "$GITHUB_PAT_DONE" == true && "$GITHUB_TOKEN" != "<add-manually>" ]]; then
+        echo -e "${BOLD}GitHub PATs:${NC}"
+        echo -e "  GITHUB_TOKEN: $(mask_secret "$GITHUB_TOKEN")"
+        echo -e "  GITHUB_TOKEN_ANALYZER: $(mask_secret "$GITHUB_TOKEN_ANALYZER")"
+        echo -e "  GH_WORKFLOW_TOKEN: $(mask_secret "$GH_WORKFLOW_TOKEN")"
+        echo ""
+    fi
+    
+    if [[ -n "${ADMIN_GITHUB_USERS:-}" && "${ADMIN_GITHUB_USERS:-}" != "<add-manually>" ]]; then
+        echo -e "${BOLD}Admin Users:${NC}"
+        echo -e "  ${ADMIN_GITHUB_USERS:-}"
+        echo ""
+    fi
+    
+    if [[ "$DEPLOYMENT_TARGET" == "azure" && -n "${DISPATCH_TARGET_REPO:-}" && "${DISPATCH_TARGET_REPO:-}" != "<add-manually>" ]]; then
+        echo -e "${BOLD}Workflow Dispatch:${NC}"
+        echo -e "  Target Repo: ${DISPATCH_TARGET_REPO:-}"
+        echo ""
+    fi
+    
+    echo -e "${BOLD}Database:${NC}"
+    if [[ "$DEPLOYMENT_TARGET" == "local" ]]; then
+        echo -e "  ${CYAN}MongoDB via Docker Compose${NC}"
+        echo -e "  Connection: mongodb://mongodb:27017/template-doctor"
+    else
+        echo -e "  ${MAGENTA}Azure Cosmos DB (Managed Identity)${NC}"
+        echo -e "  Configured automatically during deployment"
+    fi
+    echo ""
+    
+    print_warning "${BOLD}NOTE:${NC} All configuration values can be changed anytime by editing ${CYAN}.env${NC}"
+    echo ""
+    
+    if ! ask_yes_no "Proceed with this configuration?" "y"; then
+        echo ""
+        print_error "Setup cancelled by user"
+        exit 0
+    fi
+}
+
+# =============================================================================
 # Create .env File
 # =============================================================================
 
@@ -689,7 +1021,9 @@ create_env_file() {
         echo ""
         
         while true; do
-            read -p "Your choice [1-$(if [[ "$DEPLOYMENT_TARGET" == "azure" ]]; then echo "3"; else echo "2"; fi)]: " -r
+            read -p "Your choice [1-$(if [[ "$DEPLOYMENT_TARGET" == "azure" ]]; then echo "3"; else echo "2"; fi)] (Press Enter for 2): " -r
+            # Default to 2 (skip) if empty
+            REPLY="${REPLY:-2}"
             
             case "$REPLY" in
                 1)
@@ -746,8 +1080,16 @@ create_env_file() {
 ############################################
 # GitHub OAuth / API Authentication (REQUIRED)
 ############################################
+# Development OAuth App (for localhost:3000)
 GITHUB_CLIENT_ID=$GITHUB_CLIENT_ID
 GITHUB_CLIENT_SECRET=$GITHUB_CLIENT_SECRET
+
+# Production OAuth App (optional - falls back to dev credentials if not set)
+# Set these to use a separate OAuth app for Azure deployment
+GITHUB_CLIENT_ID_PROD=
+GITHUB_CLIENT_SECRET_PROD=
+
+# GitHub API Tokens
 GITHUB_TOKEN=$GITHUB_TOKEN
 GITHUB_TOKEN_ANALYZER=$GITHUB_TOKEN_ANALYZER
 GH_WORKFLOW_TOKEN=$GH_WORKFLOW_TOKEN
@@ -894,12 +1236,30 @@ start_local_development() {
     echo "  • Express backend + Vite frontend (port 3000)"
     echo ""
     
+    # Check if containers are already running
+    if docker compose ps 2>/dev/null | grep -q "Up"; then
+        print_warning "Docker containers are already running!"
+        echo ""
+        if ask_yes_no "Stop and restart containers?" "y"; then
+            print_step "Stopping existing containers..."
+            docker compose down
+            echo ""
+            print_success "Containers stopped"
+            echo ""
+        else
+            print_info "Keeping existing containers. You can restart manually with:"
+            echo "  docker compose down"
+            echo "  docker compose --profile combined up -d"
+            return
+        fi
+    fi
+    
     if ask_yes_no "Start Docker containers now (MongoDB + Template Doctor)?" "y"; then
         print_step "Starting docker compose..."
         echo ""
         
-        # Start in background
-        if docker compose --profile combined up -d; then
+        # Start in background with --build to ensure latest code
+        if docker compose --profile combined up -d --build; then
             echo ""
             print_success "Containers started successfully!"
             echo ""
@@ -943,11 +1303,19 @@ start_local_development() {
             fi
         else
             print_error "Failed to start containers"
+            echo ""
+            print_info "This could be due to:"
+            echo "  • Port 3000 already in use"
+            echo "  • Previous containers not cleaned up"
+            echo ""
+            print_info "Try cleaning up first:"
+            echo "  docker compose down"
+            echo "  docker compose --profile combined up -d"
             exit 1
         fi
     else
         print_info "Skipping container start. To start manually, run:"
-        echo "  docker compose --profile combined up"
+        echo "  docker compose --profile combined up -d"
     fi
 }
 
@@ -958,6 +1326,102 @@ start_local_development() {
 deploy_to_azure() {
     print_section "Step 8: Deploy to Azure"
     
+    # Check if dev setup was already done (flag set during deployment target selection)
+    local dev_setup_done=false
+    if [[ "$GITHUB_PAT_DONE" == true ]]; then
+        dev_setup_done=true
+    fi
+    
+    if [[ "$dev_setup_done" == true ]]; then
+        # Check if production OAuth is already configured
+        if [[ -n "${GITHUB_CLIENT_ID_PROD:-}" && -n "${GITHUB_CLIENT_SECRET_PROD:-}" && \
+              "$GITHUB_CLIENT_ID_PROD" != "<add-manually>" && "$GITHUB_CLIENT_SECRET_PROD" != "<add-manually>" ]]; then
+            # Production OAuth already configured
+            print_success "Production OAuth credentials already configured in .env"
+            echo ""
+            print_warning "${BOLD}REMINDER: Update your GitHub OAuth App URLs after deployment${NC}"
+            echo ""
+            echo "After 'azd up' completes, update your production OAuth app at:"
+            echo "  https://github.com/settings/developers"
+            echo ""
+            echo "Set these URLs to match your Azure deployment:"
+            echo -e "  ${BOLD}Homepage URL:${NC} https://your-azure-url.azurecontainerapps.io"
+            echo -e "  ${BOLD}Callback URL:${NC} https://your-azure-url.azurecontainerapps.io/callback.html"
+            echo ""
+        else
+            # Production OAuth not configured yet
+            print_warning "${BOLD}CRITICAL: Production OAuth App Configuration!${NC}"
+            echo ""
+            print_info "Your .env has development OAuth credentials for localhost:3000."
+            echo ""
+            echo "You have two options:"
+            echo ""
+            echo -e "${BOLD}Option 1: Use separate production OAuth App (RECOMMENDED)${NC}"
+            echo "  1. Create NEW GitHub OAuth App at: https://github.com/settings/developers"
+            echo "  2. Configure with production URLs (you'll get these from 'azd up'):"
+            echo -e "     ${BOLD}Homepage URL:${NC} https://your-azure-url.azurecontainerapps.io"
+            echo -e "     ${BOLD}Callback URL:${NC} https://your-azure-url.azurecontainerapps.io/callback.html"
+            echo "  3. Enter production credentials now (we'll add GITHUB_CLIENT_ID_PROD to .env)"
+            echo ""
+            echo -e "${BOLD}Option 2: Reuse dev OAuth App${NC}"
+            echo "  • After 'azd up', update your existing OAuth app URLs to production domain"
+            echo "  • Not recommended - keeps dev and prod mixed"
+            echo ""
+            
+            if ask_yes_no "Create separate production OAuth App?" "n"; then
+                echo ""
+                print_step "Great! Let's set up production OAuth credentials."
+                echo ""
+                print_warning "After provisioning, go to https://github.com/settings/developers"
+                print_warning "Create the OAuth app with your Azure URL, then come back here."
+                echo ""
+                
+                if ask_yes_no "I've created the production OAuth app and have credentials ready" "n"; then
+                    echo ""
+                    read -p "Production GitHub Client ID: " GITHUB_CLIENT_ID_PROD
+                    read -sp "Production GitHub Client Secret: " GITHUB_CLIENT_SECRET_PROD
+                    echo ""
+                    
+                    if [[ -n "$GITHUB_CLIENT_ID_PROD" && -n "$GITHUB_CLIENT_SECRET_PROD" ]]; then
+                        # Add production credentials to .env
+                        echo "" >> "$ENV_FILE"
+                        echo "# Production OAuth (Azure deployment)" >> "$ENV_FILE"
+                        echo "GITHUB_CLIENT_ID_PROD=$GITHUB_CLIENT_ID_PROD" >> "$ENV_FILE"
+                        echo "GITHUB_CLIENT_SECRET_PROD=$GITHUB_CLIENT_SECRET_PROD" >> "$ENV_FILE"
+                        print_success "Production OAuth credentials added to .env"
+                    else
+                        print_warning "Skipping production OAuth - you can add GITHUB_CLIENT_ID_PROD and GITHUB_CLIENT_SECRET_PROD to .env later"
+                    fi
+                else
+                    print_info "No problem - add GITHUB_CLIENT_ID_PROD and GITHUB_CLIENT_SECRET_PROD to .env after creating the app"
+                fi
+            else
+                print_warning "You'll need to update your existing OAuth app URLs after deployment"
+            fi
+        fi
+        echo ""
+    else
+        # User skipped local setup - show full OAuth warning
+        print_warning "${BOLD}IMPORTANT: GitHub OAuth App Configuration${NC}"
+        echo ""
+        print_info "After Azure provisioning completes, you MUST configure OAuth URLs."
+        echo ""
+        echo "Steps:"
+        echo "  1. Wait for 'azd up' to show your Azure URL"
+        echo "  2. Create GitHub OAuth App at: https://github.com/settings/developers"
+        echo "  3. Set URLs to match Azure deployment:"
+        echo -e "     ${BOLD}Homepage URL:${NC} https://your-azure-url.azurecontainerapps.io"
+        echo -e "     ${BOLD}Callback URL:${NC} https://your-azure-url.azurecontainerapps.io/callback.html"
+        echo "  4. Copy Client ID and Client Secret"
+        echo "  5. Update Azure Container App environment variables (via Azure Portal or azd env set)"
+        echo ""
+        print_warning "OAuth authentication requires URLs to match your deployment domain!"
+        echo ""
+        
+        wait_for_enter
+    fi
+    
+    echo ""
     print_info "Ready to deploy to Azure with azd!"
     echo ""
     echo "This will:"
@@ -968,39 +1432,78 @@ deploy_to_azure() {
     echo ""
     
     # Check if azd is already initialized using azd env list
-    if ! azd env list --output json | grep -q '"name":'; then
+    print_step "Checking Azure Developer CLI environment..."
+    local azd_initialized=false
+    
+    # Try to detect if environment is already initialized
+    if azd env get-values &>/dev/null; then
+        # Successfully got env values - environment is active
+        azd_initialized=true
+        local current_env=$(azd env list 2>/dev/null | awk '$2=="true" {print $1}')
+        if [[ -z "$current_env" ]]; then
+            current_env="(detected but name unknown)"
+        fi
+        print_success "Azure environment already initialized: $current_env"
+        echo ""
+    elif azd env list --output json 2>/dev/null | grep -q '"name":'; then
+        # Environment exists but may not be selected
+        azd_initialized=true
+        print_info "Azure environment found. Use 'azd env select' if needed."
+        echo ""
+    fi
+    
+    if [[ "$azd_initialized" == false ]]; then
         print_step "Initializing azd environment..."
         echo ""
         if azd init; then
             print_success "azd initialized"
         else
             print_error "Failed to initialize azd"
+            echo ""
+            print_info "If you already have an environment, select it with:"
+            echo "  azd env select <environment-name>"
             exit 1
         fi
-    else
-        print_info "azd environment already initialized"
     fi
     
     echo ""
-    if ask_yes_no "Run azd up now?" "y"; then
-        print_step "Running azd up (this may take 5-10 minutes)..."
+    if ask_yes_no "Provision and deploy to Azure now?" "y"; then
+        # Step 1: Provision infrastructure only (Container App created with placeholder image)
+        print_step "Provisioning Azure infrastructure (azd provision)..."
+        print_info "This creates: Resource Group, Container Registry, Log Analytics, Container Apps Environment, Cosmos DB"
         echo ""
         
-        if azd up; then
+        if azd provision; then
+            echo ""
+            print_success "✓ Infrastructure provisioned successfully!"
+            echo ""
+        else
+            print_error "Provisioning failed"
+            print_info "Check the error messages above and try again"
+            exit 1
+        fi
+        
+        # Step 2: Build and deploy application using deploy.sh
+        print_step "Building and deploying application (./scripts/deploy.sh)..."
+        print_info "This builds the container image and deploys to Azure Container Apps"
+        echo ""
+        
+        if bash "$REPO_ROOT/scripts/deploy.sh"; then
             echo ""
             print_success "🎉 Deployment complete!"
             echo ""
             print_info "Your application is now running on Azure!"
             echo ""
             print_info "Next steps:"
-            echo "  • azd has printed your application URL above"
-            echo "  • Set up production OAuth app with your Azure domain"
-            echo "  • Update GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET for production"
+            echo "  • Check the URL printed above"
+            echo "  • Update your production OAuth app with the Azure URL"
+            echo "  • Update callback URLs to match your deployment domain"
             echo ""
             echo -e "${BOLD}Useful commands:${NC}"
-            echo -e "  View logs:    ${CYAN}azd logs${NC}"
-            echo -e "  Redeploy:     ${CYAN}azd deploy${NC}"
-            echo -e "  Tear down:    ${CYAN}azd down${NC}"
+            echo -e "  View logs:      ${CYAN}azd logs${NC}"
+            echo -e "  Redeploy code:  ${CYAN}./scripts/deploy.sh${NC}"
+            echo -e "  Re-provision:   ${CYAN}azd provision${NC}"
+            echo -e "  Tear down:      ${CYAN}azd down${NC}"
             echo ""
         else
             print_error "Deployment failed"
@@ -1009,7 +1512,8 @@ deploy_to_azure() {
         fi
     else
         print_info "Skipping deployment. To deploy manually, run:"
-        echo "  azd up"
+        echo "  azd provision          # Provision infrastructure"
+        echo "  ./scripts/deploy.sh    # Build and deploy application"
     fi
 }
 
@@ -1066,6 +1570,56 @@ main() {
     # Change to repo root
     cd "$REPO_ROOT"
     
+    # Check if --deploy flag was used
+    if [[ "$SKIP_TO_DEPLOY" == true ]]; then
+        print_section "Quick Deploy Mode"
+        echo ""
+        print_info "Skipping configuration - deploying with existing .env"
+        echo ""
+        
+        # Verify .env exists
+        if [[ ! -f "$ENV_FILE" ]]; then
+            print_error ".env file not found!"
+            echo ""
+            print_info "The --deploy flag requires an existing .env file."
+            print_info "Run without --deploy flag to configure first:"
+            echo ""
+            echo "  ./scripts/full-setup.sh"
+            echo ""
+            exit 1
+        fi
+        
+        # Load existing .env
+        print_step "Loading configuration from .env..."
+        load_and_validate_config
+        print_success "Configuration loaded"
+        echo ""
+        
+        # Check version
+        check_version
+        
+        # Set deployment target to Azure
+        DEPLOYMENT_TARGET="azure"
+        
+        # Install dependencies
+        install_dependencies
+        
+        # Build packages
+        build_packages
+        
+        # Deploy to Azure
+        deploy_to_azure
+        
+        # Print summary
+        print_summary
+        
+        return 0
+    fi
+    
+    # Normal interactive setup flow
+    # Check version and prompt for update if needed
+    check_version
+    
     # Step 1: Choose deployment target
     select_deployment_target
     
@@ -1075,21 +1629,38 @@ main() {
     # Step 3: GitHub OAuth
     setup_github_oauth
     
-    # Step 4: GitHub PAT
-    setup_github_pat
+    # Step 4: GitHub PAT (skip if Azure and dev already done)
+    if [[ "$GITHUB_PAT_DONE" != true ]]; then
+        setup_github_pat
+    fi
     
-    # Step 5 (local) or 4 (azure): Admin users
-    setup_admin_user
+    # Step 5 (local) or 4 (azure): Admin users (skip if Azure and dev already done)
+    if [[ "$GITHUB_PAT_DONE" != true ]]; then
+        setup_admin_user
+    fi
     
     # Step 5 (azure) or skip: Dispatch repo (only needed for Azure)
     if [[ "$DEPLOYMENT_TARGET" == "azure" ]]; then
-        setup_dispatch_repo
+        # Skip if dev setup already done (assume same dispatch repo)
+        if [[ "$GITHUB_PAT_DONE" != true ]]; then
+            setup_dispatch_repo
+        else
+            # Dev setup done - use existing dispatch repo from .env
+            DISPATCH_TARGET_REPO="${DISPATCH_TARGET_REPO:-Template-Doctor/template-doctor}"
+            print_info "Using existing DISPATCH_TARGET_REPO from development setup"
+        fi
     else
         DISPATCH_TARGET_REPO="<add-manually>"
     fi
     
     # MongoDB setup
     setup_mongodb
+    
+    # Load existing config and validate before summary
+    load_and_validate_config
+    
+    # Show configuration summary and get confirmation
+    show_config_summary
     
     # Create .env file
     create_env_file

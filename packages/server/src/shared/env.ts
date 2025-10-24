@@ -11,15 +11,43 @@ export interface AppEnv {
 
 let cached: AppEnv | null = null;
 
+/**
+ * Determine which GitHub OAuth credentials to use based on environment.
+ * In production (NODE_ENV=production or Azure), prefer *_PROD variables.
+ * Falls back to standard GITHUB_CLIENT_ID/SECRET if _PROD variants not set.
+ */
+function getOAuthCredentials(): { clientId?: string; clientSecret?: string } {
+  const isProduction =
+    process.env.NODE_ENV === 'production' ||
+    process.env.WEBSITE_INSTANCE_ID || // Azure App Service
+    process.env.CONTAINER_APP_NAME; // Azure Container Apps
+
+  if (isProduction) {
+    // Production: use _PROD if available, fall back to dev
+    const clientId = process.env.GITHUB_CLIENT_ID_PROD || process.env.GITHUB_CLIENT_ID;
+    const clientSecret = process.env.GITHUB_CLIENT_SECRET_PROD || process.env.GITHUB_CLIENT_SECRET;
+    return { clientId, clientSecret };
+  } else {
+    // Development: use standard variables
+    return {
+      clientId: process.env.GITHUB_CLIENT_ID,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET,
+    };
+  }
+}
+
 export function loadEnv(): AppEnv {
   if (cached) return cached;
+  
+  const { clientId, clientSecret } = getOAuthCredentials();
+  
   const required: Array<[keyof AppEnv, boolean]> = [
     ['GITHUB_CLIENT_ID', false], // not all endpoints need both at cold start
     ['GITHUB_CLIENT_SECRET', false],
   ];
   const env: AppEnv = {
-    GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
-    GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
+    GITHUB_CLIENT_ID: clientId,
+    GITHUB_CLIENT_SECRET: clientSecret,
     GH_WORKFLOW_TOKEN: process.env.GH_WORKFLOW_TOKEN,
     // Include common dev ports (4000 Vite primary, 5173 Vite default fallback) plus legacy 8080 for backward compatibility
     GITHUB_OAUTH_ALLOWED_ORIGINS: (

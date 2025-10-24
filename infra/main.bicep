@@ -56,7 +56,11 @@ module cosmos './database.bicep' = {
   params: {
     location: location
     environmentName: environmentName
+    logAnalyticsWorkspaceId: containerAppsEnvironment.outputs.logAnalyticsWorkspaceId
   }
+  dependsOn: [
+    containerAppsEnvironment
+  ]
 }
 
 // Container Apps Environment

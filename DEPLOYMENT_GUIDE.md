@@ -73,13 +73,19 @@
 
 4. **Deploy to Azure**
    ```bash
-   cd infra
-   azd up
+   azd provision
    ```
    - Enter environment name (e.g., "prod")
    - Select your Azure subscription
    - Choose Azure region (e.g., "eastus")
-   - Wait 5-10 minutes for deployment
+   - Wait 5-10 minutes for infrastructure provisioning
+   
+   Then deploy the application:
+   ```bash
+   ./scripts/deploy.sh
+   ```
+   - This builds and deploys the container image
+   - Wait 2-5 minutes for deployment
 
 5. **Done!**
    - Azure automatically provisions everything:
@@ -89,6 +95,25 @@
      - ✅ All required permissions
    - Note the URL displayed at the end of deployment
    - Navigate to your Template Doctor instance
+
+### Quick Redeploy (Already Configured)
+
+If you already have `.env` configured and just need to redeploy:
+
+```bash
+./scripts/full-setup.sh --deploy
+```
+
+This command:
+- ✅ Skips all configuration prompts
+- ✅ Validates existing `.env` file
+- ✅ Checks for version updates
+- ✅ Installs dependencies and builds packages
+- ✅ Runs `azd provision` (infrastructure)
+- ✅ Runs `./scripts/deploy.sh` (container build + deploy)
+- ✅ Displays your application URL
+
+**When to use**: After initial setup, for quick updates or redeployments.
 
 ---
 
@@ -161,6 +186,20 @@
 
 **Problem**: "GitHub OAuth not working"
 - ✅ Solution: Verify callback URL in GitHub OAuth app matches your deployed URL exactly
+
+**Problem**: "Container App provisioning timeout"
+- ✅ Solution: The setup script uses two-step deployment (`azd provision` then `deploy.sh`) to avoid timeout issues
+
+**Problem**: "Deployment stuck or blocking retries"
+- ✅ Solution: Cancel stuck deployment:
+  ```bash
+  az deployment group cancel --resource-group <rg-name> --name container-app
+  ```
+  Or recreate everything:
+  ```bash
+  azd down --force --purge
+  ./scripts/full-setup.sh --deploy
+  ```
 
 ---
 
