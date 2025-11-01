@@ -18,6 +18,7 @@
     "Phi-4",
     "Phi-4-mini-instruct",
     "Mistral-small-2503",
-    "Mistral-medium-2505"
+    "Mistral-medium-2505",
+    "Mistral-document-ai-2505"
   ]
 }
